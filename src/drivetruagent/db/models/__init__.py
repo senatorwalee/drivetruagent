@@ -11,6 +11,7 @@ from drivetruagent.db.models.catalog import (
     Option,
     OptionGroup,
 )
+from drivetruagent.db.models.events import AgentEvent
 from drivetruagent.db.models.ordering import (
     Cart,
     CartLine,
@@ -21,6 +22,7 @@ from drivetruagent.db.models.orders import Order, OrderLine, OrderLineOption
 from drivetruagent.db.models.policy import PendingAction
 
 __all__ = [
+    "AgentEvent",
     "Cart",
     "CartLine",
     "CartLineOption",

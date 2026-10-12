@@ -2,11 +2,15 @@ from pathlib import Path
 
 import pytest
 
-INTEGRATION_DIR = Path(__file__).parent / "integration"
+TESTS_DIR = Path(__file__).parent
+INTEGRATION_DIR = TESTS_DIR / "integration"
+EVALS_DIR = INTEGRATION_DIR / "evals"
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
-    """Mark everything under tests/integration, so `-m "not integration"` skips it."""
+    """Mark tests by folder, so `-m "not integration"` and `-m eval` work."""
     for item in items:
         if INTEGRATION_DIR in item.path.parents:
             item.add_marker(pytest.mark.integration)
+        if EVALS_DIR in item.path.parents:
+            item.add_marker(pytest.mark.eval)

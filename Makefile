@@ -1,4 +1,4 @@
-.PHONY: up down dev migrate seed lint format test test-unit check hooks
+.PHONY: up down dev migrate seed chat lint format test test-unit eval check hooks
 
 # Start and stop the local Postgres.
 up:
@@ -19,6 +19,10 @@ migrate:
 seed:
 	uv run python -m drivetruagent.seed
 
+# Talk to the agent in the terminal. Needs OPENAI_API_KEY in .env.
+chat:
+	uv run python -m drivetruagent.agent.chat
+
 lint:
 	uv run ruff check .
 	uv run ruff format --check .
@@ -28,13 +32,19 @@ format:
 	uv run ruff check --fix .
 	uv run ruff format .
 
-# All tests. The integration tests start their own Postgres container.
+# All tests except the evals. The integration tests start their own Postgres
+# container.
 test:
 	uv run pytest
 
 # Fast tests only: no Docker needed.
 test-unit:
-	uv run pytest -m "not integration"
+	uv run pytest -m "not integration and not eval"
+
+# Evals: whole conversations with the real model. Needs OPENAI_API_KEY and
+# costs money, so it is never part of `make test` or CI.
+eval:
+	uv run pytest -m eval -v
 
 # Everything CI runs. Use this before pushing.
 check: lint test

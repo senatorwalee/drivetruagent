@@ -2,7 +2,7 @@ from decimal import Decimal
 from functools import lru_cache
 from typing import Literal, Self
 
-from pydantic import Field, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from drivetruagent.policy.decisions import PolicyLimits
@@ -18,6 +18,14 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     # Sales tax as a fraction of the subtotal. The default is Ontario's HST.
     tax_rate: Decimal = Field(default=Decimal("0.13"), ge=0, lt=1)
+
+    # The agent. Without a key the ordering API still works; only the
+    # conversation endpoint is unavailable.
+    openai_api_key: SecretStr | None = None
+    openai_text_model: str = "gpt-6-luna"
+    restaurant_name: str = "Maple Lane Burgers"
+    # How many times the model may ask for tools within one customer turn.
+    agent_max_tool_rounds: int = Field(default=8, ge=1)
 
     # Policy limits. More than this many of one item on a line is unusual,
     # and the customer is asked to confirm it.

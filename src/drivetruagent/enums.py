@@ -42,6 +42,17 @@ class PendingActionStatus(StrEnum):
     ESCALATED = "escalated"
 
 
+class AgentEventKind(StrEnum):
+    """What one row of the agent's event log records."""
+
+    USER_MESSAGE = "user_message"
+    # One request to the model: which model, how long it took, token counts.
+    MODEL_CALL = "model_call"
+    TOOL_CALL = "tool_call"
+    TOOL_RESULT = "tool_result"
+    ASSISTANT_MESSAGE = "assistant_message"
+
+
 # A session in one of these states is still in progress. Every other state is
 # final: the session has ended and can never change again.
 ACTIVE_SESSION_STATES = frozenset(

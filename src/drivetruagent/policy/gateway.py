@@ -18,7 +18,11 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from drivetruagent.db.models import PendingAction
-from drivetruagent.enums import PendingActionStatus, SessionState
+from drivetruagent.enums import (
+    FINAL_SESSION_STATES,
+    PendingActionStatus,
+    SessionState,
+)
 from drivetruagent.ordering import cart as cart_rules
 from drivetruagent.ordering import orders as order_rules
 from drivetruagent.ordering.errors import OrderingError, PendingActionNotFound
@@ -40,11 +44,12 @@ from drivetruagent.policy.decisions import (
     PolicyResult,
 )
 from drivetruagent.policy.outcome import ActionOutcome, OutcomeError
-from drivetruagent.policy.rules import evaluate
+from drivetruagent.policy.rules import SESSION_ENDED, evaluate
 
 PENDING_ACTION_RESOLVED = "pending_action_resolved"
 PENDING_ACTION_STALE = "pending_action_stale"
 PENDING_ACTION_CANCELLED = "pending_action_cancelled"
+HUMAN_REQUESTED = "human_requested"
 
 
 async def execute(
@@ -144,6 +149,36 @@ async def cancel(
         rule=PENDING_ACTION_CANCELLED,
         message="Cancelled. Nothing was changed. Ask what the customer would like.",
         cart=snapshot,
+    )
+
+
+async def hand_to_human(
+    db: AsyncSession, session_id: uuid.UUID, reason: str, *, tax_rate: Decimal
+) -> ActionOutcome:
+    """End the session as handed off, because a person is needed or was asked for."""
+    customer_session = await lock_session(db, session_id)
+    if customer_session.state in FINAL_SESSION_STATES:
+        snapshot = await cart_rules.get_cart(db, session_id, tax_rate=tax_rate)
+        return _rejected(
+            PolicyResult(
+                Decision.REJECT,
+                SESSION_ENDED,
+                "This session has ended. Nothing more can be changed.",
+                {"state": customer_session.state.value},
+            ),
+            snapshot,
+        )
+    return await _escalate(
+        db,
+        session_id,
+        PolicyResult(
+            Decision.ESCALATE,
+            HUMAN_REQUESTED,
+            "Tell the customer a team member will be right with them.",
+            {"reason": reason},
+        ),
+        tax_rate,
+        end_reason=f"{HUMAN_REQUESTED}: {reason}"[:200],
     )
 
 
@@ -252,11 +287,19 @@ async def _hold_for_confirmation(
 
 
 async def _escalate(
-    db: AsyncSession, session_id: uuid.UUID, result: PolicyResult, tax_rate: Decimal
+    db: AsyncSession,
+    session_id: uuid.UUID,
+    result: PolicyResult,
+    tax_rate: Decimal,
+    *,
+    end_reason: str | None = None,
 ) -> ActionOutcome:
     await _supersede_pending(db, session_id)
     await end_session(
-        db, session_id, SessionState.HANDED_OFF, reason=result.rule or "escalated"
+        db,
+        session_id,
+        SessionState.HANDED_OFF,
+        reason=end_reason or result.rule or "escalated",
     )
     snapshot = await cart_rules.get_cart(db, session_id, tax_rate=tax_rate)
     return ActionOutcome(

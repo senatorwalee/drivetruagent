@@ -13,6 +13,7 @@ import httpx
 import pytest
 from alembic import command
 from alembic.config import Config
+from fastapi import FastAPI
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -78,8 +79,12 @@ async def db_session(migrated_database: str) -> AsyncIterator[AsyncSession]:
 
 
 @pytest.fixture
-async def client(db_session: AsyncSession) -> AsyncIterator[httpx.AsyncClient]:
-    """An HTTP client for the app, with requests using the test's session."""
+def app(db_session: AsyncSession) -> FastAPI:
+    """The app, wired to the test's database session and to fixed settings.
+
+    A test that needs the agent replaces the model as well:
+        app.dependency_overrides[get_model_client] = lambda: scripted_model
+    """
     app = create_app()
 
     async def use_test_session() -> AsyncIterator[AsyncSession]:
@@ -92,10 +97,20 @@ async def client(db_session: AsyncSession) -> AsyncIterator[httpx.AsyncClient]:
             raise
 
     app.dependency_overrides[get_session] = use_test_session
-    # Fixed settings, so API tests do not depend on a local .env file.
+    # Fixed settings, so API tests do not depend on a local .env file. No
+    # model key: the agent is unavailable unless a test supplies a model.
     app.dependency_overrides[get_settings] = lambda: Settings(
-        database_url="postgresql+psycopg://unused", tax_rate=TEST_TAX_RATE
+        database_url="postgresql+psycopg://unused",
+        tax_rate=TEST_TAX_RATE,
+        openai_api_key=None,
+        _env_file=None,  # pyright: ignore[reportCallIssue]
     )
+    return app
+
+
+@pytest.fixture
+async def client(app: FastAPI) -> AsyncIterator[httpx.AsyncClient]:
+    """An HTTP client that calls the app in memory."""
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
