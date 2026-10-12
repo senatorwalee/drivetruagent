@@ -35,3 +35,27 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+    "integration: needs Docker; runs against a real Postgres container",
+]
+
+[tool.ruff]
+target-version = "py313"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "F",     # pyflakes
+    "I",     # import sorting
+    "UP",    # modern Python syntax
+    "B",     # likely bugs
+    "SIM",   # simplifications
+    "ASYNC", # async mistakes
+    "RUF",   # ruff's own rules
+]
+
+[tool.pyright]
+include = ["src", "tests"]
+typeCheckingMode = "standard"
+pythonVersion = "3.13"
