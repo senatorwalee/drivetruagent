@@ -16,7 +16,8 @@ built piece by piece.
 | Piece | What it covers | State |
 |---|---|---|
 | 00 | Project setup, database connection, health endpoints, tests, CI | Done |
-| 01 | Menu, session, cart and order tables | Next |
+| 01a | Menu tables and the seed menu (20 items, English and Canadian French) | Done |
+| 01b | Session, cart and order tables | Next |
 | 02 | Cart logic and pricing | Planned |
 | 03 | Ordering API | Planned |
 | 04 | Policy engine: allow, reject, confirm, escalate | Planned |
@@ -44,6 +45,7 @@ cp .env.example .env     # local settings
 make hooks               # install the git hooks
 make up                  # start Postgres on localhost:5433
 make migrate             # apply database migrations
+make seed                # load the menu from data/menu.json
 make dev                 # run the API on http://127.0.0.1:8000
 ```
 
@@ -59,6 +61,7 @@ collide with a Postgres installed directly on your machine.
 | `make up` / `make down` | Start and stop the local Postgres |
 | `make dev` | Run the API with auto-reload |
 | `make migrate` | Apply all database migrations |
+| `make seed` | Load `data/menu.json` into the database; safe to run repeatedly |
 | `make lint` | Run ruff and pyright |
 | `make format` | Fix lint issues and format the code |
 | `make test` | Run every test (needs Docker) |
@@ -82,6 +85,21 @@ Three layers check every change:
 | Before each push (git hook) | The full test suite |
 | On each pushed commit (GitHub Actions) | Lint, format check, pyright, full test suite |
 
+## The menu is data
+
+The menu lives in `data/menu.json` and is loaded into the database with
+`make seed`. Nothing about the menu is written into a prompt.
+
+Each item lists the choices a customer can make about it. A choice that must
+be made and has no default (the size of the fries) is one the agent has to ask
+about. A choice with a default (regular style, plain seasoning) is filled in
+by the backend. Changing what the agent asks is therefore a data change.
+
+The file is validated in full before anything is written, and the load runs in
+one transaction. The database is made to match the file: items and options
+dropped from the file are deactivated, not deleted, because past orders refer
+to them.
+
 ## Health endpoints
 
 | Endpoint | Meaning |
@@ -96,7 +114,9 @@ src/drivetruagent/
 ├── main.py          builds the FastAPI app
 ├── config.py        settings from environment variables
 ├── api/             HTTP endpoints
-└── db/              engine, sessions and table models
+├── db/              engine, sessions and table models
+└── seed.py          loads the menu file into the database
+data/menu.json       the menu: items, choices, prices, aliases
 migrations/          Alembic migration scripts
 tests/               unit and integration tests
 ```

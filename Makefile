@@ -1,4 +1,4 @@
-.PHONY: up down dev migrate lint format test test-unit check hooks
+.PHONY: up down dev migrate seed lint format test test-unit check hooks
 
 # Start and stop the local Postgres.
 up:
@@ -14,6 +14,10 @@ dev:
 # Apply all database migrations to the local Postgres.
 migrate:
 	uv run alembic upgrade head
+
+# Load data/menu.json into the local Postgres. Safe to run repeatedly.
+seed:
+	uv run python -m drivetruagent.seed
 
 lint:
 	uv run ruff check .

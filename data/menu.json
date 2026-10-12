@@ -1,0 +1,1155 @@
+{
+  "categories": [
+    {
+      "code": "burgers",
+      "name": {
+        "en": "Burgers",
+        "fr": "Hamburgers"
+      },
+      "items": [
+        {
+          "code": "classic_burger",
+          "name": {
+            "en": "Classic burger",
+            "fr": "Hamburger classique"
+          },
+          "description": {
+            "en": "Beef patty, lettuce, tomato, pickles and house sauce.",
+            "fr": "Galette de bœuf, laitue, tomate, cornichons et sauce maison."
+          },
+          "base_price_cents": 549,
+          "aliases": {
+            "en": [
+              "burger",
+              "hamburger",
+              "classic",
+              "plain burger"
+            ],
+            "fr": [
+              "hamburger",
+              "burger",
+              "classique"
+            ]
+          },
+          "option_groups": [
+            {
+              "code": "extras",
+              "name": {
+                "en": "Extras",
+                "fr": "Suppléments"
+              },
+              "min_select": 0,
+              "max_select": 3,
+              "options": [
+                {
+                  "code": "cheese",
+                  "name": {
+                    "en": "Cheese",
+                    "fr": "Fromage"
+                  },
+                  "price_delta_cents": 75
+                },
+                {
+                  "code": "bacon",
+                  "name": {
+                    "en": "Bacon",
+                    "fr": "Bacon"
+                  },
+                  "price_delta_cents": 125
+                },
+                {
+                  "code": "extra_patty",
+                  "name": {
+                    "en": "Extra patty",
+                    "fr": "Galette supplémentaire"
+                  },
+                  "price_delta_cents": 200
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "cheeseburger",
+          "name": {
+            "en": "Cheeseburger",
+            "fr": "Hamburger au fromage"
+          },
+          "description": {
+            "en": "Beef patty with melted cheese, pickles and house sauce.",
+            "fr": "Galette de bœuf avec fromage fondu, cornichons et sauce maison."
+          },
+          "base_price_cents": 599,
+          "aliases": {
+            "en": [
+              "burger",
+              "cheese burger"
+            ],
+            "fr": [
+              "cheeseburger",
+              "burger au fromage",
+              "hamburger",
+              "burger"
+            ]
+          },
+          "option_groups": [
+            {
+              "code": "extras",
+              "name": {
+                "en": "Extras",
+                "fr": "Suppléments"
+              },
+              "min_select": 0,
+              "max_select": 2,
+              "options": [
+                {
+                  "code": "bacon",
+                  "name": {
+                    "en": "Bacon",
+                    "fr": "Bacon"
+                  },
+                  "price_delta_cents": 125
+                },
+                {
+                  "code": "extra_patty",
+                  "name": {
+                    "en": "Extra patty",
+                    "fr": "Galette supplémentaire"
+                  },
+                  "price_delta_cents": 200
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "double_cheeseburger",
+          "name": {
+            "en": "Double cheeseburger",
+            "fr": "Double hamburger au fromage"
+          },
+          "description": {
+            "en": "Two beef patties with two slices of cheese.",
+            "fr": "Deux galettes de bœuf avec deux tranches de fromage."
+          },
+          "base_price_cents": 799,
+          "aliases": {
+            "en": [
+              "burger",
+              "double",
+              "double cheese burger",
+              "double burger"
+            ],
+            "fr": [
+              "double cheeseburger",
+              "double",
+              "double burger",
+              "hamburger",
+              "burger"
+            ]
+          },
+          "option_groups": [
+            {
+              "code": "extras",
+              "name": {
+                "en": "Extras",
+                "fr": "Suppléments"
+              },
+              "min_select": 0,
+              "max_select": 1,
+              "options": [
+                {
+                  "code": "bacon",
+                  "name": {
+                    "en": "Bacon",
+                    "fr": "Bacon"
+                  },
+                  "price_delta_cents": 125
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "chicken_burger",
+          "name": {
+            "en": "Crispy chicken burger",
+            "fr": "Burger au poulet croustillant"
+          },
+          "description": {
+            "en": "Breaded chicken fillet with lettuce and mayonnaise.",
+            "fr": "Filet de poulet pané avec laitue et mayonnaise."
+          },
+          "base_price_cents": 649,
+          "aliases": {
+            "en": [
+              "burger",
+              "chicken burger",
+              "chicken sandwich",
+              "crispy chicken"
+            ],
+            "fr": [
+              "burger au poulet",
+              "sandwich au poulet",
+              "poulet croustillant",
+              "burger"
+            ]
+          },
+          "option_groups": [
+            {
+              "code": "spice",
+              "name": {
+                "en": "Spice level",
+                "fr": "Niveau d'épices"
+              },
+              "min_select": 1,
+              "max_select": 1,
+              "options": [
+                {
+                  "code": "mild",
+                  "name": {
+                    "en": "Mild",
+                    "fr": "Doux"
+                  },
+                  "default": true
+                },
+                {
+                  "code": "spicy",
+                  "name": {
+                    "en": "Spicy",
+                    "fr": "Épicé"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "veggie_burger",
+          "name": {
+            "en": "Veggie burger",
+            "fr": "Burger végétarien"
+          },
+          "description": {
+            "en": "Plant-based patty with lettuce, tomato and house sauce.",
+            "fr": "Galette végétale avec laitue, tomate et sauce maison."
+          },
+          "base_price_cents": 629,
+          "aliases": {
+            "en": [
+              "burger",
+              "vegetarian burger",
+              "veggie",
+              "plant burger"
+            ],
+            "fr": [
+              "végéburger",
+              "burger végé",
+              "végé",
+              "burger"
+            ]
+          },
+          "option_groups": [
+            {
+              "code": "extras",
+              "name": {
+                "en": "Extras",
+                "fr": "Suppléments"
+              },
+              "min_select": 0,
+              "max_select": 1,
+              "options": [
+                {
+                  "code": "cheese",
+                  "name": {
+                    "en": "Cheese",
+                    "fr": "Fromage"
+                  },
+                  "price_delta_cents": 75
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "sides",
+      "name": {
+        "en": "Sides",
+        "fr": "Accompagnements"
+      },
+      "items": [
+        {
+          "code": "fries",
+          "name": {
+            "en": "Fries",
+            "fr": "Frites"
+          },
+          "base_price_cents": 249,
+          "aliases": {
+            "en": [
+              "fry",
+              "french fries",
+              "chips"
+            ],
+            "fr": [
+              "frite",
+              "patates frites"
+            ]
+          },
+          "option_groups": [
+            {
+              "code": "size",
+              "name": {
+                "en": "Size",
+                "fr": "Format"
+              },
+              "min_select": 1,
+              "max_select": 1,
+              "options": [
+                {
+                  "code": "small",
+                  "name": {
+                    "en": "Small",
+                    "fr": "Petit"
+                  }
+                },
+                {
+                  "code": "medium",
+                  "name": {
+                    "en": "Medium",
+                    "fr": "Moyen"
+                  },
+                  "price_delta_cents": 70
+                },
+                {
+                  "code": "large",
+                  "name": {
+                    "en": "Large",
+                    "fr": "Grand"
+                  },
+                  "price_delta_cents": 130
+                }
+              ]
+            },
+            {
+              "code": "style",
+              "name": {
+                "en": "Style",
+                "fr": "Style"
+              },
+              "min_select": 1,
+              "max_select": 1,
+              "options": [
+                {
+                  "code": "regular",
+                  "name": {
+                    "en": "Regular",
+                    "fr": "Régulières"
+                  },
+                  "default": true
+                },
+                {
+                  "code": "curly",
+                  "name": {
+                    "en": "Curly",
+                    "fr": "Frisées"
+                  },
+                  "price_delta_cents": 50
+                },
+                {
+                  "code": "waffle",
+                  "name": {
+                    "en": "Waffle",
+                    "fr": "Gaufrées"
+                  },
+                  "price_delta_cents": 50
+                }
+              ]
+            },
+            {
+              "code": "seasoning",
+              "name": {
+                "en": "Seasoning",
+                "fr": "Assaisonnement"
+              },
+              "min_select": 1,
+              "max_select": 1,
+              "options": [
+                {
+                  "code": "plain",
+                  "name": {
+                    "en": "Plain",
+                    "fr": "Nature"
+                  },
+                  "default": true
+                },
+                {
+                  "code": "seasoned",
+                  "name": {
+                    "en": "Seasoned",
+                    "fr": "Assaisonnées"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "onion_rings",
+          "name": {
+            "en": "Onion rings",
+            "fr": "Rondelles d'oignon"
+          },
+          "base_price_cents": 329,
+          "aliases": {
+            "en": [
+              "rings",
+              "onion ring"
+            ],
+            "fr": [
+              "rondelles",
+              "oignons frits"
+            ]
+          },
+          "option_groups": [
+            {
+              "code": "size",
+              "name": {
+                "en": "Size",
+                "fr": "Format"
+              },
+              "min_select": 1,
+              "max_select": 1,
+              "options": [
+                {
+                  "code": "regular",
+                  "name": {
+                    "en": "Regular",
+                    "fr": "Régulier"
+                  }
+                },
+                {
+                  "code": "large",
+                  "name": {
+                    "en": "Large",
+                    "fr": "Grand"
+                  },
+                  "price_delta_cents": 120
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "chicken_nuggets",
+          "name": {
+            "en": "Chicken nuggets",
+            "fr": "Croquettes de poulet"
+          },
+          "base_price_cents": 449,
+          "aliases": {
+            "en": [
+              "nuggets",
+              "nugget",
+              "chicken bites"
+            ],
+            "fr": [
+              "croquettes",
+              "pépites de poulet",
+              "nuggets"
+            ]
+          },
+          "option_groups": [
+            {
+              "code": "count",
+              "name": {
+                "en": "Pieces",
+                "fr": "Morceaux"
+              },
+              "min_select": 1,
+              "max_select": 1,
+              "options": [
+                {
+                  "code": "6_pieces",
+                  "name": {
+                    "en": "6 pieces",
+                    "fr": "6 morceaux"
+                  }
+                },
+                {
+                  "code": "9_pieces",
+                  "name": {
+                    "en": "9 pieces",
+                    "fr": "9 morceaux"
+                  },
+                  "price_delta_cents": 200
+                },
+                {
+                  "code": "12_pieces",
+                  "name": {
+                    "en": "12 pieces",
+                    "fr": "12 morceaux"
+                  },
+                  "price_delta_cents": 350
+                }
+              ]
+            },
+            {
+              "code": "dip",
+              "name": {
+                "en": "Dipping sauce",
+                "fr": "Sauce à tremper"
+              },
+              "min_select": 0,
+              "max_select": 2,
+              "options": [
+                {
+                  "code": "ketchup",
+                  "name": {
+                    "en": "Ketchup",
+                    "fr": "Ketchup"
+                  }
+                },
+                {
+                  "code": "barbecue",
+                  "name": {
+                    "en": "Barbecue",
+                    "fr": "Barbecue"
+                  }
+                },
+                {
+                  "code": "honey_mustard",
+                  "name": {
+                    "en": "Honey mustard",
+                    "fr": "Miel et moutarde"
+                  }
+                },
+                {
+                  "code": "sweet_chili",
+                  "name": {
+                    "en": "Sweet chili",
+                    "fr": "Chili doux"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "side_salad",
+          "name": {
+            "en": "Side salad",
+            "fr": "Salade d'accompagnement"
+          },
+          "base_price_cents": 349,
+          "aliases": {
+            "en": [
+              "salad",
+              "garden salad"
+            ],
+            "fr": [
+              "salade",
+              "petite salade"
+            ]
+          },
+          "option_groups": [
+            {
+              "code": "dressing",
+              "name": {
+                "en": "Dressing",
+                "fr": "Vinaigrette"
+              },
+              "min_select": 1,
+              "max_select": 1,
+              "options": [
+                {
+                  "code": "vinaigrette",
+                  "name": {
+                    "en": "Vinaigrette",
+                    "fr": "Vinaigrette classique"
+                  },
+                  "default": true
+                },
+                {
+                  "code": "ranch",
+                  "name": {
+                    "en": "Ranch",
+                    "fr": "Ranch"
+                  }
+                },
+                {
+                  "code": "none",
+                  "name": {
+                    "en": "No dressing",
+                    "fr": "Sans vinaigrette"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "drinks",
+      "name": {
+        "en": "Drinks",
+        "fr": "Boissons"
+      },
+      "items": [
+        {
+          "code": "cola",
+          "name": {
+            "en": "Cola",
+            "fr": "Cola"
+          },
+          "base_price_cents": 199,
+          "aliases": {
+            "en": [
+              "coke",
+              "pop",
+              "soda",
+              "soft drink"
+            ],
+            "fr": [
+              "coke",
+              "liqueur",
+              "boisson gazeuse"
+            ]
+          },
+          "option_groups": [
+            {
+              "code": "size",
+              "name": {
+                "en": "Size",
+                "fr": "Format"
+              },
+              "min_select": 1,
+              "max_select": 1,
+              "options": [
+                {
+                  "code": "small",
+                  "name": {
+                    "en": "Small",
+                    "fr": "Petit"
+                  }
+                },
+                {
+                  "code": "medium",
+                  "name": {
+                    "en": "Medium",
+                    "fr": "Moyen"
+                  },
+                  "price_delta_cents": 40
+                },
+                {
+                  "code": "large",
+                  "name": {
+                    "en": "Large",
+                    "fr": "Grand"
+                  },
+                  "price_delta_cents": 80
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "lemon_lime_soda",
+          "name": {
+            "en": "Lemon-lime soda",
+            "fr": "Boisson gazeuse citron-lime"
+          },
+          "base_price_cents": 199,
+          "aliases": {
+            "en": [
+              "sprite",
+              "lemon lime",
+              "pop",
+              "soda",
+              "soft drink"
+            ],
+            "fr": [
+              "sprite",
+              "citron-lime",
+              "liqueur",
+              "boisson gazeuse"
+            ]
+          },
+          "option_groups": [
+            {
+              "code": "size",
+              "name": {
+                "en": "Size",
+                "fr": "Format"
+              },
+              "min_select": 1,
+              "max_select": 1,
+              "options": [
+                {
+                  "code": "small",
+                  "name": {
+                    "en": "Small",
+                    "fr": "Petit"
+                  }
+                },
+                {
+                  "code": "medium",
+                  "name": {
+                    "en": "Medium",
+                    "fr": "Moyen"
+                  },
+                  "price_delta_cents": 40
+                },
+                {
+                  "code": "large",
+                  "name": {
+                    "en": "Large",
+                    "fr": "Grand"
+                  },
+                  "price_delta_cents": 80
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "iced_tea",
+          "name": {
+            "en": "Iced tea",
+            "fr": "Thé glacé"
+          },
+          "base_price_cents": 219,
+          "aliases": {
+            "en": [
+              "ice tea",
+              "tea"
+            ],
+            "fr": [
+              "thé froid",
+              "thé"
+            ]
+          },
+          "option_groups": [
+            {
+              "code": "size",
+              "name": {
+                "en": "Size",
+                "fr": "Format"
+              },
+              "min_select": 1,
+              "max_select": 1,
+              "options": [
+                {
+                  "code": "small",
+                  "name": {
+                    "en": "Small",
+                    "fr": "Petit"
+                  }
+                },
+                {
+                  "code": "medium",
+                  "name": {
+                    "en": "Medium",
+                    "fr": "Moyen"
+                  },
+                  "price_delta_cents": 40
+                },
+                {
+                  "code": "large",
+                  "name": {
+                    "en": "Large",
+                    "fr": "Grand"
+                  },
+                  "price_delta_cents": 80
+                }
+              ]
+            },
+            {
+              "code": "sweetness",
+              "name": {
+                "en": "Sweetness",
+                "fr": "Sucre"
+              },
+              "min_select": 1,
+              "max_select": 1,
+              "options": [
+                {
+                  "code": "sweetened",
+                  "name": {
+                    "en": "Sweetened",
+                    "fr": "Sucré"
+                  },
+                  "default": true
+                },
+                {
+                  "code": "unsweetened",
+                  "name": {
+                    "en": "Unsweetened",
+                    "fr": "Non sucré"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "orange_juice",
+          "name": {
+            "en": "Orange juice",
+            "fr": "Jus d'orange"
+          },
+          "base_price_cents": 259,
+          "aliases": {
+            "en": [
+              "oj",
+              "juice"
+            ],
+            "fr": [
+              "jus"
+            ]
+          },
+          "option_groups": [
+            {
+              "code": "size",
+              "name": {
+                "en": "Size",
+                "fr": "Format"
+              },
+              "min_select": 1,
+              "max_select": 1,
+              "options": [
+                {
+                  "code": "small",
+                  "name": {
+                    "en": "Small",
+                    "fr": "Petit"
+                  }
+                },
+                {
+                  "code": "large",
+                  "name": {
+                    "en": "Large",
+                    "fr": "Grand"
+                  },
+                  "price_delta_cents": 90
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "coffee",
+          "name": {
+            "en": "Coffee",
+            "fr": "Café"
+          },
+          "base_price_cents": 179,
+          "aliases": {
+            "en": [
+              "hot coffee",
+              "regular coffee"
+            ],
+            "fr": [
+              "café filtre"
+            ]
+          },
+          "option_groups": [
+            {
+              "code": "size",
+              "name": {
+                "en": "Size",
+                "fr": "Format"
+              },
+              "min_select": 1,
+              "max_select": 1,
+              "options": [
+                {
+                  "code": "small",
+                  "name": {
+                    "en": "Small",
+                    "fr": "Petit"
+                  }
+                },
+                {
+                  "code": "medium",
+                  "name": {
+                    "en": "Medium",
+                    "fr": "Moyen"
+                  },
+                  "price_delta_cents": 40
+                },
+                {
+                  "code": "large",
+                  "name": {
+                    "en": "Large",
+                    "fr": "Grand"
+                  },
+                  "price_delta_cents": 80
+                }
+              ]
+            },
+            {
+              "code": "milk",
+              "name": {
+                "en": "Milk",
+                "fr": "Lait"
+              },
+              "min_select": 1,
+              "max_select": 1,
+              "options": [
+                {
+                  "code": "none",
+                  "name": {
+                    "en": "Black",
+                    "fr": "Noir"
+                  },
+                  "default": true
+                },
+                {
+                  "code": "milk",
+                  "name": {
+                    "en": "Milk",
+                    "fr": "Lait"
+                  }
+                },
+                {
+                  "code": "cream",
+                  "name": {
+                    "en": "Cream",
+                    "fr": "Crème"
+                  }
+                },
+                {
+                  "code": "oat",
+                  "name": {
+                    "en": "Oat milk",
+                    "fr": "Boisson d'avoine"
+                  },
+                  "price_delta_cents": 50
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "bottled_water",
+          "name": {
+            "en": "Bottled water",
+            "fr": "Bouteille d'eau"
+          },
+          "base_price_cents": 149,
+          "aliases": {
+            "en": [
+              "water",
+              "bottle of water"
+            ],
+            "fr": [
+              "eau",
+              "eau en bouteille"
+            ]
+          },
+          "option_groups": []
+        },
+        {
+          "code": "milkshake",
+          "name": {
+            "en": "Milkshake",
+            "fr": "Lait frappé"
+          },
+          "base_price_cents": 399,
+          "aliases": {
+            "en": [
+              "shake",
+              "milk shake"
+            ],
+            "fr": [
+              "milkshake",
+              "frappé"
+            ]
+          },
+          "option_groups": [
+            {
+              "code": "size",
+              "name": {
+                "en": "Size",
+                "fr": "Format"
+              },
+              "min_select": 1,
+              "max_select": 1,
+              "options": [
+                {
+                  "code": "small",
+                  "name": {
+                    "en": "Small",
+                    "fr": "Petit"
+                  }
+                },
+                {
+                  "code": "large",
+                  "name": {
+                    "en": "Large",
+                    "fr": "Grand"
+                  },
+                  "price_delta_cents": 120
+                }
+              ]
+            },
+            {
+              "code": "flavour",
+              "name": {
+                "en": "Flavour",
+                "fr": "Saveur"
+              },
+              "min_select": 1,
+              "max_select": 1,
+              "options": [
+                {
+                  "code": "vanilla",
+                  "name": {
+                    "en": "Vanilla",
+                    "fr": "Vanille"
+                  }
+                },
+                {
+                  "code": "chocolate",
+                  "name": {
+                    "en": "Chocolate",
+                    "fr": "Chocolat"
+                  }
+                },
+                {
+                  "code": "strawberry",
+                  "name": {
+                    "en": "Strawberry",
+                    "fr": "Fraise"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "desserts",
+      "name": {
+        "en": "Desserts",
+        "fr": "Desserts"
+      },
+      "items": [
+        {
+          "code": "apple_pie",
+          "name": {
+            "en": "Apple pie",
+            "fr": "Tarte aux pommes"
+          },
+          "base_price_cents": 199,
+          "aliases": {
+            "en": [
+              "pie"
+            ],
+            "fr": [
+              "tarte",
+              "chausson aux pommes"
+            ]
+          },
+          "option_groups": []
+        },
+        {
+          "code": "sundae",
+          "name": {
+            "en": "Sundae",
+            "fr": "Sundae"
+          },
+          "base_price_cents": 299,
+          "aliases": {
+            "en": [
+              "ice cream sundae"
+            ],
+            "fr": [
+              "coupe glacée"
+            ]
+          },
+          "option_groups": [
+            {
+              "code": "topping",
+              "name": {
+                "en": "Topping",
+                "fr": "Garniture"
+              },
+              "min_select": 1,
+              "max_select": 1,
+              "options": [
+                {
+                  "code": "chocolate",
+                  "name": {
+                    "en": "Chocolate",
+                    "fr": "Chocolat"
+                  }
+                },
+                {
+                  "code": "caramel",
+                  "name": {
+                    "en": "Caramel",
+                    "fr": "Caramel"
+                  }
+                },
+                {
+                  "code": "strawberry",
+                  "name": {
+                    "en": "Strawberry",
+                    "fr": "Fraise"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "cookie",
+          "name": {
+            "en": "Chocolate chip cookie",
+            "fr": "Biscuit aux pépites de chocolat"
+          },
+          "base_price_cents": 149,
+          "aliases": {
+            "en": [
+              "cookie",
+              "chocolate cookie"
+            ],
+            "fr": [
+              "biscuit",
+              "biscuit au chocolat"
+            ]
+          },
+          "option_groups": []
+        },
+        {
+          "code": "soft_serve_cone",
+          "name": {
+            "en": "Soft-serve cone",
+            "fr": "Cornet de crème glacée molle"
+          },
+          "base_price_cents": 179,
+          "aliases": {
+            "en": [
+              "ice cream cone",
+              "cone",
+              "soft serve",
+              "ice cream"
+            ],
+            "fr": [
+              "cornet",
+              "crème glacée",
+              "crème molle"
+            ]
+          },
+          "option_groups": []
+        }
+      ]
+    }
+  ]
+}
