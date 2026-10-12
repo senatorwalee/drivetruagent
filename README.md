@@ -20,8 +20,8 @@ built piece by piece.
 | 01b | Session, cart and order tables | Done |
 | 02 | Cart logic, pricing and order submission | Done |
 | 03 | Ordering API and menu search | Done |
-| 04 | Policy engine: allow, reject, confirm, escalate | Next |
-| 05 | Text-mode agent and first evals | Planned |
+| 04 | Policy engine: allow, reject, confirm, escalate | Done |
+| 05 | Text-mode agent and first evals | Next |
 | Later | Stock reservations, voice, human handoff, knowledge search, tracing | Planned |
 
 ## Stack
@@ -142,6 +142,43 @@ How they behave:
 - **Tax is rounded once**, on the subtotal, so subtotal plus tax always
   equals the total to the cent.
 
+## Policy engine
+
+The model proposes; code decides. Every action the agent proposes goes
+through `src/drivetruagent/policy/` and gets one of four decisions:
+
+| Decision | Meaning | What happens |
+|---|---|---|
+| `allow` | Fine | The action runs and the new cart comes back |
+| `reject` | Not possible | Nothing changes; the reason comes back as a code |
+| `confirm` | Unusual; check with the customer first | Nothing changes; the action is stored and its id comes back |
+| `escalate` | A person should take over | The session ends as handed off |
+
+None of these rules live in a prompt. A model that ignores its instructions
+still cannot add 1,000 fries or submit an order nobody confirmed.
+
+**The rules**
+
+- **State.** Each session state allows only certain actions. An order can be
+  submitted only after the agent has read it back (`request_confirmation`),
+  and any cart change means reading it back again.
+- **Quantity.** More than 10 of one item is unusual and is confirmed first.
+  More than 25, or a cart of more than 50 items, is extreme: the customer is
+  still asked first, because mishearing is the likeliest cause, and if they
+  say yes a person takes over. The three numbers are settings.
+- **No prices.** The actions are a fixed set of typed shapes, and none has a
+  field for a price, a discount or a total.
+
+**Confirming**
+
+When the decision is `confirm`, the action itself is stored. If the customer
+says yes, that stored copy is what runs, so it cannot change between asking
+and confirming. A stored action goes stale as soon as the cart changes or
+another action is proposed, so "yes" always answers the question just asked.
+
+Every proposal returns the same shape whatever the decision: the decision,
+the rule behind it, a short instruction for the agent, and the current cart.
+
 ## API
 
 Run `make dev` and open <http://127.0.0.1:8000/docs> to try these.
@@ -157,9 +194,16 @@ Run `make dev` and open <http://127.0.0.1:8000/docs> to try these.
 | `DELETE /sessions/{id}/cart/lines/{line_no}` | Remove a line |
 | `POST /sessions/{id}/order` | Submit the cart |
 | `GET /orders/{id}` | Read a submitted order |
+| `POST /sessions/{id}/actions` | Propose an action; returns the policy decision |
+| `POST /sessions/{id}/pending-actions/{pid}/confirm` | The customer said yes to a held action |
+| `POST /sessions/{id}/pending-actions/{pid}/cancel` | The customer said no |
 | `GET /menu` | The whole menu by category |
 | `GET /menu/search?q=` | Find items matching what a customer said |
 | `GET /menu/items/{code}` | One item with its choices |
+
+The three action endpoints are the agent's path and go through the policy
+engine. The cart endpoints act directly and are for staff and back-office
+use, where a person has already made the judgement.
 
 No endpoint holds a rule: each calls an ordering function, commits, and
 returns. The agent will call the same functions in-process, so the HTTP API
@@ -207,6 +251,7 @@ src/drivetruagent/
 ├── api/             HTTP endpoints and error mapping
 ├── db/              engine, sessions and table models
 ├── ordering/        the rules: sessions, carts, pricing, orders, menu search
+├── policy/          allow, reject, confirm or escalate each proposed action
 └── seed.py          loads the menu file into the database
 data/menu.json       the menu: items, choices, prices, aliases
 migrations/          Alembic migration scripts
