@@ -51,13 +51,21 @@ def table_names(database_url: str) -> set[str]:
 def test_upgrade_creates_the_tables(scratch_database_url: str) -> None:
     command.upgrade(alembic_config(scratch_database_url), "head")
 
-    assert {
+    assert table_names(scratch_database_url) == {
+        "alembic_version",
         "menu_categories",
         "menu_items",
         "option_groups",
         "options",
         "menu_item_aliases",
-    } <= table_names(scratch_database_url)
+        "sessions",
+        "carts",
+        "cart_lines",
+        "cart_line_options",
+        "orders",
+        "order_lines",
+        "order_line_options",
+    }
 
 
 def test_downgrade_removes_everything(scratch_database_url: str) -> None:

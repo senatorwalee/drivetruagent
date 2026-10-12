@@ -17,8 +17,8 @@ built piece by piece.
 |---|---|---|
 | 00 | Project setup, database connection, health endpoints, tests, CI | Done |
 | 01a | Menu tables and the seed menu (20 items, English and Canadian French) | Done |
-| 01b | Session, cart and order tables | Next |
-| 02 | Cart logic and pricing | Planned |
+| 01b | Session, cart and order tables | Done |
+| 02 | Cart logic and pricing | Next |
 | 03 | Ordering API | Planned |
 | 04 | Policy engine: allow, reject, confirm, escalate | Planned |
 | 05 | Text-mode agent and first evals | Planned |
@@ -99,6 +99,19 @@ The file is validated in full before anything is written, and the load runs in
 one transaction. The database is made to match the file: items and options
 dropped from the file are deactivated, not deleted, because past orders refer
 to them.
+
+## Carts store choices; orders store frozen prices
+
+A cart line records the item, the quantity and the chosen options, and no
+price. Prices are worked out from the menu whenever they are needed, so a cart
+can never hold a stale total.
+
+When a cart is submitted, names and prices are copied into the order tables.
+From then on the order is history: a later menu change cannot alter it.
+
+The database itself refuses states that must never exist, for example two
+active sessions in one lane, a second order for a session, or an order whose
+total is not subtotal plus tax.
 
 ## Health endpoints
 
