@@ -11,11 +11,25 @@ from drivetruagent.db.models.catalog import (
     Option,
     OptionGroup,
 )
+from drivetruagent.db.models.ordering import (
+    Cart,
+    CartLine,
+    CartLineOption,
+    CustomerSession,
+)
+from drivetruagent.db.models.orders import Order, OrderLine, OrderLineOption
 
 __all__ = [
+    "Cart",
+    "CartLine",
+    "CartLineOption",
+    "CustomerSession",
     "MenuCategory",
     "MenuItem",
     "MenuItemAlias",
     "Option",
     "OptionGroup",
+    "Order",
+    "OrderLine",
+    "OrderLineOption",
 ]
