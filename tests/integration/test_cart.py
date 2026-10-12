@@ -38,7 +38,7 @@ from drivetruagent.ordering.errors import (
 from drivetruagent.ordering.sessions import end_session, open_session
 from drivetruagent.ordering.views import CartSnapshot, LineView
 
-TAX = Decimal("0.14975")
+TAX = Decimal("0.13")
 
 pytestmark = pytest.mark.usefixtures("menu")
 
@@ -147,11 +147,11 @@ async def test_cart_totals_cover_every_line(
         db_session, session_id, "cola", selections={"size": ["medium"]}, tax_rate=TAX
     )
 
-    # 2 x 379 + 239 = 997; tax 149.30 rounds to 149.
+    # 2 x 379 + 239 = 997; tax 129.61 rounds to 130.
     assert cart.item_count == 3
     assert cart.subtotal_cents == 997
-    assert cart.tax_cents == 149
-    assert cart.total_cents == 1146
+    assert cart.tax_cents == 130
+    assert cart.total_cents == 1127
 
 
 async def test_unknown_item_is_refused(

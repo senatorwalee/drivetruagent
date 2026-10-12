@@ -29,7 +29,7 @@ def line_total_cents(unit_price: int, quantity: int) -> int:
 def tax_cents(subtotal_cents: int, tax_rate: Decimal) -> int:
     """Tax on a subtotal, rounded half up to the nearest cent.
 
-    Decimal, not float: 0.14975 has no exact float form, and a price that is
+    Decimal, not float: 0.13 has no exact float form, and a price that is
     off by a cent now and then is a bug customers notice.
     """
     exact = Decimal(subtotal_cents) * tax_rate

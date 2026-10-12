@@ -15,7 +15,7 @@ from drivetruagent.ordering.sessions import open_session
 from drivetruagent.seed import load_menu, seed_menu
 from tests.integration.conftest import MENU_PATH
 
-TAX = Decimal("0.14975")
+TAX = Decimal("0.13")
 
 
 async def test_simultaneous_adds_get_distinct_line_numbers(
