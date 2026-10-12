@@ -19,8 +19,8 @@ built piece by piece.
 | 01a | Menu tables and the seed menu (20 items, English and Canadian French) | Done |
 | 01b | Session, cart and order tables | Done |
 | 02 | Cart logic, pricing and order submission | Done |
-| 03 | Ordering API | Next |
-| 04 | Policy engine: allow, reject, confirm, escalate | Planned |
+| 03 | Ordering API and menu search | Done |
+| 04 | Policy engine: allow, reject, confirm, escalate | Next |
 | 05 | Text-mode agent and first evals | Planned |
 | Later | Stock reservations, voice, human handoff, knowledge search, tracing | Planned |
 
@@ -142,6 +142,55 @@ How they behave:
 - **Tax is rounded once**, on the subtotal, so subtotal plus tax always
   equals the total to the cent.
 
+## API
+
+Run `make dev` and open <http://127.0.0.1:8000/docs> to try these.
+
+| Method and path | Does |
+|---|---|
+| `POST /sessions` | Open a session and its cart |
+| `GET /sessions/{id}` | Read a session |
+| `PATCH /sessions/{id}` | Set the session's language |
+| `GET /sessions/{id}/cart` | Read the cart, priced |
+| `POST /sessions/{id}/cart/lines` | Add an item |
+| `PATCH /sessions/{id}/cart/lines/{line_no}` | Change quantity, options, or both |
+| `DELETE /sessions/{id}/cart/lines/{line_no}` | Remove a line |
+| `POST /sessions/{id}/order` | Submit the cart |
+| `GET /orders/{id}` | Read a submitted order |
+| `GET /menu` | The whole menu by category |
+| `GET /menu/search?q=` | Find items matching what a customer said |
+| `GET /menu/items/{code}` | One item with its choices |
+
+No endpoint holds a rule: each calls an ordering function, commits, and
+returns. The agent will call the same functions in-process, so the HTTP API
+and the agent's tools cannot disagree.
+
+Every expected failure has one shape, and a caller reacts to the code:
+
+```json
+{
+  "error": {
+    "code": "missing_required_options",
+    "message": "'fries' still needs a choice for: size.",
+    "details": {"item_code": "fries", "missing": [{"group_code": "size", "options": ["..."]}]}
+  }
+}
+```
+
+| Status | Meaning |
+|---|---|
+| 404 | The session, cart line or order does not exist |
+| 409 | The current state does not allow it: lane busy, session ended, item unavailable, empty cart |
+| 422 | The menu or the rules do not allow it: unknown item or option, a missing choice, too many options |
+
+### Menu search
+
+`GET /menu/search?q=un cheeseburger` returns ranked matches. The search is
+deterministic, with no model and no vector search: it compares the words
+against names and aliases in both languages, ignoring case, accents, plurals
+and filler words. A vague word such as "burger" returns several items with
+equal scores, which tells the agent to ask which one.
+
 ## Health endpoints
 
 | Endpoint | Meaning |
@@ -155,9 +204,9 @@ How they behave:
 src/drivetruagent/
 ├── main.py          builds the FastAPI app
 ├── config.py        settings from environment variables
-├── api/             HTTP endpoints
+├── api/             HTTP endpoints and error mapping
 ├── db/              engine, sessions and table models
-├── ordering/        the rules: sessions, carts, pricing, order submission
+├── ordering/        the rules: sessions, carts, pricing, orders, menu search
 └── seed.py          loads the menu file into the database
 data/menu.json       the menu: items, choices, prices, aliases
 migrations/          Alembic migration scripts

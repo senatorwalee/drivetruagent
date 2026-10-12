@@ -21,7 +21,7 @@ from drivetruagent.ordering.errors import EmptyCart, SessionEnded, SessionNotFou
 from drivetruagent.ordering.orders import submit_order
 from drivetruagent.ordering.sessions import open_session
 
-TAX = Decimal("0.14975")
+TAX = Decimal("0.13")
 
 pytestmark = pytest.mark.usefixtures("menu")
 
@@ -34,7 +34,7 @@ async def session_id(db_session: AsyncSession, menu: None) -> uuid.UUID:
 
 @pytest.fixture
 async def filled_cart(db_session: AsyncSession, session_id: uuid.UUID) -> None:
-    """Two large fries and a medium cola: subtotal 997, tax 149, total 1146."""
+    """Two large fries and a medium cola: subtotal 997, tax 130, total 1127."""
     await add_item(
         db_session,
         session_id,
@@ -69,8 +69,8 @@ async def test_order_matches_the_cart_it_came_from(
     assert order.lines == cart.lines
     assert order.item_count == 3
     assert order.subtotal_cents == 997
-    assert order.tax_cents == 149
-    assert order.total_cents == 1146
+    assert order.tax_cents == 130
+    assert order.total_cents == 1127
     assert order.order_number >= 1
     assert order.session_id == session_id
 
@@ -85,8 +85,8 @@ async def test_order_rows_hold_a_frozen_copy(
     fries, cola = order.lines
     assert (order.subtotal_cents, order.tax_cents, order.total_cents) == (
         997,
-        149,
-        1146,
+        130,
+        1127,
     )
     assert (fries.line_no, fries.item_code, fries.item_name) == (1, "fries", "Fries")
     assert (fries.quantity, fries.unit_price_cents, fries.line_total_cents) == (
@@ -163,7 +163,7 @@ async def test_later_menu_changes_do_not_alter_the_order(
     )
 
     order = await stored_order(db_session, view.order_id)
-    assert order.total_cents == 1146
+    assert order.total_cents == 1127
     assert order.lines[0].item_name == "Fries"
     assert order.lines[0].unit_price_cents == 379
 
@@ -220,7 +220,7 @@ async def test_cart_can_still_be_read_after_submission(
     cart = await get_cart(db_session, session_id, tax_rate=TAX)
 
     assert cart.state is SessionState.SUBMITTED
-    assert cart.total_cents == 1146
+    assert cart.total_cents == 1127
 
 
 async def test_submitting_an_unknown_session_is_reported(

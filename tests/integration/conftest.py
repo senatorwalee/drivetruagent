@@ -6,6 +6,7 @@ every test starts from the same clean database.
 """
 
 from collections.abc import AsyncIterator, Iterator
+from decimal import Decimal
 from pathlib import Path
 
 import httpx
@@ -21,6 +22,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.pool import NullPool
 from testcontainers.community.postgres import PostgresContainer
 
+from drivetruagent.config import Settings, get_settings
 from drivetruagent.db.base import Base
 from drivetruagent.db.session import get_session
 from drivetruagent.main import create_app
@@ -30,6 +32,8 @@ POSTGRES_IMAGE = "pgvector/pgvector:pg17"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = REPO_ROOT / "alembic.ini"
 MENU_PATH = REPO_ROOT / "data" / "menu.json"
+# Ontario HST, the app's default.
+TEST_TAX_RATE = Decimal("0.13")
 
 
 @pytest.fixture(scope="session")
@@ -79,9 +83,19 @@ async def client(db_session: AsyncSession) -> AsyncIterator[httpx.AsyncClient]:
     app = create_app()
 
     async def use_test_session() -> AsyncIterator[AsyncSession]:
-        yield db_session
+        try:
+            yield db_session
+        except Exception:
+            # What the real dependency does on a failed request: closing its
+            # session discards everything since the last commit.
+            await db_session.rollback()
+            raise
 
     app.dependency_overrides[get_session] = use_test_session
+    # Fixed settings, so API tests do not depend on a local .env file.
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        database_url="postgresql+psycopg://unused", tax_rate=TEST_TAX_RATE
+    )
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
