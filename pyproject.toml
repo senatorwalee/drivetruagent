@@ -1,7 +1,7 @@
 [project]
 name = "drivetruagent"
 version = "0.1.0"
-description = "Add your description here"
+description = "Voice-first drive-through ordering agent with a backend that stays in charge of menu, stock and orders"
 readme = "README.md"
 authors = [
     { name = "olawaletijani", email = "tijaniolawale99@gmail.com" }
