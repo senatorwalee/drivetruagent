@@ -56,6 +56,6 @@ select = [
 ]
 
 [tool.pyright]
-include = ["src", "tests"]
+include = ["src", "tests", "migrations"]
 typeCheckingMode = "standard"
 pythonVersion = "3.13"
