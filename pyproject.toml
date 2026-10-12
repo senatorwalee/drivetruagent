@@ -1,7 +1,7 @@
 [project]
 name = "drivetruagent"
 version = "0.1.0"
-description = "Add your description here"
+description = "Voice-first drive-through ordering agent with a backend that stays in charge of menu, stock and orders"
 readme = "README.md"
 authors = [
     { name = "olawaletijani", email = "tijaniolawale99@gmail.com" }
@@ -17,9 +17,6 @@ dependencies = [
     "uvicorn[standard]>=0.54.0",
 ]
 
-[project.scripts]
-drivetruagent = "drivetruagent:main"
-
 [build-system]
 requires = ["uv_build>=0.13.0,<0.14.0"]
 build-backend = "uv_build"
@@ -34,3 +31,31 @@ dev = [
     "ruff>=0.17.0",
     "testcontainers[postgres]>=4.15.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: needs Docker; runs against a real Postgres container",
+]
+
+[tool.ruff]
+target-version = "py313"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "F",     # pyflakes
+    "I",     # import sorting
+    "UP",    # modern Python syntax
+    "B",     # likely bugs
+    "SIM",   # simplifications
+    "ASYNC", # async mistakes
+    "RUF",   # ruff's own rules
+]
+
+[tool.pyright]
+include = ["src", "tests", "migrations"]
+typeCheckingMode = "standard"
+pythonVersion = "3.13"

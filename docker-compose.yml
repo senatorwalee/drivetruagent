@@ -1,0 +1,20 @@
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: drivetruagent
+      POSTGRES_PASSWORD: drivetruagent
+      POSTGRES_DB: drivetruagent
+    ports:
+      # Host port 5433, because a locally installed Postgres already uses 5432.
+      - "5433:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U drivetruagent -d drivetruagent"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  db_data:

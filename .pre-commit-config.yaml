@@ -1,0 +1,45 @@
+# Hooks run the project's own tool versions through uv, so they always match CI.
+# Install with `make hooks`.
+default_install_hook_types: [pre-commit, pre-push]
+
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check --fix
+        language: system
+        types: [python]
+        stages: [pre-commit]
+
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format
+        language: system
+        types: [python]
+        stages: [pre-commit]
+
+      - id: pyright
+        name: pyright
+        entry: uv run pyright
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
+      - id: unit-tests
+        name: unit tests
+        entry: uv run pytest -m "not integration" -q
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
+      # The full suite needs Docker, so it runs before a push, not on every commit.
+      - id: all-tests
+        name: all tests
+        entry: uv run pytest -q
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
