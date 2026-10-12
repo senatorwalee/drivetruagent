@@ -27,6 +27,21 @@ class SessionState(StrEnum):
     TERMINATED = "terminated"
 
 
+class PendingActionStatus(StrEnum):
+    """What became of an action that was held for the customer's confirmation."""
+
+    # Waiting for the customer's answer.
+    PENDING = "pending"
+    # The customer said yes and the action ran.
+    CONFIRMED = "confirmed"
+    # The customer said no, or the action could no longer run.
+    CANCELLED = "cancelled"
+    # The cart changed or another action was proposed before an answer came.
+    SUPERSEDED = "superseded"
+    # The customer said yes, and the order was handed to a person.
+    ESCALATED = "escalated"
+
+
 # A session in one of these states is still in progress. Every other state is
 # final: the session has ended and can never change again.
 ACTIVE_SESSION_STATES = frozenset(
