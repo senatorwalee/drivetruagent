@@ -28,7 +28,6 @@ from drivetruagent.ordering.errors import (
     InvalidQuantity,
     ItemUnavailable,
     NothingToUpdate,
-    SessionNotFound,
     UnknownCartLine,
     UnknownItem,
 )
@@ -39,7 +38,7 @@ from drivetruagent.ordering.selection import (
     merge_selections,
     resolve_selection,
 )
-from drivetruagent.ordering.sessions import lock_active_session
+from drivetruagent.ordering.sessions import get_session, lock_active_session
 from drivetruagent.ordering.views import (
     DEFAULT_LANGUAGE,
     CartSnapshot,
@@ -184,9 +183,7 @@ async def get_cart(
     db: AsyncSession, session_id: uuid.UUID, *, tax_rate: Decimal
 ) -> CartSnapshot:
     """The current cart, priced. Takes no lock and works on ended sessions too."""
-    customer_session = await db.get(CustomerSession, session_id, populate_existing=True)
-    if customer_session is None:
-        raise SessionNotFound(session_id)
+    customer_session = await get_session(db, session_id)
     cart = await load_cart(db, session_id)
     return await build_snapshot(db, customer_session, cart, tax_rate)
 

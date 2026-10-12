@@ -26,7 +26,7 @@ async def load_item_by_code(db: AsyncSession, item_code: str) -> ItemSpec | None
         .execution_options(populate_existing=True)
     )
     item = (await db.execute(statement)).scalar_one_or_none()
-    return _to_spec(item) if item else None
+    return to_item_spec(item) if item else None
 
 
 async def load_items_by_id(
@@ -41,10 +41,10 @@ async def load_items_by_id(
         .execution_options(populate_existing=True)
     )
     items = (await db.execute(statement)).scalars()
-    return {item.id: _to_spec(item) for item in items}
+    return {item.id: to_item_spec(item) for item in items}
 
 
-def _to_spec(item: MenuItem) -> ItemSpec:
+def to_item_spec(item: MenuItem) -> ItemSpec:
     return ItemSpec(
         id=item.id,
         code=item.code,

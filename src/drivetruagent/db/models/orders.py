@@ -96,6 +96,7 @@ class OrderLine(UuidPrimaryKey, Timestamps, Base):
     options: Mapped[list["OrderLineOption"]] = relationship(
         back_populates="line",
         lazy="raise",
+        order_by="OrderLineOption.position",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
@@ -115,12 +116,17 @@ class OrderLineOption(UuidPrimaryKey, Timestamps, Base):
         CheckConstraint(
             "price_delta_cents >= 0", name="price_delta_cents_non_negative"
         ),
+        CheckConstraint("position >= 0", name="position_non_negative"),
     )
 
     order_line_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("order_lines.id", ondelete="CASCADE")
     )
+    # Where this option sits among the line's options, so an order reads back
+    # in the same order the customer saw.
+    position: Mapped[int]
     group_code: Mapped[str]
+    group_name: Mapped[str]
     option_code: Mapped[str]
     option_name: Mapped[str]
     price_delta_cents: Mapped[int]

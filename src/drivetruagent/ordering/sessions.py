@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from drivetruagent.db.models import Cart, CustomerSession
-from drivetruagent.enums import FINAL_SESSION_STATES, SessionState
+from drivetruagent.enums import FINAL_SESSION_STATES, Language, SessionState
 from drivetruagent.ordering.errors import LaneBusy, SessionEnded, SessionNotFound
 
 ONE_ACTIVE_SESSION_PER_LANE = "uq_sessions_one_active_per_lane"
@@ -63,6 +63,25 @@ async def lock_active_session(
     customer_session = await lock_session(db, session_id)
     if customer_session.state in FINAL_SESSION_STATES:
         raise SessionEnded(customer_session.state)
+    return customer_session
+
+
+async def get_session(db: AsyncSession, session_id: uuid.UUID) -> CustomerSession:
+    """Read a session without locking it. Raises SessionNotFound."""
+    customer_session = await db.get(CustomerSession, session_id, populate_existing=True)
+    if customer_session is None:
+        raise SessionNotFound(session_id)
+    return customer_session
+
+
+async def set_language(
+    db: AsyncSession, session_id: uuid.UUID, language: Language
+) -> CustomerSession:
+    """Set the language the customer is served in. Names in later cart
+    snapshots, and in the order, follow it."""
+    customer_session = await lock_active_session(db, session_id)
+    customer_session.language = language
+    await db.flush()
     return customer_session
 
 

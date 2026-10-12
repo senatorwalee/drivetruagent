@@ -32,7 +32,9 @@ async def count(session: AsyncSession, model: type) -> int:
 def frozen_option(line: OrderLine, **overrides: object) -> OrderLineOption:
     values: dict[str, object] = {
         "order_line_id": line.id,
+        "position": 0,
         "group_code": "size",
+        "group_name": "Size",
         "option_code": "large",
         "option_name": "Large",
         "price_delta_cents": 130,
@@ -229,6 +231,18 @@ async def test_negative_frozen_price_delta_is_rejected(
 
     with pytest.raises(
         IntegrityError, match="ck_order_line_options_price_delta_cents_non_negative"
+    ):
+        await db_session.flush()
+
+
+async def test_negative_option_position_is_rejected(
+    db_session: AsyncSession,
+) -> None:
+    line = await make_order_line(db_session)
+    db_session.add(frozen_option(line, position=-1))
+
+    with pytest.raises(
+        IntegrityError, match="ck_order_line_options_position_non_negative"
     ):
         await db_session.flush()
 

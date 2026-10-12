@@ -169,6 +169,13 @@ class NothingToUpdate(OrderingError):
         super().__init__("Give a new quantity, new options, or both.")
 
 
+class OrderNotFound(OrderingError):
+    code = "order_not_found"
+
+    def __init__(self, order_id: object) -> None:
+        super().__init__(f"No order with id {order_id}.")
+
+
 class EmptyCart(OrderingError):
     code = "empty_cart"
 

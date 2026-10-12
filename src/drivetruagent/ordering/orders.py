@@ -4,7 +4,9 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from drivetruagent.db.models import Order, OrderLine, OrderLineOption
 from drivetruagent.enums import SessionState
@@ -13,9 +15,9 @@ from drivetruagent.ordering.cart import (
     load_priced_lines,
     snapshot_from_lines,
 )
-from drivetruagent.ordering.errors import EmptyCart
+from drivetruagent.ordering.errors import EmptyCart, OrderNotFound
 from drivetruagent.ordering.sessions import lock_active_session
-from drivetruagent.ordering.views import OrderView
+from drivetruagent.ordering.views import LineView, OrderView, SelectedOptionView
 
 ORDER_SUBMITTED = "order_submitted"
 
@@ -64,12 +66,14 @@ async def submit_order(
         db.add_all(
             OrderLineOption(
                 order_line_id=order_line.id,
+                position=position,
                 group_code=option.group_code,
+                group_name=option.group_name,
                 option_code=option.option_code,
                 option_name=option.option_name,
                 price_delta_cents=option.price_delta_cents,
             )
-            for option in view.options
+            for position, option in enumerate(view.options)
         )
 
     customer_session.state = SessionState.SUBMITTED
@@ -87,5 +91,56 @@ async def submit_order(
         subtotal_cents=snapshot.subtotal_cents,
         tax_cents=snapshot.tax_cents,
         total_cents=snapshot.total_cents,
+        submitted_at=order.submitted_at,
+    )
+
+
+async def get_order(db: AsyncSession, order_id: uuid.UUID) -> OrderView:
+    """Read a submitted order back, exactly as it was frozen.
+
+    Built only from the order's own rows. The menu is not consulted, so the
+    result is the same however the menu has changed since.
+    """
+    statement = (
+        select(Order)
+        .where(Order.id == order_id)
+        .options(selectinload(Order.lines).selectinload(OrderLine.options))
+        .execution_options(populate_existing=True)
+    )
+    order = (await db.execute(statement)).scalar_one_or_none()
+    if order is None:
+        raise OrderNotFound(order_id)
+
+    lines = [
+        LineView(
+            line_no=line.line_no,
+            item_code=line.item_code,
+            item_name=line.item_name,
+            quantity=line.quantity,
+            options=[
+                SelectedOptionView(
+                    group_code=option.group_code,
+                    group_name=option.group_name,
+                    option_code=option.option_code,
+                    option_name=option.option_name,
+                    price_delta_cents=option.price_delta_cents,
+                )
+                for option in line.options
+            ],
+            unit_price_cents=line.unit_price_cents,
+            line_total_cents=line.line_total_cents,
+        )
+        for line in order.lines
+    ]
+    return OrderView(
+        order_id=order.id,
+        order_number=order.order_number,
+        session_id=order.session_id,
+        language=order.language,
+        lines=lines,
+        item_count=sum(line.quantity for line in lines),
+        subtotal_cents=order.subtotal_cents,
+        tax_cents=order.tax_cents,
+        total_cents=order.total_cents,
         submitted_at=order.submitted_at,
     )

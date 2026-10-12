@@ -9,7 +9,7 @@ import uuid
 from collections.abc import Mapping
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from drivetruagent.enums import Language, SessionState
 
@@ -68,3 +68,71 @@ class OrderView(BaseModel):
     tax_cents: int
     total_cents: int
     submitted_at: datetime
+
+
+class SessionView(BaseModel):
+    # Built straight from the database row.
+    model_config = ConfigDict(from_attributes=True)
+
+    session_id: uuid.UUID = Field(validation_alias="id")
+    lane: str
+    state: SessionState
+    # None until the customer's language has been detected or set.
+    language: Language | None
+    started_at: datetime
+    ended_at: datetime | None
+    end_reason: str | None
+
+
+# --- Menu -------------------------------------------------------------------
+
+
+class MenuItemSummary(BaseModel):
+    item_code: str
+    item_name: str
+    # The price with the cheapest choices; options may add to it.
+    base_price_cents: int
+    # Codes of the choices the customer has to be asked about. Empty means the
+    # item can be added straight away.
+    must_ask: list[str]
+
+
+class MenuMatch(MenuItemSummary):
+    category_code: str
+    # 100 is an exact match. Several matches with the same score mean the
+    # customer was vague, and should be asked which one they meant.
+    score: int
+
+
+class ChoiceOptionView(BaseModel):
+    option_code: str
+    option_name: str
+    price_delta_cents: int
+
+
+class ChoiceGroupView(BaseModel):
+    group_code: str
+    group_name: str
+    min_select: int
+    max_select: int
+    must_ask: bool
+    # Filled in by the backend when the customer says nothing about this choice.
+    default_option_code: str | None
+    options: list[ChoiceOptionView]
+
+
+class ItemDetails(MenuItemSummary):
+    category_code: str
+    description: str | None
+    available: bool
+    choices: list[ChoiceGroupView]
+
+
+class CategoryView(BaseModel):
+    category_code: str
+    category_name: str
+    items: list[MenuItemSummary]
+
+
+class MenuView(BaseModel):
+    categories: list[CategoryView]
