@@ -23,16 +23,16 @@ repos:
         name: pyright
         entry: uv run pyright
         language: system
-        types: [python]
         pass_filenames: false
+        always_run: true
         stages: [pre-commit]
 
       - id: unit-tests
         name: unit tests
         entry: uv run pytest -m "not integration" -q
         language: system
-        types: [python]
         pass_filenames: false
+        always_run: true
         stages: [pre-commit]
 
       # The full suite needs Docker, so it runs before a push, not on every commit.
