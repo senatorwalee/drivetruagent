@@ -18,8 +18,8 @@ built piece by piece.
 | 00 | Project setup, database connection, health endpoints, tests, CI | Done |
 | 01a | Menu tables and the seed menu (20 items, English and Canadian French) | Done |
 | 01b | Session, cart and order tables | Done |
-| 02 | Cart logic and pricing | Next |
-| 03 | Ordering API | Planned |
+| 02 | Cart logic, pricing and order submission | Done |
+| 03 | Ordering API | Next |
 | 04 | Policy engine: allow, reject, confirm, escalate | Planned |
 | 05 | Text-mode agent and first evals | Planned |
 | Later | Stock reservations, voice, human handoff, knowledge search, tracing | Planned |
@@ -113,6 +113,35 @@ The database itself refuses states that must never exist, for example two
 active sessions in one lane, a second order for a session, or an order whose
 total is not subtotal plus tax.
 
+## Ordering rules
+
+The rules live in `src/drivetruagent/ordering/` as plain Python, with no HTTP
+and no model involved. Whatever the agent proposes ends up as a call to one of
+these functions:
+
+| Function | What it does |
+|---|---|
+| `open_session` | Starts a session and its empty cart; refuses a busy lane |
+| `add_item` | Adds a line; refuses if a required choice is missing |
+| `update_line` | Changes a quantity, the options, or both |
+| `remove_line` | Removes a line; its number is never reused |
+| `get_cart` | Returns the cart, priced |
+| `submit_order` | Freezes the cart into an order and ends the session |
+
+How they behave:
+
+- **Every change returns the whole cart, priced**, in the session's language.
+  Nothing downstream has to remember earlier state or do arithmetic.
+- **A refused request changes nothing.** Validation happens before any write.
+- **Failures are typed.** Each error has a stable code and structured details.
+  "Fries need a size" comes back as `missing_required_options` with the sizes
+  on offer, so the agent can ask the right question without another lookup.
+- **Changes to one cart never interleave.** Each one locks the session row
+  first, so a tool call that arrives twice cannot corrupt the cart. A test
+  fires five changes at once on separate connections to prove it.
+- **Tax is rounded once**, on the subtotal, so subtotal plus tax always
+  equals the total to the cent.
+
 ## Health endpoints
 
 | Endpoint | Meaning |
@@ -128,6 +157,7 @@ src/drivetruagent/
 ├── config.py        settings from environment variables
 ├── api/             HTTP endpoints
 ├── db/              engine, sessions and table models
+├── ordering/        the rules: sessions, carts, pricing, order submission
 └── seed.py          loads the menu file into the database
 data/menu.json       the menu: items, choices, prices, aliases
 migrations/          Alembic migration scripts

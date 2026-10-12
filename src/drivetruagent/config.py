@@ -1,6 +1,8 @@
+from decimal import Decimal
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,6 +14,9 @@ class Settings(BaseSettings):
     database_url: str
     environment: Literal["local", "test", "ci"] = "local"
     log_level: str = "INFO"
+    # Sales tax as a fraction of the subtotal. The default is Quebec's combined
+    # GST and QST: 5% + 9.975%.
+    tax_rate: Decimal = Field(default=Decimal("0.14975"), ge=0, lt=1)
 
 
 @lru_cache

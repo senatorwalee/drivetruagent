@@ -12,15 +12,24 @@ import httpx
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.pool import NullPool
 from testcontainers.community.postgres import PostgresContainer
 
+from drivetruagent.db.base import Base
 from drivetruagent.db.session import get_session
 from drivetruagent.main import create_app
+from drivetruagent.seed import load_menu, seed_menu
 
 POSTGRES_IMAGE = "pgvector/pgvector:pg17"
-ALEMBIC_INI = Path(__file__).resolve().parents[2] / "alembic.ini"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+ALEMBIC_INI = REPO_ROOT / "alembic.ini"
+MENU_PATH = REPO_ROOT / "data" / "menu.json"
 
 
 @pytest.fixture(scope="session")
@@ -76,3 +85,28 @@ async def client(db_session: AsyncSession) -> AsyncIterator[httpx.AsyncClient]:
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
+
+
+@pytest.fixture
+async def menu(db_session: AsyncSession) -> None:
+    """The real menu from data/menu.json, loaded for this test only."""
+    await seed_menu(db_session, load_menu(MENU_PATH))
+
+
+@pytest.fixture
+async def committing_sessions(
+    migrated_database: str,
+) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
+    """Sessions that really commit, each on its own connection.
+
+    For tests where several transactions must run at the same time, which the
+    rollback-based db_session cannot do. Every table is emptied afterwards, so
+    other tests still start from a clean database.
+    """
+    engine = create_async_engine(migrated_database, poolclass=NullPool)
+    yield async_sessionmaker(engine, expire_on_commit=False)
+
+    tables = ", ".join(table.name for table in Base.metadata.sorted_tables)
+    async with engine.begin() as connection:
+        await connection.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
+    await engine.dispose()
