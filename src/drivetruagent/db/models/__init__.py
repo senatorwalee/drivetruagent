@@ -18,6 +18,7 @@ from drivetruagent.db.models.ordering import (
     CustomerSession,
 )
 from drivetruagent.db.models.orders import Order, OrderLine, OrderLineOption
+from drivetruagent.db.models.policy import PendingAction
 
 __all__ = [
     "Cart",
@@ -32,4 +33,5 @@ __all__ = [
     "Order",
     "OrderLine",
     "OrderLineOption",
+    "PendingAction",
 ]

@@ -13,7 +13,12 @@ from pydantic import BaseModel
 from drivetruagent.ordering.errors import OrderingError
 
 # The thing asked for does not exist.
-_NOT_FOUND = {"session_not_found", "unknown_cart_line", "order_not_found"}
+_NOT_FOUND = {
+    "session_not_found",
+    "unknown_cart_line",
+    "order_not_found",
+    "pending_action_not_found",
+}
 # The request is well formed, but the current state does not allow it.
 _CONFLICT = {
     "lane_busy",

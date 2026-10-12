@@ -1,9 +1,11 @@
 from decimal import Decimal
 from functools import lru_cache
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from drivetruagent.policy.decisions import PolicyLimits
 
 
 class Settings(BaseSettings):
@@ -16,6 +18,31 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     # Sales tax as a fraction of the subtotal. The default is Ontario's HST.
     tax_rate: Decimal = Field(default=Decimal("0.13"), ge=0, lt=1)
+
+    # Policy limits. More than this many of one item on a line is unusual,
+    # and the customer is asked to confirm it.
+    line_quantity_confirm_above: int = Field(default=10, ge=1)
+    # More than this many is extreme: once confirmed, a person takes over.
+    line_quantity_escalate_above: int = Field(default=25, ge=1)
+    # The same applies to a cart holding more than this many items in total.
+    cart_items_escalate_above: int = Field(default=50, ge=1)
+
+    @model_validator(mode="after")
+    def check_limits_are_in_order(self) -> Self:
+        if self.line_quantity_escalate_above <= self.line_quantity_confirm_above:
+            raise ValueError(
+                "line_quantity_escalate_above must be greater than "
+                "line_quantity_confirm_above"
+            )
+        return self
+
+    @property
+    def policy_limits(self) -> PolicyLimits:
+        return PolicyLimits(
+            line_quantity_confirm_above=self.line_quantity_confirm_above,
+            line_quantity_escalate_above=self.line_quantity_escalate_above,
+            cart_items_escalate_above=self.cart_items_escalate_above,
+        )
 
 
 @lru_cache

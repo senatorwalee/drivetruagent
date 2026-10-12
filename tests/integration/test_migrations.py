@@ -65,6 +65,7 @@ def test_upgrade_creates_the_tables(scratch_database_url: str) -> None:
         "orders",
         "order_lines",
         "order_line_options",
+        "pending_actions",
     }
 
 

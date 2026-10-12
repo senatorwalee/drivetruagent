@@ -25,6 +25,7 @@ from drivetruagent.enums import Language, SessionState
 from drivetruagent.ordering import pricing
 from drivetruagent.ordering.catalog import load_item_by_code, load_items_by_id
 from drivetruagent.ordering.errors import (
+    EmptyCart,
     InvalidQuantity,
     ItemUnavailable,
     NothingToUpdate,
@@ -174,6 +175,25 @@ async def remove_line(
     await db.execute(delete(CartLine).where(CartLine.id == line.id))
 
     return await _finish_change(db, customer_session, cart, tax_rate)
+
+
+async def request_confirmation(
+    db: AsyncSession, session_id: uuid.UUID, *, tax_rate: Decimal
+) -> CartSnapshot:
+    """Mark that the order is being read back to the customer.
+
+    The cart itself does not change, so its version stays the same. Any later
+    change to the cart moves the session back to ordering, which means the
+    order has to be read back again before it can be submitted.
+    """
+    customer_session = await lock_active_session(db, session_id)
+    cart = await load_cart(db, session_id)
+    lines = await load_priced_lines(db, cart)
+    if not lines:
+        raise EmptyCart()
+    customer_session.state = SessionState.CONFIRMING
+    await db.flush()
+    return snapshot_from_lines(customer_session, cart, lines, tax_rate)
 
 
 # --- Reads ------------------------------------------------------------------
