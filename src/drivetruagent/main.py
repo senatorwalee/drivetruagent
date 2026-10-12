@@ -3,7 +3,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from drivetruagent.api import health
+from drivetruagent.api import health, menu, sessions
+from drivetruagent.api.errors import register_error_handlers
 from drivetruagent.config import get_settings
 from drivetruagent.db.session import create_engine, create_session_factory
 
@@ -23,6 +24,9 @@ def create_app() -> FastAPI:
     """Build the FastAPI application. Tests call this to get a fresh app."""
     app = FastAPI(title="Drive-through agent", lifespan=lifespan)
     app.include_router(health.router)
+    app.include_router(sessions.router)
+    app.include_router(menu.router)
+    register_error_handlers(app)
     return app
 
 
