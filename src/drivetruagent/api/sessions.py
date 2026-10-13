@@ -10,7 +10,12 @@ import uuid
 
 from fastapi import APIRouter, status
 
-from drivetruagent.api.deps import IdempotencyKey, SessionDep, SettingsDep
+from drivetruagent.api.deps import (
+    BusinessDateDep,
+    IdempotencyKey,
+    SessionDep,
+    SettingsDep,
+)
 from drivetruagent.api.errors import CONFLICT, NOT_FOUND, REFUSED
 from drivetruagent.api.schemas import (
     AddLineRequest,
@@ -35,12 +40,15 @@ router = APIRouter(tags=["ordering"])
     summary="Open a session",
 )
 async def open_session(
-    db: SessionDep, body: OpenSessionRequest | None = None
+    db: SessionDep, today: BusinessDateDep, body: OpenSessionRequest | None = None
 ) -> SessionView:
     """Start a customer's visit, with an empty cart. Refused if the lane
-    already has a session in progress."""
+    already has a session in progress.
+
+    The session keeps today's date, where the restaurant is, for as long as
+    it lasts: a special heard about before midnight is still given after it."""
     lane = (body or OpenSessionRequest()).lane
-    customer_session = await sessions.open_session(db, lane)
+    customer_session = await sessions.open_session(db, lane, business_date=today)
     await db.commit()
     return SessionView.model_validate(customer_session)
 

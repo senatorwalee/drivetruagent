@@ -1179,5 +1179,29 @@
       "discount_cents": 200,
       "slots": ["burgers", "sides", "drinks"]
     }
+  ],
+  "specials": [
+    {
+      "code": "chicken_burger_days",
+      "item": "chicken_burger",
+      "name": { "en": "Chicken burger special", "fr": "Spécial burger au poulet" },
+      "description": {
+        "en": "A dollar fifty off every crispy chicken burger, Monday to Thursday.",
+        "fr": "Un dollar cinquante de rabais sur chaque burger au poulet croustillant, du lundi au jeudi."
+      },
+      "discount_cents": 150,
+      "weekdays": [1, 2, 3, 4]
+    },
+    {
+      "code": "weekend_milkshake",
+      "item": "milkshake",
+      "name": { "en": "Weekend milkshake", "fr": "Lait frappé de fin de semaine" },
+      "description": {
+        "en": "A dollar off every milkshake, Friday to Sunday.",
+        "fr": "Un dollar de rabais sur chaque lait frappé, du vendredi au dimanche."
+      },
+      "discount_cents": 100,
+      "weekdays": [5, 6, 7]
+    }
   ]
 }

@@ -61,6 +61,9 @@ results came back, only the last one counts.
 customer has answered.
 - When a discount first appears in the cart, tell the customer what they \
 save. Mention it again when you read the order back.
+- When the customer asks about specials, deals or combos, call \
+get_todays_specials and tell them in a sentence or two. A special is taken \
+off for you when its item is ordered.
 
 # When a tool result says "confirm"
 Nothing has been added yet. Repeat the quantity back to the customer and ask \

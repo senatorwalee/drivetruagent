@@ -12,6 +12,7 @@ from drivetruagent.agent.loop import AgentConfig
 from drivetruagent.agent.model import ModelClient, ModelUnavailable
 from drivetruagent.agent.openai_model import OpenAIModel
 from drivetruagent.config import Settings
+from drivetruagent.ordering.offers import SpecialsCache
 
 
 @dataclass(frozen=True)
@@ -50,11 +51,14 @@ def agent_info(settings: Settings) -> AgentInfo:
     return AgentInfo(True, settings.openai_text_model, False, ())
 
 
-def agent_config(settings: Settings) -> AgentConfig:
+def agent_config(
+    settings: Settings, *, specials_cache: SpecialsCache | None = None
+) -> AgentConfig:
     return AgentConfig(
         restaurant_name=settings.restaurant_name,
         tax_rate=settings.tax_rate,
         limits=settings.policy_limits,
         max_tool_rounds=settings.agent_max_tool_rounds,
         reservation_ttl=settings.reservation_ttl,
+        specials_cache=specials_cache,
     )

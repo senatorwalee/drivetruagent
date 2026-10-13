@@ -20,7 +20,7 @@ from drivetruagent.evals.scenario import Scenario, check
 from drivetruagent.evals.scenarios import SCENARIOS
 from tests.integration.conftest import TEST_TAX_RATE
 
-pytestmark = pytest.mark.usefixtures("menu")
+pytestmark = pytest.mark.usefixtures("specials")
 
 
 @pytest.fixture(scope="module")

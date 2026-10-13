@@ -132,4 +132,20 @@ SCENARIOS: tuple[Scenario, ...] = (
         total_cents=620,  # 549 + 13%
         must_use=ORDERING_TOOLS,
     ),
+    Scenario(
+        name="asks_for_the_special",
+        # Played on a Monday: 150 off the crispy chicken burger. The agent
+        # looks the special up; the saving is the backend's doing.
+        customer=(
+            "What's today's special?",
+            "Great, I'll have one of those. Mild, please.",
+            "No thanks, that's all.",
+            "Yes.",
+        ),
+        final_state=SessionState.SUBMITTED,
+        lines=(ExpectedLine("chicken_burger", 1, {"spice": "mild"}),),
+        discount_cents=150,
+        total_cents=564,  # (649 - 150) + 13%
+        must_use=ORDERING_TOOLS | {"get_todays_specials"},
+    ),
 )

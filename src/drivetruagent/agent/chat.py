@@ -48,7 +48,11 @@ async def chat() -> None:
     try:
         async with session_factory() as db:
             # A lane of its own, so it never collides with another session.
-            customer_session = await open_session(db, f"chat-{uuid.uuid4().hex[:8]}")
+            customer_session = await open_session(
+                db,
+                f"chat-{uuid.uuid4().hex[:8]}",
+                business_date=settings.business_date(),
+            )
             await db.commit()
             session_id = customer_session.id
             print(f"Session {session_id}. Type what the customer says; quit to stop.\n")

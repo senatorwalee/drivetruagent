@@ -26,7 +26,9 @@ async def run_scenario(
     Stops early if the session ends (order placed, or handed to a person):
     there is nobody left to talk to.
     """
-    customer_session = await open_session(db, lane)
+    customer_session = await open_session(
+        db, lane, business_date=scenario.business_date
+    )
     await db.commit()
     session_id = customer_session.id
 

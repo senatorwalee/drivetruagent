@@ -1024,6 +1024,11 @@
       },
       "SessionView": {
         "properties": {
+          "business_date": {
+            "format": "date",
+            "title": "Business Date",
+            "type": "string"
+          },
           "end_reason": {
             "anyOf": [
               {
@@ -1082,9 +1087,24 @@
           "language",
           "started_at",
           "ended_at",
-          "end_reason"
+          "end_reason",
+          "business_date"
         ],
         "title": "SessionView",
+        "type": "object"
+      },
+      "SetSpecialRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "is_active"
+        ],
+        "title": "SetSpecialRequest",
         "type": "object"
       },
       "SetStockRequest": {
@@ -1100,6 +1120,85 @@
           "on_hand"
         ],
         "title": "SetStockRequest",
+        "type": "object"
+      },
+      "SpecialStatus": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "is_active"
+        ],
+        "title": "SpecialStatus",
+        "type": "object"
+      },
+      "SpecialView": {
+        "description": "An item that is cheaper today. The saving is applied by the backend to\nevery one in the cart; nobody has to ask for it.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "in_stock": {
+            "title": "In Stock",
+            "type": "boolean"
+          },
+          "item_code": {
+            "title": "Item Code",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "regular_price_cents": {
+            "title": "Regular Price Cents",
+            "type": "integer"
+          },
+          "saves_cents": {
+            "title": "Saves Cents",
+            "type": "integer"
+          },
+          "special_price_cents": {
+            "title": "Special Price Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "description",
+          "item_code",
+          "item_name",
+          "regular_price_cents",
+          "special_price_cents",
+          "saves_cents",
+          "in_stock"
+        ],
+        "title": "SpecialView",
         "type": "object"
       },
       "StockLevelView": {
@@ -1771,7 +1870,7 @@
     },
     "/sessions": {
       "post": {
-        "description": "Start a customer's visit, with an empty cart. Refused if the lane\nalready has a session in progress.",
+        "description": "Start a customer's visit, with an empty cart. Refused if the lane\nalready has a session in progress.\n\nThe session keeps today's date, where the restaurant is, for as long as\nit lasts: a special heard about before midnight is still given after it.",
         "operationId": "open_session_sessions_post",
         "requestBody": {
           "content": {
@@ -2722,6 +2821,118 @@
         "summary": "The customer said yes",
         "tags": [
           "agent actions"
+        ]
+      }
+    },
+    "/specials": {
+      "get": {
+        "description": "The specials running today, where the restaurant is.\n\nThe list is served from a short-lived cache; `in_stock` is read live. A\nsession keeps the specials of the day it opened on, so a cart is priced\nfrom the session's own date, not from this.",
+        "operationId": "read_specials_specials_get",
+        "parameters": [
+          {
+            "description": "The language names are returned in.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Language",
+              "default": "en",
+              "description": "The language names are returned in."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SpecialView"
+                  },
+                  "title": "Response Read Specials Specials Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Today's specials",
+        "tags": [
+          "offers"
+        ]
+      }
+    },
+    "/specials/{code}": {
+      "put": {
+        "description": "For staff. Takes effect on the next read and the next cart change.",
+        "operationId": "set_special_specials__code__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetSpecialRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecialStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "End a special early, or bring it back",
+        "tags": [
+          "offers"
         ]
       }
     }

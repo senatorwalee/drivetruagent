@@ -30,7 +30,7 @@ from drivetruagent.agent.tools import TOOL_DEFINITIONS, ToolContext, run_tool
 from drivetruagent.enums import AgentEventKind
 from drivetruagent.ordering.cart import get_cart
 from drivetruagent.ordering.inventory import DEFAULT_RESERVATION_TTL
-from drivetruagent.ordering.offers import close_suggestions
+from drivetruagent.ordering.offers import SpecialsCache, close_suggestions
 from drivetruagent.ordering.sessions import get_session
 from drivetruagent.ordering.views import CartSnapshot
 from drivetruagent.policy.decisions import PolicyLimits
@@ -47,6 +47,8 @@ class AgentConfig:
     limits: PolicyLimits
     max_tool_rounds: int
     reservation_ttl: timedelta = DEFAULT_RESERVATION_TTL
+    # Shared between sessions by whoever runs the loop. None: no caching.
+    specials_cache: SpecialsCache | None = None
 
 
 @dataclass(frozen=True)
@@ -79,7 +81,12 @@ async def run_turn(
 
     instructions = await build_instructions(db, config.restaurant_name)
     context = ToolContext(
-        db, session_id, config.tax_rate, config.limits, config.reservation_ttl
+        db,
+        session_id,
+        config.tax_rate,
+        config.limits,
+        config.reservation_ttl,
+        specials_cache=config.specials_cache,
     )
     tools_used: list[str] = []
     reply: str | None = None

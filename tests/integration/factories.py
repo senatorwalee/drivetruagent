@@ -5,6 +5,7 @@ constraint violation surface at that line.
 """
 
 import itertools
+from datetime import date
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -91,7 +92,10 @@ async def make_option(
 async def make_session(session: AsyncSession, **overrides: Any) -> CustomerSession:
     """A customer session. Each gets its own lane unless one is given, because
     only one active session is allowed per lane."""
-    values: dict[str, Any] = {"lane": unique_code("lane")}
+    values: dict[str, Any] = {
+        "lane": unique_code("lane"),
+        "business_date": date(2026, 10, 12),
+    }
     customer_session = CustomerSession(**values | overrides)
     session.add(customer_session)
     await session.flush()

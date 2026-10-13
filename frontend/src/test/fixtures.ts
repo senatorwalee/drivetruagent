@@ -47,6 +47,7 @@ export const session: Session = {
   started_at: '2026-10-13T12:00:00Z',
   ended_at: null,
   end_reason: null,
+  business_date: '2026-10-13',
 }
 
 /** One large fries and one medium cola. */

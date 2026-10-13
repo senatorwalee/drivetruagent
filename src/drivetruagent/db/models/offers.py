@@ -1,4 +1,4 @@
-"""Combos, and the record of what has been suggested to a session.
+"""Combos, specials, and the record of what has been suggested to a session.
 
 A combo is a rule, not a product: "one burger, one side and one drink bought
 together cost less". Nothing about it is stored on a cart. Whether a cart
@@ -7,7 +7,8 @@ earns a combo is worked out each time the cart is priced.
 
 import uuid
 
-from sqlalchemy import CheckConstraint, ForeignKey, UniqueConstraint, text
+from sqlalchemy import CheckConstraint, ForeignKey, SmallInteger, UniqueConstraint, text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from drivetruagent.db.base import (
@@ -18,7 +19,12 @@ from drivetruagent.db.base import (
     has_english,
     text_enum,
 )
-from drivetruagent.db.models.catalog import LOCALIZED_TEXT, LocalizedText, MenuCategory
+from drivetruagent.db.models.catalog import (
+    LOCALIZED_TEXT,
+    LocalizedText,
+    MenuCategory,
+    MenuItem,
+)
 from drivetruagent.enums import DiscountKind, SuggestionStatus
 
 
@@ -72,6 +78,41 @@ class ComboRuleSlot(UuidPrimaryKey, Timestamps, Base):
 
     rule: Mapped[ComboRule] = relationship(back_populates="slots", lazy="raise")
     category: Mapped[MenuCategory] = relationship(lazy="raise")
+
+
+class Special(UuidPrimaryKey, Timestamps, Base):
+    """An item that is cheaper on certain days of the week."""
+
+    __tablename__ = "specials"
+    __table_args__ = (
+        has_english("name_i18n"),
+        has_english("description_i18n"),
+        CheckConstraint("discount_cents > 0", name="discount_cents_positive"),
+        # ISO weekdays: 1 is Monday, 7 is Sunday. `<@` means "is contained in".
+        CheckConstraint(
+            "weekdays <@ ARRAY[1, 2, 3, 4, 5, 6, 7]::smallint[]",
+            name="weekdays_valid",
+        ),
+    )
+
+    code: Mapped[str] = mapped_column(unique=True)
+    # RESTRICT: an item cannot be deleted while a special is built on it.
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("menu_items.id", ondelete="RESTRICT"), index=True
+    )
+    name_i18n: Mapped[LocalizedText] = mapped_column(LOCALIZED_TEXT)
+    description_i18n: Mapped[LocalizedText | None] = mapped_column(LOCALIZED_TEXT)
+    # Taken off each unit of the item.
+    discount_cents: Mapped[int]
+    # The days it runs on. Empty means every day.
+    weekdays: Mapped[list[int]] = mapped_column(
+        ARRAY(SmallInteger), server_default=text("'{}'")
+    )
+    is_active: Mapped[bool] = mapped_column(server_default=text("true"))
+    # When two specials name one item on the same day, the lower applies.
+    sort_order: Mapped[int] = mapped_column(server_default=text("0"))
+
+    item: Mapped[MenuItem] = relationship(lazy="raise")
 
 
 class SessionSuggestion(UuidPrimaryKey, Timestamps, Base):

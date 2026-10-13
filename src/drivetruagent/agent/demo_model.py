@@ -1,9 +1,9 @@
 """A stand-in model that plays one fixed conversation, for demos without a key.
 
 Select it with AGENT_MODEL=demo. Whatever the customer types, the model makes
-the next move of a set script: a combo offered and taken up, a missing size,
-two items in one breath, an unusual quantity that is held and then corrected,
-the read-back, and the order being placed.
+the next move of a set script: today's special, a combo offered and taken up,
+a missing size, two items in one breath, an unusual quantity that is held and
+then corrected, the read-back, and the order being placed.
 
 Only the model is scripted. Every tool call it makes runs for real through
 the same policy engine and ordering rules, and everything it says about
@@ -22,6 +22,7 @@ MODEL_NAME = "demo-script"
 # script advances whatever is typed; these are shown to the presenter.
 SUGGESTED_LINES: tuple[str, ...] = (
     "Hi",
+    "What's today's special?",
     "A cheeseburger, please.",
     "Sure, some fries.",
     "Large, and a medium cola.",
@@ -71,6 +72,21 @@ def _cancel_held_action(results: list[ToolResult]) -> ModelTurn:
             "cancel_pending_action",
             {"pending_action_id": held.result["pending_action_id"]},
         )
+    )
+
+
+def _tell_the_special(results: list[ToolResult]) -> ModelTurn:
+    specials = results[-1].result.get("specials", [])
+    if not specials:
+        return ModelTurn(
+            text="There's no special today. What can I get you?", model=MODEL_NAME
+        )
+    special = specials[0]
+    return ModelTurn(
+        text=f"Today's special is the {special['item_name'].lower()}: "
+        f"{_money(special['special_price_cents'])} instead of "
+        f"{_money(special['regular_price_cents'])}. What can I get you?",
+        model=MODEL_NAME,
     )
 
 
@@ -144,6 +160,12 @@ def _singular(category_name: str) -> str:
 _SCRIPT: tuple[dict[int, Move], ...] = (
     {0: _say("Welcome! What can I get you today?")},
     {
+        # The most asked question of the day. The answer is read through
+        # the cache; what the model says comes from the tool result.
+        0: _call("get_todays_specials"),
+        1: _tell_the_special,
+    },
+    {
         # A burger on its own: the backend suggests the combo.
         0: _call("add_item", item_code="cheeseburger", quantity=1, selections=[]),
         1: _offer_what_was_suggested,
@@ -188,7 +210,7 @@ _SCRIPT: tuple[dict[int, Move], ...] = (
 
 
 # The turn where the customer says no to the fifteen cookies.
-_CANCEL_TURN = 5
+_CANCEL_TURN = 6
 
 
 class DemoModel:

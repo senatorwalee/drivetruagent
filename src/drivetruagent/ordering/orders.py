@@ -47,7 +47,7 @@ async def submit_order(
     lines = await load_priced_lines(db, cart)
     if not lines:
         raise EmptyCart()
-    discounts = await price_discounts(db, lines)
+    discounts = await price_discounts(db, customer_session, lines)
     snapshot = snapshot_from_lines(customer_session, cart, lines, discounts, tax_rate)
 
     # Stock is checked again and taken before any order row is written, so a

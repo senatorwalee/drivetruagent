@@ -175,7 +175,7 @@ async def test_the_model_is_given_instructions_and_every_tool(
     # The menu index comes from the database.
     assert "- fries: Fries / Frites" in request.instructions
     assert "- soft_serve_cone: Soft-serve cone" in request.instructions
-    assert len(request.tools) == 12
+    assert len(request.tools) == 13
     assert request.messages == (UserMessage("Hi"),)
 
 

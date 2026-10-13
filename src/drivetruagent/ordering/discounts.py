@@ -8,6 +8,7 @@ and the combo is simply not there the next time.
 from collections import Counter
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import date
 
 from drivetruagent.enums import DiscountKind
 
@@ -37,6 +38,36 @@ class ComboRule:
     @property
     def main_category(self) -> str:
         return self.slots[0].category_code
+
+
+@dataclass(frozen=True)
+class Special:
+    """An item that is cheaper on certain days."""
+
+    code: str
+    name: Mapping[str, str]
+    description: Mapping[str, str] | None
+    item_code: str
+    item_name: Mapping[str, str]
+    # The item's price with the cheapest choices, before the special.
+    base_price_cents: int
+    # Taken off each unit of the item.
+    discount_cents: int
+    # ISO weekdays, 1 for Monday to 7 for Sunday. Empty means every day.
+    weekdays: frozenset[int] = frozenset()
+
+    def runs_on(self, day: date) -> bool:
+        return not self.weekdays or day.isoweekday() in self.weekdays
+
+    @property
+    def saves_cents(self) -> int:
+        """What actually comes off a unit. Never more than the item costs,
+        even if its price was lowered after the special was set up."""
+        return min(self.discount_cents, self.base_price_cents)
+
+    @property
+    def special_price_cents(self) -> int:
+        return self.base_price_cents - self.saves_cents
 
 
 @dataclass(frozen=True)
@@ -98,6 +129,36 @@ def apply_combos(
             )
         )
     return CombosApplied(tuple(discounts), leftover)
+
+
+def apply_specials(
+    units_by_item: Mapping[str, int], specials: Sequence[Special]
+) -> tuple[Discount, ...]:
+    """Take each special off every unit of its item that is in the cart.
+
+    `specials` are the ones running today, in priority order. If two name the
+    same item, the first applies and the second is ignored: specials on one
+    item do not stack.
+    """
+    discounts: list[Discount] = []
+    taken: set[str] = set()
+    for special in specials:
+        units = units_by_item.get(special.item_code, 0)
+        if special.item_code in taken:
+            continue
+        taken.add(special.item_code)
+        if units < 1 or special.saves_cents == 0:
+            continue
+        discounts.append(
+            Discount(
+                kind=DiscountKind.SPECIAL,
+                code=special.code,
+                name=special.name,
+                times=units,
+                amount_cents=special.saves_cents * units,
+            )
+        )
+    return tuple(discounts)
 
 
 def find_opening(

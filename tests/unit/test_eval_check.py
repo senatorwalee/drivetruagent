@@ -11,6 +11,7 @@ import pytest
 from drivetruagent.agent.tools import TOOL_DEFINITIONS
 from drivetruagent.enums import Language, SessionState
 from drivetruagent.evals.scenario import (
+    DEFAULT_BUSINESS_DATE,
     Exchange,
     ExpectedLine,
     Scenario,
@@ -18,7 +19,13 @@ from drivetruagent.evals.scenario import (
     check,
 )
 from drivetruagent.evals.scenarios import SCENARIOS
-from drivetruagent.ordering.discounts import ComboRule, ComboSlot, apply_combos
+from drivetruagent.ordering.discounts import (
+    ComboRule,
+    ComboSlot,
+    Special,
+    apply_combos,
+    apply_specials,
+)
 from drivetruagent.ordering.views import (
     CartSnapshot,
     LineView,
@@ -297,7 +304,7 @@ def test_scenario_total_matches_the_menu_prices(each: Scenario) -> None:
         base, deltas = prices[expected.item_code]
         unit = base + sum(deltas[choice] for choice in expected.options.items())
         subtotal += unit * expected.quantity
-    discount = combo_discount(each)
+    discount = expected_discount(each)
     taxable = Decimal(subtotal - discount)
     tax = int((taxable * Decimal("0.13")).quantize(Decimal(1), ROUND_HALF_UP))
 
@@ -305,17 +312,21 @@ def test_scenario_total_matches_the_menu_prices(each: Scenario) -> None:
     assert each.total_cents == subtotal - discount + tax
 
 
-def combo_discount(each: Scenario) -> int:
-    """What the menu file's combos take off the scenario's expected lines."""
+def expected_discount(each: Scenario) -> int:
+    """What the menu file's combos and specials take off the scenario's
+    expected lines, on the day the scenario is played."""
     menu = load_menu(MENU_PATH)
     category_of = {
         item.code: category.code
         for category in menu.categories
         for item in category.items
     }
-    units: Counter[str] = Counter()
+    prices = menu_prices()
+    by_category: Counter[str] = Counter()
+    by_item: Counter[str] = Counter()
     for expected in each.lines or ():
-        units[category_of[expected.item_code]] += expected.quantity
+        by_category[category_of[expected.item_code]] += expected.quantity
+        by_item[expected.item_code] += expected.quantity
     rules = [
         ComboRule(
             code=combo.code,
@@ -325,7 +336,31 @@ def combo_discount(each: Scenario) -> int:
         )
         for combo in menu.combos
     ]
-    return sum(d.amount_cents for d in apply_combos(units, rules).discounts)
+    specials = [
+        Special(
+            code=special.code,
+            name=special.name.model_dump(),
+            description=None,
+            item_code=special.item,
+            item_name={"en": special.item},
+            base_price_cents=prices[special.item][0],
+            discount_cents=special.discount_cents,
+            weekdays=frozenset(special.weekdays),
+        )
+        for special in menu.specials
+    ]
+    running = [special for special in specials if special.runs_on(each.business_date)]
+    discounts = (
+        *apply_combos(by_category, rules).discounts,
+        *apply_specials(by_item, running),
+    )
+    return sum(discount.amount_cents for discount in discounts)
+
+
+def test_scenarios_are_played_on_a_monday_unless_they_say_otherwise() -> None:
+    """A fixed day, so a total never depends on when the evals are run."""
+    assert DEFAULT_BUSINESS_DATE.isoweekday() == 1
+    assert all(each.business_date == DEFAULT_BUSINESS_DATE for each in SCENARIOS)
 
 
 def test_wrong_discount() -> None:

@@ -118,11 +118,29 @@ async def client(app: FastAPI) -> AsyncIterator[httpx.AsyncClient]:
 
 @pytest.fixture
 async def menu(db_session: AsyncSession) -> None:
-    """The real menu from data/menu.json, loaded for this test only."""
-    await seed_menu(db_session, load_menu(MENU_PATH))
+    """The real menu from data/menu.json, loaded for this test only.
+
+    Without its specials: which special runs depends on the day of the week,
+    and a test that is not about specials should not change with the
+    calendar. Tests that are ask for `specials` as well.
+    """
+    await seed_menu(
+        db_session, load_menu(MENU_PATH).model_copy(update={"specials": []})
+    )
     # Committed, so that a failed request rolling back its own work does not
     # take the menu with it. The fixture's outer transaction still undoes it
     # when the test ends.
+    await db_session.commit()
+
+
+@pytest.fixture
+async def specials(db_session: AsyncSession, menu: None) -> None:
+    """The real menu's specials, on top of the menu.
+
+    Monday to Thursday: 150 off a chicken burger. Friday to Sunday: 100 off a
+    milkshake. Tests pick the day by giving the session a business date.
+    """
+    await seed_menu(db_session, load_menu(MENU_PATH))
     await db_session.commit()
 
 

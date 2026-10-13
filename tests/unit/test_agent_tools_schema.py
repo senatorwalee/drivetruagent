@@ -9,6 +9,7 @@ from drivetruagent.agent.tools import TOOL_DEFINITIONS, TOOLS, Tool
 EXPECTED_TOOLS = {
     "search_menu",
     "get_item_details",
+    "get_todays_specials",
     "add_item",
     "update_item",
     "remove_item",

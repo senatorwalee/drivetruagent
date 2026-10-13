@@ -4,7 +4,7 @@ Each rejection test names the constraint it expects, so a test cannot pass
 because some other rule happened to fire.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 from sqlalchemy import delete, func, select, text
@@ -54,11 +54,20 @@ async def test_new_session_starts_at_greeting(db_session: AsyncSession) -> None:
 
 
 async def test_session_lane_defaults_to_lane_1(db_session: AsyncSession) -> None:
-    customer_session = CustomerSession()
+    customer_session = CustomerSession(business_date=date(2026, 10, 12))
     db_session.add(customer_session)
     await db_session.flush()
 
     assert customer_session.lane == "lane-1"
+
+
+async def test_a_session_must_have_a_business_date(db_session: AsyncSession) -> None:
+    """No database default: a date guessed in the wrong timezone would hand
+    out the wrong day's specials around midnight."""
+    db_session.add(CustomerSession())
+
+    with pytest.raises(IntegrityError, match="business_date"):
+        await db_session.flush()
 
 
 def test_every_state_is_either_active_or_final() -> None:
@@ -135,8 +144,8 @@ async def test_unknown_state_is_rejected(db_session: AsyncSession) -> None:
     with pytest.raises(IntegrityError, match="ck_sessions_state_valid"):
         await db_session.execute(
             text(
-                "INSERT INTO sessions (lane, state, ended_at) "
-                "VALUES ('lane-9', 'paused', now())"
+                "INSERT INTO sessions (lane, state, ended_at, business_date) "
+                "VALUES ('lane-9', 'paused', now(), '2026-10-12')"
             )
         )
 
@@ -144,7 +153,10 @@ async def test_unknown_state_is_rejected(db_session: AsyncSession) -> None:
 async def test_unknown_language_is_rejected(db_session: AsyncSession) -> None:
     with pytest.raises(IntegrityError, match="ck_sessions_language_valid"):
         await db_session.execute(
-            text("INSERT INTO sessions (lane, language) VALUES ('lane-9', 'de')")
+            text(
+                "INSERT INTO sessions (lane, language, business_date) "
+                "VALUES ('lane-9', 'de', '2026-10-12')"
+            )
         )
 
 
