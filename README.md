@@ -34,7 +34,8 @@ built piece by piece.
 | Model | OpenAI, through the Responses API; the model name is a setting |
 | Voice (planned) | OpenAI Realtime, relayed through the backend |
 | Tests | pytest, with a real Postgres started by testcontainers |
-| Tooling | uv, ruff, pyright, pre-commit, GitHub Actions |
+| Web app | React, TypeScript and Vite; TanStack Query; types generated from the API |
+| Tooling | uv, ruff, pyright, oxlint, Vitest, pre-commit, GitHub Actions |
 
 ## Getting started
 
@@ -65,11 +66,14 @@ collide with a Postgres installed directly on your machine.
 | `make seed` | Load `data/menu.json` into the database; safe to run repeatedly |
 | `make chat` | Talk to the agent in the terminal (needs `OPENAI_API_KEY`) |
 | `make eval` | Run the evals against the real model (needs `OPENAI_API_KEY`) |
+| `make ui` | Run the web app on <http://localhost:5174> (needs `make dev` running too) |
+| `make gen-api` | Regenerate the web app's API types after changing an endpoint |
+| `make check-ui` | Everything CI runs for the web app: lint, type check, tests, build |
 | `make lint` | Run ruff and pyright |
 | `make format` | Fix lint issues and format the code |
 | `make test` | Run every test except the evals (needs Docker) |
 | `make test-unit` | Run the fast tests only (no Docker) |
-| `make check` | Everything CI runs: lint, then all tests |
+| `make check` | Everything CI runs for the backend: lint, then all tests |
 
 ## Testing
 
@@ -84,9 +88,9 @@ Three layers check every change:
 
 | When | What runs |
 |---|---|
-| On each commit (git hook) | ruff, pyright, unit tests |
+| On each commit (git hook) | ruff, pyright, unit tests; and the web app's lint, types and tests when it changed |
 | Before each push (git hook) | The full test suite |
-| On each pushed commit (GitHub Actions) | Lint, format check, pyright, full test suite |
+| On each pushed commit (GitHub Actions) | Backend: lint, format check, pyright, full test suite. Web app: lint, type check, tests, build |
 
 ## The menu is data
 
@@ -209,6 +213,48 @@ model is scripted. Every tool call it makes runs through the same policy
 engine and ordering rules, and the totals it speaks are read from what the
 tools returned. `GET /agent` says which model is in use and, for the demo,
 what to type at each turn.
+
+## The live session screen
+
+`frontend/` is a React app with one screen so far: a live view of a session,
+for demos. It shows the agent (an indicator that changes as it listens, works
+and speaks), the conversation, the order filling up as items are added, and
+every tool call with the backend's decision.
+
+```bash
+npm --prefix frontend install   # once
+make dev                        # the API, in one terminal
+make ui                         # the web app, in another
+```
+
+Then open <http://localhost:5174>. With `AGENT_MODEL=demo` in `.env` the
+screen offers the next line of the script at each turn, so the whole order
+can be played with a click per turn.
+
+The same session can be shown three ways, switched from the top bar and
+remembered in the address (`?view=`):
+
+| View | Emphasis |
+|---|---|
+| Menu board | The agent and the order, like a drive-through sign at night |
+| Receipt | The order as a printed receipt; the decisions as a ledger |
+| Control room | The decision log, with the session's state across the top |
+
+How it is put together:
+
+- **One place holds the session.** `src/session/` fetches, follows a turn
+  while it runs, and derives what to show. The three views in `src/views/`
+  receive that and only draw it, so switching view mid-order loses nothing.
+- **The screen is derived from the event log.** The transcript, the decisions
+  and what is waiting for a yes are all computed from the backend's audit
+  trail by pure functions, so the screen cannot drift from what happened.
+- **A turn is followed step by step.** While the agent is working, the screen
+  polls the event log and cart, so items appear one at a time.
+- **API types are generated, and checked.** `make gen-api` writes TypeScript
+  types from the backend's API description. A backend test fails if that
+  description is out of date, so the two cannot drift apart unnoticed.
+- **One test suite covers all three views.** They look different but must
+  show the same things and offer the same controls.
 
 ## Evals
 
@@ -350,6 +396,10 @@ src/drivetruagent/
 ├── evals/           scenarios and the checker that judges a finished conversation
 └── seed.py          loads the menu file into the database
 data/menu.json       the menu: items, choices, prices, aliases
+frontend/src/
+├── api/             typed client; types generated from the backend
+├── session/         the live session: fetching, and what to show (no JSX)
+└── views/           the screen in three looks, plus the pieces they share
 migrations/          Alembic migration scripts
 tests/               unit and integration tests
 ```

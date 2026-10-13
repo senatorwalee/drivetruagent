@@ -137,6 +137,7 @@ async def test_agent_info_says_when_no_model_is_configured(
     info = (await client.get("/agent")).json()
 
     assert info == {
+        "restaurant_name": "Maple Lane Burgers",
         "available": False,
         "model": None,
         "scripted": False,

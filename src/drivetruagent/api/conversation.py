@@ -34,6 +34,7 @@ class MessageResponse(BaseModel):
 
 
 class AgentInfoResponse(BaseModel):
+    restaurant_name: str
     # False when no model is configured; the conversation endpoint answers 503.
     available: bool
     model: str | None
@@ -114,6 +115,7 @@ async def read_events(
 async def read_agent_info(settings: SettingsDep) -> AgentInfoResponse:
     info = agent_info(settings)
     return AgentInfoResponse(
+        restaurant_name=settings.restaurant_name,
         available=info.available,
         model=info.model,
         scripted=info.scripted,

@@ -1,0 +1,152 @@
+/**
+ * Turns a session's raw event log into what the screen shows.
+ *
+ * Pure functions, no React and no network. The event log is the backend's
+ * audit trail: every message, tool call and tool result, in order. Everything
+ * here is derived from it, so the screen never keeps its own copy of the
+ * conversation that could drift from the truth.
+ */
+import type { AgentEvent } from '../api/client'
+import type { Decision, DecisionKind, PendingItem, PlacedOrder, Timeline, TranscriptLine } from './types'
+
+type Json = Record<string, unknown>
+
+interface ToolCallPayload {
+  call_id: string
+  name: string
+  arguments: Json
+}
+
+interface ToolResultPayload {
+  call_id: string
+  name: string
+  result: Json
+}
+
+/** Tools that change the cart, and so can leave something waiting for a yes. */
+const HOLDABLE_TOOLS = new Set(['add_item', 'update_item'])
+const DECISIONS = new Set<DecisionKind>(['allow', 'reject', 'confirm', 'escalate'])
+
+export function buildTimeline(events: readonly AgentEvent[]): Timeline {
+  const transcript: TranscriptLine[] = []
+  const decisions: Decision[] = []
+  const calls = new Map<string, ToolCallPayload>()
+  let pending: PendingItem | null = null
+  let order: PlacedOrder | null = null
+
+  for (const event of events) {
+    switch (event.kind) {
+      case 'user_message':
+        transcript.push({ id: event.seq, speaker: 'customer', text: textOf(event) })
+        break
+      case 'assistant_message':
+        transcript.push({ id: event.seq, speaker: 'agent', text: textOf(event) })
+        break
+      case 'tool_call': {
+        const call = event.payload as unknown as ToolCallPayload
+        calls.set(call.call_id, call)
+        break
+      }
+      case 'tool_result': {
+        const { call_id, name, result } = event.payload as unknown as ToolResultPayload
+        const args = calls.get(call_id)?.arguments ?? {}
+        const kind = decisionKind(result)
+        decisions.push({
+          id: event.seq,
+          tool: name,
+          summary: summarise(args),
+          kind,
+          reason: reasonOf(result),
+          cartVersion: cartVersionOf(result),
+        })
+        pending = nextPending(pending, name, kind, args)
+        order = placedOrder(result) ?? order
+        break
+      }
+      default:
+        // model_call events are bookkeeping; the screen does not show them.
+        break
+    }
+  }
+
+  return { transcript, decisions, pending, order }
+}
+
+function textOf(event: AgentEvent): string {
+  const text = event.payload['text']
+  return typeof text === 'string' ? text : ''
+}
+
+function decisionKind(result: Json): DecisionKind {
+  const decision = result['decision']
+  if (typeof decision === 'string' && DECISIONS.has(decision as DecisionKind)) {
+    return decision as DecisionKind
+  }
+  // No decision field: either a lookup, or a tool that failed before policy ran.
+  return 'error' in result ? 'reject' : 'read'
+}
+
+function reasonOf(result: Json): string | null {
+  if (typeof result['rule'] === 'string') return result['rule']
+  const error = result['error'] as { code?: unknown } | undefined
+  return typeof error?.code === 'string' ? error.code : null
+}
+
+function cartVersionOf(result: Json): number | null {
+  const cart = result['cart'] as { version?: unknown } | undefined
+  return typeof cart?.version === 'number' ? cart.version : null
+}
+
+function placedOrder(result: Json): PlacedOrder | null {
+  const order = result['order'] as { order_number?: unknown; total_cents?: unknown } | undefined
+  if (typeof order?.order_number !== 'number' || typeof order.total_cents !== 'number') return null
+  return { orderNumber: order.order_number, totalCents: order.total_cents }
+}
+
+/**
+ * What is waiting for the customer's yes after this tool result.
+ *
+ * A `confirm` on a cart change starts a wait. Anything that runs afterwards
+ * ends it: the backend drops a held action as soon as it is answered or the
+ * cart moves on, and this mirrors that.
+ */
+function nextPending(current: PendingItem | null, tool: string, kind: DecisionKind, args: Json): PendingItem | null {
+  if (kind === 'confirm' && HOLDABLE_TOOLS.has(tool)) {
+    const quantity = args['quantity']
+    const itemCode = args['item_code']
+    if (typeof quantity === 'number' && typeof itemCode === 'string') {
+      return { quantity, itemCode }
+    }
+    return null
+  }
+  // Lookups and rejections change nothing, so a wait survives them.
+  return kind === 'read' || kind === 'reject' ? current : null
+}
+
+/** The arguments of a tool call in a short readable form. */
+export function summarise(args: Json): string {
+  const parts: string[] = []
+  const quantity = typeof args['quantity'] === 'number' ? args['quantity'] : null
+
+  if (typeof args['line_no'] === 'number') parts.push(`L${args['line_no']}`)
+  if (typeof args['item_code'] === 'string') {
+    parts.push(quantity !== null && quantity !== 1 ? `${args['item_code']} × ${quantity}` : args['item_code'])
+  } else if (quantity !== null) {
+    parts.push(`quantity=${quantity}`)
+  }
+  parts.push(...selectionParts(args['selections']))
+  if (typeof args['query'] === 'string') parts.push(`"${args['query']}"`)
+  if (typeof args['language'] === 'string') parts.push(args['language'])
+  if (typeof args['reason'] === 'string') parts.push(args['reason'])
+
+  return parts.join(' · ')
+}
+
+function selectionParts(selections: unknown): string[] {
+  if (!Array.isArray(selections)) return []
+  return selections.flatMap((selection: { group?: unknown; options?: unknown }) => {
+    if (typeof selection.group !== 'string' || !Array.isArray(selection.options)) return []
+    const options = selection.options.length > 0 ? selection.options.join('+') : 'none'
+    return [`${selection.group}=${options}`]
+  })
+}
