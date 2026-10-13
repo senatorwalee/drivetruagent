@@ -14,9 +14,10 @@ Nothing here commits. The caller owns the transaction.
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import timedelta
 from decimal import Decimal
 
-from sqlalchemy import delete, insert, select
+from sqlalchemy import delete, func, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -26,12 +27,20 @@ from drivetruagent.ordering import pricing
 from drivetruagent.ordering.catalog import load_item_by_code, load_items_by_id
 from drivetruagent.ordering.errors import (
     EmptyCart,
+    InsufficientStock,
     InvalidQuantity,
     ItemUnavailable,
     NothingToUpdate,
     UnknownCartLine,
     UnknownItem,
 )
+from drivetruagent.ordering.inventory import (
+    DEFAULT_RESERVATION_TTL,
+    StockNeed,
+    extend_reservations,
+    reserve,
+)
+from drivetruagent.ordering.menu import alternatives_to
 from drivetruagent.ordering.selection import (
     ChosenOption,
     ItemSpec,
@@ -101,6 +110,7 @@ async def add_item(
     selections: Selections | None = None,
     *,
     tax_rate: Decimal,
+    reservation_ttl: timedelta = DEFAULT_RESERVATION_TTL,
 ) -> CartSnapshot:
     """Add a new line. Raises MissingRequiredOptions if a choice is still needed."""
     _check_quantity(quantity)
@@ -113,6 +123,7 @@ async def add_item(
     if not item.is_active:
         raise ItemUnavailable(item_code)
     chosen = resolve_selection(item, selections or {})
+    await _hold_stock(db, customer_session, cart, item, +quantity, reservation_ttl)
 
     line = CartLine(
         cart_id=cart.id, line_no=cart.next_line_no, item_id=item.id, quantity=quantity
@@ -122,7 +133,7 @@ async def add_item(
     await _write_options(db, line.id, chosen)
     cart.next_line_no += 1
 
-    return await _finish_change(db, customer_session, cart, tax_rate)
+    return await _finish_change(db, customer_session, cart, tax_rate, reservation_ttl)
 
 
 async def update_line(
@@ -133,6 +144,7 @@ async def update_line(
     selections: Selections | None = None,
     *,
     tax_rate: Decimal,
+    reservation_ttl: timedelta = DEFAULT_RESERVATION_TTL,
 ) -> CartSnapshot:
     """Change a line's quantity, its options, or both.
 
@@ -147,12 +159,20 @@ async def update_line(
     cart = await load_cart(db, session_id)
     line = await _load_line(db, cart, line_no)
 
+    item = (await load_items_by_id(db, [line.item_id]))[line.item_id]
+
+    # Everything that can refuse the change happens before anything is written.
+    chosen: list[ChosenOption] | None = None
     if selections is not None:
-        item = (await load_items_by_id(db, [line.item_id]))[line.item_id]
         current = _current_selections(
             item, [o.option_id for o in line.selected_options]
         )
         chosen = resolve_selection(item, merge_selections(current, selections))
+    if quantity is not None and quantity != line.quantity:
+        change = quantity - line.quantity
+        await _hold_stock(db, customer_session, cart, item, change, reservation_ttl)
+
+    if chosen is not None:
         await db.execute(
             delete(CartLineOption).where(CartLineOption.cart_line_id == line.id)
         )
@@ -160,25 +180,37 @@ async def update_line(
     if quantity is not None:
         line.quantity = quantity
 
-    return await _finish_change(db, customer_session, cart, tax_rate)
+    return await _finish_change(db, customer_session, cart, tax_rate, reservation_ttl)
 
 
 async def remove_line(
-    db: AsyncSession, session_id: uuid.UUID, line_no: int, *, tax_rate: Decimal
+    db: AsyncSession,
+    session_id: uuid.UUID,
+    line_no: int,
+    *,
+    tax_rate: Decimal,
+    reservation_ttl: timedelta = DEFAULT_RESERVATION_TTL,
 ) -> CartSnapshot:
     """Remove a line. Its number is not reused by later lines."""
     customer_session = await lock_active_session(db, session_id)
     cart = await load_cart(db, session_id)
     line = await _load_line(db, cart, line_no)
+    item = (await load_items_by_id(db, [line.item_id]))[line.item_id]
 
+    # Give back the stock this line was holding.
+    await _hold_stock(db, customer_session, cart, item, -line.quantity, reservation_ttl)
     # The database removes the line's chosen options with it (ON DELETE CASCADE).
     await db.execute(delete(CartLine).where(CartLine.id == line.id))
 
-    return await _finish_change(db, customer_session, cart, tax_rate)
+    return await _finish_change(db, customer_session, cart, tax_rate, reservation_ttl)
 
 
 async def request_confirmation(
-    db: AsyncSession, session_id: uuid.UUID, *, tax_rate: Decimal
+    db: AsyncSession,
+    session_id: uuid.UUID,
+    *,
+    tax_rate: Decimal,
+    reservation_ttl: timedelta = DEFAULT_RESERVATION_TTL,
 ) -> CartSnapshot:
     """Mark that the order is being read back to the customer.
 
@@ -192,6 +224,7 @@ async def request_confirmation(
     if not lines:
         raise EmptyCart()
     customer_session.state = SessionState.CONFIRMING
+    await extend_reservations(db, session_id, ttl=reservation_ttl)
     await db.flush()
     return snapshot_from_lines(customer_session, cart, lines, tax_rate)
 
@@ -266,6 +299,39 @@ def snapshot_from_lines(
 # --- Helpers ----------------------------------------------------------------
 
 
+async def _hold_stock(
+    db: AsyncSession,
+    customer_session: CustomerSession,
+    cart: Cart,
+    item: ItemSpec,
+    change: int,
+    ttl: timedelta,
+) -> None:
+    """Adjust the stock this session holds of an item by `change` units.
+
+    Called before the cart is written, so a refusal leaves the cart untouched.
+    If there is not enough, the error is given some in-stock alternatives from
+    the same category for the agent to offer.
+    """
+    in_cart = (
+        await db.execute(
+            select(func.coalesce(func.sum(CartLine.quantity), 0)).where(
+                CartLine.cart_id == cart.id, CartLine.item_id == item.id
+            )
+        )
+    ).scalar_one()
+    need = StockNeed(item.id, item.code, int(in_cart) + change)
+    try:
+        await reserve(db, customer_session.id, need, ttl=ttl)
+    except InsufficientStock as error:
+        language = customer_session.language or DEFAULT_LANGUAGE
+        alternatives = await alternatives_to(db, item.code, language)
+        error.details["alternatives"] = [
+            alternative.model_dump(mode="json") for alternative in alternatives
+        ]
+        raise
+
+
 def _check_quantity(quantity: int) -> None:
     if quantity < 1:
         raise InvalidQuantity(quantity)
@@ -309,11 +375,17 @@ async def _write_options(
 
 
 async def _finish_change(
-    db: AsyncSession, customer_session: CustomerSession, cart: Cart, tax_rate: Decimal
+    db: AsyncSession,
+    customer_session: CustomerSession,
+    cart: Cart,
+    tax_rate: Decimal,
+    reservation_ttl: timedelta,
 ) -> CartSnapshot:
     cart.version += 1
     # A cart edited after the read-back has to be confirmed again.
     customer_session.state = SessionState.ORDERING
+    # The session is clearly still here, so its held stock stays held.
+    await extend_reservations(db, customer_session.id, ttl=reservation_ttl)
     await db.flush()
     return await build_snapshot(db, customer_session, cart, tax_rate)
 

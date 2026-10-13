@@ -4,6 +4,7 @@ These are the lookups the agent uses to turn what a customer said into item
 and option codes. They only read; they never change anything.
 """
 
+import uuid
 from dataclasses import dataclass
 
 from sqlalchemy import Select, select
@@ -14,6 +15,7 @@ from drivetruagent.db.models import MenuCategory, MenuItem, OptionGroup
 from drivetruagent.enums import Language
 from drivetruagent.ordering.catalog import to_item_spec
 from drivetruagent.ordering.errors import UnknownItem
+from drivetruagent.ordering.inventory import sold_out_item_ids
 from drivetruagent.ordering.search import Candidate, search
 from drivetruagent.ordering.selection import GroupSpec, ItemSpec
 from drivetruagent.ordering.views import (
@@ -55,6 +57,7 @@ async def search_menu(
     the agent should then ask which one.
     """
     entries = await _load_active_entries(db)
+    sold_out = await sold_out_item_ids(db)
     candidates = [
         Candidate(
             value=entry,
@@ -68,7 +71,7 @@ async def search_menu(
     ]
     return [
         MenuMatch(
-            **_summary(match.value.item, language).model_dump(),
+            **_summary(match.value.item, language, sold_out).model_dump(),
             category_code=match.value.category_code,
             score=match.score,
         )
@@ -85,9 +88,10 @@ async def get_item_details(
     if item is None:
         raise UnknownItem(item_code)
     entry = _to_entry(item)
+    sold_out = await sold_out_item_ids(db)
 
     return ItemDetails(
-        **_summary(entry.item, language).model_dump(),
+        **_summary(entry.item, language, sold_out).model_dump(),
         category_code=entry.category_code,
         description=localize(entry.description, language)
         if entry.description
@@ -100,6 +104,7 @@ async def get_item_details(
 async def get_menu(db: AsyncSession, language: Language) -> MenuView:
     """Every available item, grouped by category, in display order."""
     categories: dict[str, CategoryView] = {}
+    sold_out = await sold_out_item_ids(db)
     for entry in await _load_active_entries(db):
         category = categories.setdefault(
             entry.category_code,
@@ -109,8 +114,30 @@ async def get_menu(db: AsyncSession, language: Language) -> MenuView:
                 items=[],
             ),
         )
-        category.items.append(_summary(entry.item, language))
+        category.items.append(_summary(entry.item, language, sold_out))
     return MenuView(categories=list(categories.values()))
+
+
+async def alternatives_to(
+    db: AsyncSession, item_code: str, language: Language, limit: int = 3
+) -> list[MenuItemSummary]:
+    """Other items from the same category that are in stock, in menu order.
+
+    Offered to the customer when what they asked for has run out.
+    """
+    entries = await _load_active_entries(db)
+    sold_out = await sold_out_item_ids(db)
+    category = next(
+        (entry.category_code for entry in entries if entry.item.code == item_code),
+        None,
+    )
+    return [
+        _summary(entry.item, language, sold_out)
+        for entry in entries
+        if entry.category_code == category
+        and entry.item.code != item_code
+        and entry.item.id not in sold_out
+    ][:limit]
 
 
 # --- Helpers ----------------------------------------------------------------
@@ -122,12 +149,15 @@ def must_ask(group: GroupSpec) -> bool:
     return group.min_select >= 1 and group.default_option is None
 
 
-def _summary(item: ItemSpec, language: Language) -> MenuItemSummary:
+def _summary(
+    item: ItemSpec, language: Language, sold_out: set[uuid.UUID]
+) -> MenuItemSummary:
     return MenuItemSummary(
         item_code=item.code,
         item_name=localize(item.name, language),
         base_price_cents=item.base_price_cents,
         must_ask=[group.code for group in item.groups if must_ask(group)],
+        in_stock=item.id not in sold_out,
     )
 
 

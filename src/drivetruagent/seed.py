@@ -33,6 +33,7 @@ from drivetruagent.db.models import (
 )
 from drivetruagent.db.session import create_engine, create_session_factory
 from drivetruagent.enums import Language
+from drivetruagent.ordering.inventory import set_on_hand
 
 DEFAULT_MENU_PATH = Path("data/menu.json")
 
@@ -90,6 +91,8 @@ class MenuItemSeed(SeedModel):
     name: LocalizedTextSeed
     description: LocalizedTextSeed | None = None
     base_price_cents: int = Field(ge=0)
+    # Units on hand. Leave it out for an item whose stock is not tracked.
+    stock: int | None = Field(default=None, ge=0)
     aliases: dict[Language, list[str]] = Field(default_factory=dict)
     option_groups: list[OptionGroupSeed] = Field(default_factory=list)
 
@@ -223,6 +226,9 @@ async def seed_menu(session: AsyncSession, menu: MenuSeed) -> SeedSummary:
                 )
             )
             alias_count += await _replace_aliases(session, item_id, item.aliases)
+            if item.stock is not None:
+                # Sets the count to the file's value, which also restocks.
+                await set_on_hand(session, item.code, item.stock)
 
     await session.execute(
         update(MenuItem)

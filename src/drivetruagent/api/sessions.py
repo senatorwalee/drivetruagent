@@ -10,7 +10,7 @@ import uuid
 
 from fastapi import APIRouter, status
 
-from drivetruagent.api.deps import SessionDep, SettingsDep
+from drivetruagent.api.deps import IdempotencyKey, SessionDep, SettingsDep
 from drivetruagent.api.errors import CONFLICT, NOT_FOUND, REFUSED
 from drivetruagent.api.schemas import (
     AddLineRequest,
@@ -19,6 +19,7 @@ from drivetruagent.api.schemas import (
     UpdateSessionRequest,
 )
 from drivetruagent.ordering import cart, orders, sessions
+from drivetruagent.ordering.idempotency import run_once
 from drivetruagent.ordering.views import CartSnapshot, OrderView, SessionView
 
 router = APIRouter(tags=["ordering"])
@@ -95,6 +96,7 @@ async def add_line(
         body.quantity,
         body.selections,
         tax_rate=settings.tax_rate,
+        reservation_ttl=settings.reservation_ttl,
     )
     await db.commit()
     return snapshot
@@ -121,6 +123,7 @@ async def update_line(
         body.quantity,
         body.selections,
         tax_rate=settings.tax_rate,
+        reservation_ttl=settings.reservation_ttl,
     )
     await db.commit()
     return snapshot
@@ -135,7 +138,11 @@ async def remove_line(
     session_id: uuid.UUID, line_no: int, db: SessionDep, settings: SettingsDep
 ) -> CartSnapshot:
     snapshot = await cart.remove_line(
-        db, session_id, line_no, tax_rate=settings.tax_rate
+        db,
+        session_id,
+        line_no,
+        tax_rate=settings.tax_rate,
+        reservation_ttl=settings.reservation_ttl,
     )
     await db.commit()
     return snapshot
@@ -151,10 +158,25 @@ async def remove_line(
     summary="Submit the cart as an order",
 )
 async def submit_order(
-    session_id: uuid.UUID, db: SessionDep, settings: SettingsDep
+    session_id: uuid.UUID,
+    db: SessionDep,
+    settings: SettingsDep,
+    idempotency_key: IdempotencyKey = None,
 ) -> OrderView:
-    """Freeze the cart into an order and end the session."""
-    order = await orders.submit_order(db, session_id, tax_rate=settings.tax_rate)
+    """Freeze the cart into an order and end the session.
+
+    Send an `Idempotency-Key` header if the request might be retried: a repeat
+    with the same key returns the same order instead of an error.
+    """
+    order = await run_once(
+        db,
+        session_id,
+        idempotency_key,
+        operation="submit_order",
+        request={},
+        response_model=OrderView,
+        run=lambda: orders.submit_order(db, session_id, tax_rate=settings.tax_rate),
+    )
     await db.commit()
     return order
 

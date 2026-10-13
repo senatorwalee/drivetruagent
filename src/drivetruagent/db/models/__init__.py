@@ -12,6 +12,11 @@ from drivetruagent.db.models.catalog import (
     OptionGroup,
 )
 from drivetruagent.db.models.events import AgentEvent
+from drivetruagent.db.models.inventory import (
+    IdempotencyRecord,
+    Inventory,
+    Reservation,
+)
 from drivetruagent.db.models.ordering import (
     Cart,
     CartLine,
@@ -27,6 +32,8 @@ __all__ = [
     "CartLine",
     "CartLineOption",
     "CustomerSession",
+    "IdempotencyRecord",
+    "Inventory",
     "MenuCategory",
     "MenuItem",
     "MenuItemAlias",
@@ -36,4 +43,5 @@ __all__ = [
     "OrderLine",
     "OrderLineOption",
     "PendingAction",
+    "Reservation",
 ]

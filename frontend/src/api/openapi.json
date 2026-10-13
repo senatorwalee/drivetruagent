@@ -486,6 +486,11 @@
             ],
             "title": "Description"
           },
+          "in_stock": {
+            "default": true,
+            "title": "In Stock",
+            "type": "boolean"
+          },
           "item_code": {
             "title": "Item Code",
             "type": "string"
@@ -575,6 +580,11 @@
             "title": "Base Price Cents",
             "type": "integer"
           },
+          "in_stock": {
+            "default": true,
+            "title": "In Stock",
+            "type": "boolean"
+          },
           "item_code": {
             "title": "Item Code",
             "type": "string"
@@ -609,6 +619,11 @@
           "category_code": {
             "title": "Category Code",
             "type": "string"
+          },
+          "in_stock": {
+            "default": true,
+            "title": "In Stock",
+            "type": "boolean"
           },
           "item_code": {
             "title": "Item Code",
@@ -945,6 +960,49 @@
         "title": "SessionView",
         "type": "object"
       },
+      "SetStockRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "on_hand": {
+            "minimum": 0.0,
+            "title": "On Hand",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "on_hand"
+        ],
+        "title": "SetStockRequest",
+        "type": "object"
+      },
+      "StockLevelView": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "integer"
+          },
+          "item_code": {
+            "title": "Item Code",
+            "type": "string"
+          },
+          "on_hand": {
+            "title": "On Hand",
+            "type": "integer"
+          },
+          "reserved": {
+            "title": "Reserved",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item_code",
+          "on_hand",
+          "reserved",
+          "available"
+        ],
+        "title": "StockLevelView",
+        "type": "object"
+      },
       "SubmitOrder": {
         "additionalProperties": false,
         "properties": {
@@ -1174,6 +1232,95 @@
         "summary": "Ready",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/inventory": {
+      "get": {
+        "description": "Every stock-tracked item. Items not listed are not tracked and are\ntreated as unlimited.",
+        "operationId": "read_stock_inventory_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StockLevelView"
+                  },
+                  "title": "Response Read Stock Inventory Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Stock levels",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/inventory/{item_code}": {
+      "put": {
+        "description": "Record a count, starting to track the item if it was not tracked.\n\nSetting stock below what sessions already hold does not cancel their\nholds. Those orders are checked again when they are submitted.",
+        "operationId": "set_stock_inventory__item_code__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_code",
+            "required": true,
+            "schema": {
+              "title": "Item Code",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetStockRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockLevelView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set how many of an item are on hand",
+        "tags": [
+          "inventory"
         ]
       }
     },
@@ -1607,6 +1754,26 @@
               "format": "uuid",
               "title": "Session Id",
               "type": "string"
+            }
+          },
+          {
+            "description": "Send the same value when retrying a request.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Send the same value when retrying a request.",
+              "title": "Idempotency-Key"
             }
           }
         ],
@@ -2117,7 +2284,7 @@
     },
     "/sessions/{session_id}/order": {
       "post": {
-        "description": "Freeze the cart into an order and end the session.",
+        "description": "Freeze the cart into an order and end the session.\n\nSend an `Idempotency-Key` header if the request might be retried: a repeat\nwith the same key returns the same order instead of an error.",
         "operationId": "submit_order_sessions__session_id__order_post",
         "parameters": [
           {
@@ -2128,6 +2295,26 @@
               "format": "uuid",
               "title": "Session Id",
               "type": "string"
+            }
+          },
+          {
+            "description": "Send the same value when retrying a request.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Send the same value when retrying a request.",
+              "title": "Idempotency-Key"
             }
           }
         ],
@@ -2265,6 +2452,26 @@
               "format": "uuid",
               "title": "Pending Action Id",
               "type": "string"
+            }
+          },
+          {
+            "description": "Send the same value when retrying a request.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Send the same value when retrying a request.",
+              "title": "Idempotency-Key"
             }
           }
         ],

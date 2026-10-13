@@ -56,4 +56,5 @@ def agent_config(settings: Settings) -> AgentConfig:
         tax_rate=settings.tax_rate,
         limits=settings.policy_limits,
         max_tool_rounds=settings.agent_max_tool_rounds,
+        reservation_ttl=settings.reservation_ttl,
     )

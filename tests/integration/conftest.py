@@ -120,6 +120,10 @@ async def client(app: FastAPI) -> AsyncIterator[httpx.AsyncClient]:
 async def menu(db_session: AsyncSession) -> None:
     """The real menu from data/menu.json, loaded for this test only."""
     await seed_menu(db_session, load_menu(MENU_PATH))
+    # Committed, so that a failed request rolling back its own work does not
+    # take the menu with it. The fixture's outer transaction still undoes it
+    # when the test ends.
+    await db_session.commit()
 
 
 @pytest.fixture

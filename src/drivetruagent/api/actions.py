@@ -9,7 +9,7 @@ import uuid
 
 from fastapi import APIRouter
 
-from drivetruagent.api.deps import SessionDep, SettingsDep
+from drivetruagent.api.deps import IdempotencyKey, SessionDep, SettingsDep
 from drivetruagent.api.errors import NOT_FOUND
 from drivetruagent.policy import gateway
 from drivetruagent.policy.actions import Action
@@ -20,7 +20,11 @@ router = APIRouter(prefix="/sessions/{session_id}", tags=["agent actions"])
 
 @router.post("/actions", responses=NOT_FOUND, summary="Propose an action")
 async def propose_action(
-    session_id: uuid.UUID, action: Action, db: SessionDep, settings: SettingsDep
+    session_id: uuid.UUID,
+    action: Action,
+    db: SessionDep,
+    settings: SettingsDep,
+    idempotency_key: IdempotencyKey = None,
 ) -> ActionOutcome:
     """Propose an action and get the policy engine's decision.
 
@@ -36,6 +40,8 @@ async def propose_action(
         action,
         tax_rate=settings.tax_rate,
         limits=settings.policy_limits,
+        reservation_ttl=settings.reservation_ttl,
+        idempotency_key=idempotency_key,
     )
     await db.commit()
     return outcome
@@ -51,6 +57,7 @@ async def confirm_pending_action(
     pending_action_id: uuid.UUID,
     db: SessionDep,
     settings: SettingsDep,
+    idempotency_key: IdempotencyKey = None,
 ) -> ActionOutcome:
     """Run the stored action, now that the customer has confirmed it."""
     outcome = await gateway.confirm(
@@ -59,6 +66,8 @@ async def confirm_pending_action(
         pending_action_id,
         tax_rate=settings.tax_rate,
         limits=settings.policy_limits,
+        reservation_ttl=settings.reservation_ttl,
+        idempotency_key=idempotency_key,
     )
     await db.commit()
     return outcome
