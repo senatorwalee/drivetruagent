@@ -172,6 +172,7 @@ async def test_agent_info_describes_the_demo_model(
     info = (await client.get("/agent")).json()
 
     assert info == {
+        "restaurant_name": "Maple Lane Burgers",
         "available": True,
         "model": "demo-script",
         "scripted": True,

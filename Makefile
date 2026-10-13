@@ -1,4 +1,4 @@
-.PHONY: up down dev migrate seed chat lint format test test-unit eval check hooks
+.PHONY: up down dev migrate seed chat ui gen-api lint format test test-unit eval check check-ui hooks
 
 # Start and stop the local Postgres.
 up:
@@ -23,6 +23,15 @@ seed:
 chat:
 	uv run python -m drivetruagent.agent.chat
 
+# Run the web app on http://localhost:5174. It talks to the API from `make dev`.
+ui:
+	npm --prefix frontend run dev
+
+# Regenerate the frontend's API types after changing an endpoint.
+gen-api:
+	uv run python scripts/export_openapi.py
+	npm --prefix frontend run gen-api
+
 lint:
 	uv run ruff check .
 	uv run ruff format --check .
@@ -46,8 +55,12 @@ test-unit:
 eval:
 	uv run pytest -m eval -v
 
-# Everything CI runs. Use this before pushing.
+# Everything CI runs for the backend. Use this before pushing.
 check: lint test
+
+# Everything CI runs for the frontend: lint, type check, tests and a build.
+check-ui:
+	npm --prefix frontend run check
 
 # Install the git hooks (once per clone).
 hooks:

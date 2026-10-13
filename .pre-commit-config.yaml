@@ -35,6 +35,15 @@ repos:
         always_run: true
         stages: [pre-commit]
 
+      # Only when something under frontend/ is part of the commit.
+      - id: frontend-check
+        name: frontend lint, types and tests
+        entry: npm --prefix frontend run check:fast
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+        stages: [pre-commit]
+
       # The full suite needs Docker, so it runs before a push, not on every commit.
       - id: all-tests
         name: all tests
