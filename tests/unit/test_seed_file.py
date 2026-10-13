@@ -299,3 +299,108 @@ def test_a_slot_used_twice_is_priced_twice() -> None:
 def test_two_combos_with_one_code_are_rejected() -> None:
     with pytest.raises(ValidationError, match="duplicate combo code"):
         MenuSeed.model_validate(menu_with_combos(combo(), combo()))
+
+
+# --- Specials ---------------------------------------------------------------
+
+
+def special(**overrides: Any) -> dict[str, Any]:
+    values: dict[str, Any] = {
+        "code": "fries_days",
+        "item": "fries",
+        "name": name("Fries special", "Spécial frites"),
+        "discount_cents": 50,
+        "weekdays": [1, 2],
+    }
+    return values | overrides
+
+
+def menu_with_specials(*specials: dict[str, Any]) -> dict[str, Any]:
+    """Fries at 249."""
+    return menu(item()) | {"specials": list(specials)}
+
+
+def test_the_real_menu_has_a_special_for_every_day_of_the_week() -> None:
+    """So "what's today's special?" has an answer whenever the demo is run."""
+    specials = load_menu(MENU_PATH).specials
+
+    covered = {day for each in specials for day in each.weekdays}
+    assert covered == {1, 2, 3, 4, 5, 6, 7}
+    assert {each.item for each in specials} == {"chicken_burger", "milkshake"}
+
+
+def test_the_real_menus_specials_are_described_in_both_languages() -> None:
+    for each in load_menu(MENU_PATH).specials:
+        assert each.description is not None, each.code
+
+
+def test_a_menu_needs_no_specials() -> None:
+    assert MenuSeed.model_validate(menu(item())).specials == []
+
+
+def test_a_valid_special_is_accepted() -> None:
+    (loaded,) = MenuSeed.model_validate(menu_with_specials(special())).specials
+
+    assert (loaded.item, loaded.discount_cents, loaded.weekdays) == (
+        "fries",
+        50,
+        [1, 2],
+    )
+
+
+def test_weekdays_left_out_means_every_day() -> None:
+    every_day = special()
+    del every_day["weekdays"]
+
+    (loaded,) = MenuSeed.model_validate(menu_with_specials(every_day)).specials
+
+    assert loaded.weekdays == []
+
+
+def test_weekdays_are_stored_in_order() -> None:
+    (loaded,) = MenuSeed.model_validate(
+        menu_with_specials(special(weekdays=[7, 1, 3]))
+    ).specials
+
+    assert loaded.weekdays == [1, 3, 7]
+
+
+@pytest.mark.parametrize("weekdays", [[0], [8], [1, 1], [-1]])
+def test_a_bad_weekday_is_rejected(weekdays: list[int]) -> None:
+    with pytest.raises(ValidationError, match="weekdays"):
+        MenuSeed.model_validate(menu_with_specials(special(weekdays=weekdays)))
+
+
+def test_a_special_on_an_unknown_item_is_rejected() -> None:
+    with pytest.raises(ValidationError, match="there is no item lobster"):
+        MenuSeed.model_validate(menu_with_specials(special(item="lobster")))
+
+
+@pytest.mark.parametrize("discount_cents", [0, -50])
+def test_a_special_must_take_something_off(discount_cents: int) -> None:
+    with pytest.raises(ValidationError, match="discount_cents"):
+        MenuSeed.model_validate(
+            menu_with_specials(special(discount_cents=discount_cents))
+        )
+
+
+def test_a_special_cannot_make_its_item_free() -> None:
+    with pytest.raises(ValidationError, match="not less than the price of fries"):
+        MenuSeed.model_validate(menu_with_specials(special(discount_cents=249)))
+
+    MenuSeed.model_validate(menu_with_specials(special(discount_cents=248)))
+
+
+def test_two_specials_with_one_code_are_rejected() -> None:
+    with pytest.raises(ValidationError, match="duplicate special code"):
+        MenuSeed.model_validate(menu_with_specials(special(), special()))
+
+
+def test_two_specials_may_name_one_item() -> None:
+    """Allowed, because they may run on different days. On a shared day the
+    earlier one applies."""
+    loaded = MenuSeed.model_validate(
+        menu_with_specials(special(), special(code="fries_weekend", weekdays=[6, 7]))
+    )
+
+    assert len(loaded.specials) == 2

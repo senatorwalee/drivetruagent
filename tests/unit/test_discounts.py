@@ -1,11 +1,20 @@
-"""Which combos a cart earns, and which it has started. No database needed."""
+"""Which combos and specials a cart earns, and which combos it has started.
+
+No database needed.
+"""
+
+from datetime import date
+
+import pytest
 
 from drivetruagent.enums import DiscountKind
 from drivetruagent.ordering.discounts import (
     ComboRule,
     ComboSlot,
     Discount,
+    Special,
     apply_combos,
+    apply_specials,
     find_opening,
 )
 
@@ -219,3 +228,127 @@ def test_only_the_missing_parts_need_to_be_sellable() -> None:
     assert missing_from(
         {"burgers": 1, "sides": 1}, BURGER_COMBO, sellable={"drinks"}
     ) == ("burger_combo", ["drinks"])
+
+
+# --- Specials ---------------------------------------------------------------
+
+MONDAY = date(2026, 10, 12)
+ALL_WEEK = [date(2026, 10, day) for day in range(12, 19)]
+
+
+def special(
+    code: str = "shake_days",
+    item_code: str = "milkshake",
+    discount_cents: int = 100,
+    base_price_cents: int = 399,
+    weekdays: frozenset[int] = frozenset(),
+) -> Special:
+    return Special(
+        code=code,
+        name={"en": code.title()},
+        description=None,
+        item_code=item_code,
+        item_name={"en": item_code.title()},
+        base_price_cents=base_price_cents,
+        discount_cents=discount_cents,
+        weekdays=weekdays,
+    )
+
+
+def off(code: str, times: int, amount_cents: int) -> Discount:
+    return Discount(
+        DiscountKind.SPECIAL, code, {"en": code.title()}, times, amount_cents
+    )
+
+
+def test_the_twelfth_of_october_2026_is_a_monday() -> None:
+    """The date these tests, and the eval scenarios, call Monday."""
+    assert MONDAY.isoweekday() == 1
+
+
+def test_a_special_runs_only_on_its_weekdays() -> None:
+    weekdays_only = special(weekdays=frozenset({1, 2, 3, 4, 5}))
+
+    assert [weekdays_only.runs_on(day) for day in ALL_WEEK] == [
+        True,
+        True,
+        True,
+        True,
+        True,
+        False,
+        False,
+    ]
+
+
+def test_a_special_with_no_weekdays_runs_every_day() -> None:
+    assert all(special().runs_on(day) for day in ALL_WEEK)
+
+
+def test_sunday_is_day_seven() -> None:
+    sundays = special(weekdays=frozenset({7}))
+
+    assert [day.isoweekday() for day in ALL_WEEK if sundays.runs_on(day)] == [7]
+
+
+def test_the_special_price_is_the_base_price_less_the_saving() -> None:
+    shake = special(discount_cents=100, base_price_cents=399)
+
+    assert (shake.saves_cents, shake.special_price_cents) == (100, 299)
+
+
+def test_a_special_never_takes_off_more_than_the_item_costs() -> None:
+    """The item's price was lowered after the special was set up."""
+    shake = special(discount_cents=500, base_price_cents=399)
+
+    assert (shake.saves_cents, shake.special_price_cents) == (399, 0)
+
+
+def test_every_unit_of_the_item_gets_the_special() -> None:
+    assert apply_specials({"milkshake": 3, "fries": 2}, [special()]) == (
+        off("shake_days", 3, 300),
+    )
+
+
+def test_a_cart_without_the_item_gets_nothing() -> None:
+    assert apply_specials({"fries": 2}, [special()]) == ()
+    assert apply_specials({}, [special()]) == ()
+    assert apply_specials({"milkshake": 0}, [special()]) == ()
+
+
+def test_no_specials_means_no_discounts() -> None:
+    assert apply_specials({"milkshake": 3}, []) == ()
+
+
+def test_specials_on_different_items_both_apply() -> None:
+    specials = [special(), special("pie_days", "apple_pie", 50, 199)]
+
+    assert apply_specials({"milkshake": 1, "apple_pie": 2}, specials) == (
+        off("shake_days", 1, 100),
+        off("pie_days", 2, 100),
+    )
+
+
+def test_two_specials_on_one_item_do_not_stack() -> None:
+    """The first in priority order applies; the second is ignored."""
+    specials = [
+        special("shake_days", discount_cents=100),
+        special("shake_more", discount_cents=150),
+    ]
+
+    assert apply_specials({"milkshake": 2}, specials) == (off("shake_days", 2, 200),)
+    assert apply_specials({"milkshake": 2}, specials[::-1]) == (
+        off("shake_more", 2, 300),
+    )
+
+
+def test_the_amount_uses_the_capped_saving() -> None:
+    capped = special(discount_cents=500, base_price_cents=399)
+
+    assert apply_specials({"milkshake": 2}, [capped]) == (off("shake_days", 2, 798),)
+
+
+@pytest.mark.parametrize("units", [1, 2, 7])
+def test_the_amount_is_the_saving_times_the_units(units: int) -> None:
+    (discount,) = apply_specials({"milkshake": units}, [special()])
+
+    assert (discount.times, discount.amount_cents) == (units, 100 * units)

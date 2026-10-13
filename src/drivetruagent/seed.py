@@ -33,6 +33,7 @@ from drivetruagent.db.models import (
     MenuItemAlias,
     Option,
     OptionGroup,
+    Special,
 )
 from drivetruagent.db.session import create_engine, create_session_factory
 from drivetruagent.enums import Language
@@ -135,11 +136,35 @@ class ComboSeed(SeedModel):
     slots: list[Code] = Field(min_length=2)
 
 
+class SpecialSeed(SeedModel):
+    """An item that is cheaper on certain days of the week."""
+
+    code: Code
+    # The code of the item it applies to.
+    item: Code
+    name: LocalizedTextSeed
+    description: LocalizedTextSeed | None = None
+    # Taken off each unit of the item.
+    discount_cents: int = Field(gt=0)
+    # ISO weekdays, 1 for Monday to 7 for Sunday. Leave empty for every day.
+    weekdays: list[Annotated[int, Field(ge=1, le=7)]] = Field(default_factory=list)
+
+    @field_validator("weekdays")
+    @classmethod
+    def check_weekdays(cls, weekdays: list[int]) -> list[int]:
+        if len(set(weekdays)) != len(weekdays):
+            raise ValueError("a weekday is listed twice")
+        return sorted(weekdays)
+
+
 class MenuSeed(SeedModel):
     categories: list[MenuCategorySeed] = Field(min_length=1)
     # In priority order: when units could count toward two combos, the
     # earlier one gets them.
     combos: list[ComboSeed] = Field(default_factory=list)
+    # In priority order: if two specials name one item on the same day, the
+    # earlier one applies.
+    specials: list[SpecialSeed] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def check_codes_are_unique(self) -> Self:
@@ -149,6 +174,27 @@ class MenuSeed(SeedModel):
             "item code",
         )
         _require_unique([combo.code for combo in self.combos], "combo code")
+        _require_unique([special.code for special in self.specials], "special code")
+        return self
+
+    @model_validator(mode="after")
+    def check_specials_leave_something_to_pay(self) -> Self:
+        prices = {
+            item.code: item.base_price_cents
+            for category in self.categories
+            for item in category.items
+        }
+        for special in self.specials:
+            if special.item not in prices:
+                raise ValueError(
+                    f"special {special.code}: there is no item {special.item}"
+                )
+            if special.discount_cents >= prices[special.item]:
+                raise ValueError(
+                    f"special {special.code}: a discount of {special.discount_cents} "
+                    f"is not less than the price of {special.item} "
+                    f"({prices[special.item]})"
+                )
         return self
 
     @model_validator(mode="after")
@@ -182,6 +228,7 @@ class SeedSummary(BaseModel):
     options: int
     aliases: int
     combos: int
+    specials: int
 
 
 def _require_unique(values: list[str], what: str) -> None:
@@ -220,6 +267,7 @@ async def _upsert(
 async def seed_menu(session: AsyncSession, menu: MenuSeed) -> SeedSummary:
     """Make the catalog tables match `menu`. The caller owns the transaction."""
     item_ids: list[uuid.UUID] = []
+    item_ids_by_code: dict[str, uuid.UUID] = {}
     category_ids: dict[str, uuid.UUID] = {}
     group_count = option_count = alias_count = 0
 
@@ -253,6 +301,7 @@ async def seed_menu(session: AsyncSession, menu: MenuSeed) -> SeedSummary:
                 },
             )
             item_ids.append(item_id)
+            item_ids_by_code[item.code] = item_id
 
             group_ids = [
                 await _seed_group(session, item_id, group_position, group)
@@ -278,6 +327,7 @@ async def seed_menu(session: AsyncSession, menu: MenuSeed) -> SeedSummary:
         .values(is_active=False, updated_at=func.now())
     )
     await _seed_combos(session, menu.combos, category_ids)
+    await _seed_specials(session, menu.specials, item_ids_by_code)
 
     return SeedSummary(
         categories=len(menu.categories),
@@ -286,6 +336,37 @@ async def seed_menu(session: AsyncSession, menu: MenuSeed) -> SeedSummary:
         options=option_count,
         aliases=alias_count,
         combos=len(menu.combos),
+        specials=len(menu.specials),
+    )
+
+
+async def _seed_specials(
+    session: AsyncSession, specials: list[SpecialSeed], item_ids: dict[str, uuid.UUID]
+) -> None:
+    special_ids = [
+        await _upsert(
+            session,
+            Special,
+            ["code"],
+            {
+                "code": special.code,
+                "item_id": item_ids[special.item],
+                "name_i18n": special.name.model_dump(),
+                "description_i18n": (
+                    special.description.model_dump() if special.description else None
+                ),
+                "discount_cents": special.discount_cents,
+                "weekdays": special.weekdays,
+                "is_active": True,
+                "sort_order": position,
+            },
+        )
+        for position, special in enumerate(specials)
+    ]
+    await session.execute(
+        update(Special)
+        .where(Special.id.not_in(special_ids), Special.is_active)
+        .values(is_active=False, updated_at=func.now())
     )
 
 

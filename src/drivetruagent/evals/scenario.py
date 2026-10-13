@@ -1,6 +1,7 @@
 """What a scenario is, and how a finished conversation is checked against it."""
 
 from dataclasses import dataclass, field
+from datetime import date
 
 from drivetruagent.enums import Language, SessionState
 from drivetruagent.ordering.views import CartSnapshot, LineView, OrderView
@@ -13,6 +14,11 @@ class ExpectedLine:
     # Choices that must be on the line: group code -> option code. Choices not
     # listed here (defaults, for example) are not checked.
     options: dict[str, str] = field(default_factory=dict)
+
+
+# A Monday. Scenarios run as if on this day unless they say otherwise, so
+# their totals do not depend on which day the evals happen to be run.
+DEFAULT_BUSINESS_DATE = date(2026, 10, 12)
 
 
 @dataclass(frozen=True)
@@ -34,6 +40,8 @@ class Scenario:
     must_not_use: frozenset[str] = frozenset()
     # Words that must not appear in anything the agent said (case ignored).
     must_not_say: tuple[str, ...] = ()
+    # The restaurant's date for the session: decides which specials run.
+    business_date: date = DEFAULT_BUSINESS_DATE
 
 
 @dataclass(frozen=True)

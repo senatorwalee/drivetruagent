@@ -7,7 +7,7 @@ do its own arithmetic.
 
 import uuid
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -101,6 +101,8 @@ class SessionView(BaseModel):
     started_at: datetime
     ended_at: datetime | None
     end_reason: str | None
+    # The restaurant's date when the car arrived. Decides the day's specials.
+    business_date: date
 
 
 # --- Menu -------------------------------------------------------------------
@@ -173,6 +175,23 @@ class ComboView(BaseModel):
     # One item from each of these, bought together, makes the combo.
     slots: list[CategoryRef]
     saves_cents: int
+
+
+class SpecialView(BaseModel):
+    """An item that is cheaper today. The saving is applied by the backend to
+    every one in the cart; nobody has to ask for it."""
+
+    code: str
+    name: str
+    description: str | None
+    item_code: str
+    item_name: str
+    # Prices with the cheapest choices. Options may add to both.
+    regular_price_cents: int
+    special_price_cents: int
+    saves_cents: int
+    # Read live, every time: a special that has sold out is worth knowing about.
+    in_stock: bool
 
 
 class SuggestionView(BaseModel):

@@ -1,5 +1,6 @@
 """Loading the menu file into a real database."""
 
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -14,8 +15,9 @@ from drivetruagent.db.models import (
     MenuItemAlias,
     Option,
     OptionGroup,
+    Special,
 )
-from drivetruagent.ordering.offers import load_combo_rules
+from drivetruagent.ordering.offers import load_combo_rules, load_specials
 from drivetruagent.seed import ComboSeed, MenuSeed, load_menu, seed_menu
 
 MENU_PATH = Path(__file__).resolve().parents[2] / "data" / "menu.json"
@@ -324,3 +326,81 @@ async def test_combo_priority_is_the_order_in_the_file(
         db_session, menu.model_copy(update={"combos": [burger_combo, sweet_deal]})
     )
     assert list(await combo_slots(db_session)) == ["burger_combo", "sweet_deal"]
+
+
+# --- Specials ---------------------------------------------------------------
+
+MONDAY = date(2026, 10, 12)
+FRIDAY = date(2026, 10, 16)
+
+
+async def special_codes(session: AsyncSession, day: date) -> list[str]:
+    return [special.code for special in await load_specials(session, day)]
+
+
+async def test_the_real_menus_specials_are_loaded(db_session: AsyncSession) -> None:
+    summary = await seed_menu(db_session, load_menu(MENU_PATH))
+
+    assert summary.specials == 2
+    assert await special_codes(db_session, MONDAY) == ["chicken_burger_days"]
+    assert await special_codes(db_session, FRIDAY) == ["weekend_milkshake"]
+    (monday,) = await load_specials(db_session, MONDAY)
+    assert (monday.item_code, monday.discount_cents) == ("chicken_burger", 150)
+    assert monday.weekdays == frozenset({1, 2, 3, 4})
+
+
+async def test_seeding_twice_keeps_the_same_specials(db_session: AsyncSession) -> None:
+    menu = load_menu(MENU_PATH)
+    await seed_menu(db_session, menu)
+    ids = set((await db_session.execute(select(Special.id))).scalars())
+
+    await seed_menu(db_session, menu)
+
+    assert set((await db_session.execute(select(Special.id))).scalars()) == ids
+
+
+async def test_a_special_removed_from_the_file_is_retired_not_deleted(
+    db_session: AsyncSession,
+) -> None:
+    menu = load_menu(MENU_PATH)
+    await seed_menu(db_session, menu)
+
+    await seed_menu(db_session, menu.model_copy(update={"specials": menu.specials[1:]}))
+
+    assert await special_codes(db_session, MONDAY) == []
+    assert await special_codes(db_session, FRIDAY) == ["weekend_milkshake"]
+    rows = await db_session.execute(select(func.count()).select_from(Special))
+    assert rows.scalar_one() == 2
+
+
+async def test_a_special_added_back_to_the_file_runs_again(
+    db_session: AsyncSession,
+) -> None:
+    menu = load_menu(MENU_PATH)
+    await seed_menu(db_session, menu)
+    await seed_menu(db_session, menu.model_copy(update={"specials": []}))
+
+    await seed_menu(db_session, menu)
+
+    assert await special_codes(db_session, MONDAY) == ["chicken_burger_days"]
+
+
+async def test_a_specials_days_and_saving_follow_the_file(
+    db_session: AsyncSession,
+) -> None:
+    menu = load_menu(MENU_PATH)
+    await seed_menu(db_session, menu)
+    changed = menu.specials[0].model_copy(
+        update={"weekdays": [5], "discount_cents": 75, "item": "cookie"}
+    )
+
+    await seed_menu(
+        db_session, menu.model_copy(update={"specials": [changed, menu.specials[1]]})
+    )
+
+    assert await special_codes(db_session, MONDAY) == []
+    friday = await load_specials(db_session, FRIDAY)
+    assert [(s.code, s.item_code, s.discount_cents) for s in friday] == [
+        ("chicken_burger_days", "cookie", 75),
+        ("weekend_milkshake", "milkshake", 100),
+    ]

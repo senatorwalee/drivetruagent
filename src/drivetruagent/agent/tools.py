@@ -27,9 +27,11 @@ from drivetruagent.agent.model import ToolDefinition
 from drivetruagent.enums import Language
 from drivetruagent.ordering import cart as cart_rules
 from drivetruagent.ordering import menu as menu_rules
+from drivetruagent.ordering import offers as offer_rules
 from drivetruagent.ordering import sessions as session_rules
 from drivetruagent.ordering.errors import OrderingError
 from drivetruagent.ordering.inventory import DEFAULT_RESERVATION_TTL
+from drivetruagent.ordering.offers import SpecialsCache
 from drivetruagent.ordering.views import DEFAULT_LANGUAGE
 from drivetruagent.policy import gateway
 from drivetruagent.policy.actions import (
@@ -58,6 +60,8 @@ class ToolContext:
     reservation_ttl: timedelta = DEFAULT_RESERVATION_TTL
     # Identifies this one tool call, so running it twice changes things once.
     idempotency_key: str | None = None
+    # Where the day's specials are kept between questions. None: read each time.
+    specials_cache: SpecialsCache | None = None
 
 
 # --- Arguments --------------------------------------------------------------
@@ -158,6 +162,39 @@ async def _get_item_details(context: ToolContext, args: ItemArgs) -> ToolOutput:
     language = await _session_language(context)
     details = await menu_rules.get_item_details(context.db, args.item_code, language)
     return details.model_dump(mode="json")
+
+
+async def _get_todays_specials(context: ToolContext, args: NoArgs) -> ToolOutput:
+    customer_session = await session_rules.get_session(context.db, context.session_id)
+    language = customer_session.language or DEFAULT_LANGUAGE
+    # The session's own date, not the clock: a customer who was told about a
+    # special just before midnight hears the same answer just after.
+    specials = await offer_rules.todays_specials(
+        context.db,
+        customer_session.business_date,
+        language,
+        cache=context.specials_cache,
+    )
+    combos = await offer_rules.list_combos(context.db, language)
+    return {
+        "specials": [special.model_dump(mode="json") for special in specials],
+        "combos": [combo.model_dump(mode="json") for combo in combos],
+        "message": _deals_message(bool(specials), bool(combos)),
+    }
+
+
+def _deals_message(has_specials: bool, has_combos: bool) -> str:
+    if not has_specials and not has_combos:
+        return "There are no specials or combos today. Say so, and offer the menu."
+    opening = (
+        "Tell the customer today's special in a sentence."
+        if has_specials
+        else "There is no special today. Say so, and mention the combo."
+    )
+    return (
+        f"{opening} These savings are applied for you when the items are "
+        "ordered: add the items as usual and the cart will show the saving."
+    )
 
 
 async def _add_item(context: ToolContext, args: AddItemArgs) -> ToolOutput:
@@ -332,6 +369,14 @@ TOOLS: tuple[Tool[Any], ...] = (
         _object({"item_code": _ITEM_CODE}),
         ItemArgs,
         _get_item_details,
+    ),
+    _tool(
+        "get_todays_specials",
+        "Get today's specials and the combo deals, with prices. Use it when "
+        "the customer asks about specials, deals, combos or how to save.",
+        _NO_ARGUMENTS,
+        NoArgs,
+        _get_todays_specials,
     ),
     _tool(
         "add_item",

@@ -1,9 +1,18 @@
+from datetime import UTC, date, datetime, timedelta
+from typing import Any
+
 import pytest
 from pydantic import ValidationError
 
 from drivetruagent.config import Settings
 
 DATABASE_URL = "postgresql+psycopg://user:password@localhost:5433/example"
+
+
+def make_settings(**values: Any) -> Settings:
+    """Settings from the given values alone: no environment, no .env file."""
+    values = {"database_url": DATABASE_URL, "_env_file": None, **values}
+    return Settings(**values)
 
 
 def test_environment_variable_overrides_default(
@@ -24,3 +33,44 @@ def test_missing_database_url_is_rejected(monkeypatch: pytest.MonkeyPatch) -> No
 
     with pytest.raises(ValidationError):
         Settings(_env_file=None)  # pyright: ignore[reportCallIssue]
+
+
+# --- The restaurant's own date ----------------------------------------------
+
+
+def test_the_restaurant_is_in_toronto_by_default() -> None:
+    assert make_settings().restaurant_timezone == "America/Toronto"
+
+
+def test_the_business_date_is_the_date_where_the_restaurant_is() -> None:
+    """One instant, two calendar dates: 03:30 UTC on the 13th is still the
+    evening of the 12th in Toronto, and that is the day whose special applies."""
+    instant = datetime(2026, 10, 13, 3, 30, tzinfo=UTC)
+
+    assert make_settings().business_date(instant) == date(2026, 10, 12)
+    assert make_settings(restaurant_timezone="UTC").business_date(instant) == date(
+        2026, 10, 13
+    )
+    assert make_settings(restaurant_timezone="Asia/Tokyo").business_date(
+        instant
+    ) == date(2026, 10, 13)
+
+
+def test_the_business_date_defaults_to_now() -> None:
+    before = datetime.now(UTC).date()
+    today = make_settings(restaurant_timezone="UTC").business_date()
+
+    # A range, so the test holds even if midnight passes while it runs.
+    assert before <= today <= datetime.now(UTC).date()
+
+
+def test_an_unknown_timezone_is_rejected_at_startup() -> None:
+    with pytest.raises(ValidationError, match="unknown timezone"):
+        make_settings(restaurant_timezone="Mars/Olympus_Mons")
+
+
+def test_the_specials_cache_lasts_a_minute_by_default() -> None:
+    assert make_settings().specials_cache_ttl == timedelta(seconds=60)
+    assert make_settings(specials_cache_ttl_seconds=0).specials_cache_ttl == timedelta(
+        0
+    )

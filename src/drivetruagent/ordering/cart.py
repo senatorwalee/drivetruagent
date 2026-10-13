@@ -25,7 +25,7 @@ from drivetruagent.db.models import Cart, CartLine, CartLineOption, CustomerSess
 from drivetruagent.enums import Language, SessionState
 from drivetruagent.ordering import offers, pricing
 from drivetruagent.ordering.catalog import load_item_by_code, load_items_by_id
-from drivetruagent.ordering.discounts import Discount, apply_combos
+from drivetruagent.ordering.discounts import Discount, apply_combos, apply_specials
 from drivetruagent.ordering.errors import (
     EmptyCart,
     InsufficientStock,
@@ -229,7 +229,7 @@ async def request_confirmation(
     customer_session.state = SessionState.CONFIRMING
     await extend_reservations(db, session_id, ttl=reservation_ttl)
     await db.flush()
-    discounts = await price_discounts(db, lines)
+    discounts = await price_discounts(db, customer_session, lines)
     return snapshot_from_lines(customer_session, cart, lines, discounts, tax_rate)
 
 
@@ -286,16 +286,26 @@ async def build_snapshot(
     db: AsyncSession, customer_session: CustomerSession, cart: Cart, tax_rate: Decimal
 ) -> CartSnapshot:
     lines = await load_priced_lines(db, cart)
-    discounts = await price_discounts(db, lines)
+    discounts = await price_discounts(db, customer_session, lines)
     return snapshot_from_lines(customer_session, cart, lines, discounts, tax_rate)
 
 
 async def price_discounts(
-    db: AsyncSession, lines: list[PricedLine]
+    db: AsyncSession, customer_session: CustomerSession, lines: list[PricedLine]
 ) -> tuple[Discount, ...]:
-    """Everything these lines earn off, read from the rules as they are now."""
+    """Everything these lines earn off, read from the rules as they are now.
+
+    Combos first, then the specials running on the date the session opened.
+    A special and a combo can both apply to the same item.
+    """
+    if not lines:
+        return ()
     rules = await offers.load_combo_rules(db)
-    return apply_combos(units_by_category(lines), rules).discounts
+    specials = await offers.load_specials(db, customer_session.business_date)
+    return (
+        *apply_combos(units_by_category(lines), rules).discounts,
+        *apply_specials(units_by_item(lines), specials),
+    )
 
 
 def units_by_category(lines: list[PricedLine]) -> dict[str, int]:
@@ -303,6 +313,14 @@ def units_by_category(lines: list[PricedLine]) -> dict[str, int]:
     units: dict[str, int] = defaultdict(int)
     for line in lines:
         units[line.item.category_code] += line.quantity
+    return dict(units)
+
+
+def units_by_item(lines: list[PricedLine]) -> dict[str, int]:
+    """How many units the cart holds of each item, across its lines."""
+    units: dict[str, int] = defaultdict(int)
+    for line in lines:
+        units[line.item.code] += line.quantity
     return dict(units)
 
 

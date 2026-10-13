@@ -34,6 +34,7 @@ export function installFakeBackend() {
       started_at: new Date().toISOString(),
       ended_at: null,
       end_reason: null,
+      business_date: '2026-10-12',
     }
     events = []
     cart = {

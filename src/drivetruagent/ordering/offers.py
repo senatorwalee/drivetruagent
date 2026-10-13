@@ -1,4 +1,5 @@
-"""Combos as the database holds them, and what has been suggested to whom.
+"""Combos and specials as the database holds them, and what has been
+suggested to whom.
 
 The arithmetic is in `discounts`; this module reads the rules and keeps the
 record that stops a customer being offered the same thing twice.
@@ -6,12 +7,14 @@ record that stops a customer being offered the same thing twice.
 
 import uuid
 from collections.abc import Mapping
+from datetime import date
 
 from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from drivetruagent.cache import TtlCache
 from drivetruagent.db import models
 from drivetruagent.db.models import (
     ComboRuleSlot,
@@ -24,17 +27,23 @@ from drivetruagent.enums import DiscountKind, Language, SuggestionStatus
 from drivetruagent.ordering.discounts import (
     ComboRule,
     ComboSlot,
+    Special,
     apply_combos,
     find_opening,
 )
+from drivetruagent.ordering.errors import UnknownSpecial
 from drivetruagent.ordering.inventory import sold_out_item_ids
 from drivetruagent.ordering.views import (
     DEFAULT_LANGUAGE,
     CategoryRef,
     ComboView,
+    SpecialView,
     SuggestionView,
     localize,
 )
+
+# The specials running on a date, as plain values that are safe to share.
+type SpecialsCache = TtlCache[date, tuple[Special, ...]]
 
 
 async def load_combo_rules(db: AsyncSession) -> tuple[ComboRule, ...]:
@@ -75,6 +84,94 @@ async def list_combos(db: AsyncSession, language: Language) -> list[ComboView]:
         )
         for rule in await load_combo_rules(db)
     ]
+
+
+async def load_specials(db: AsyncSession, on: date) -> tuple[Special, ...]:
+    """The specials running on a date, highest priority first, from the database.
+
+    Pricing uses this, never the cache: a cart is charged what the database
+    says inside its own transaction.
+    """
+    statement = (
+        select(models.Special)
+        .join(models.Special.item)
+        .where(models.Special.is_active, MenuItem.is_active)
+        .order_by(models.Special.sort_order, models.Special.code)
+        .options(selectinload(models.Special.item))
+        .execution_options(populate_existing=True)
+    )
+    specials = (
+        Special(
+            code=row.code,
+            name=row.name_i18n,
+            description=row.description_i18n,
+            item_code=row.item.code,
+            item_name=row.item.name_i18n,
+            base_price_cents=row.item.base_price_cents,
+            discount_cents=row.discount_cents,
+            weekdays=frozenset(row.weekdays),
+        )
+        for row in (await db.execute(statement)).scalars()
+    )
+    return tuple(special for special in specials if special.runs_on(on))
+
+
+async def todays_specials(
+    db: AsyncSession,
+    on: date,
+    language: Language,
+    *,
+    cache: SpecialsCache | None = None,
+) -> list[SpecialView]:
+    """What to tell a customer who asks about the day's specials.
+
+    The list of specials changes rarely and is asked for all day, so with a
+    cache it is read from memory. Stock changes with every order, so it is
+    read from the database every time and laid over the list.
+    """
+    # `is not None`, never truthiness: an empty cache has a length of zero.
+    specials = cache.get(on) if cache is not None else None
+    if specials is None:
+        specials = await load_specials(db, on)
+        if cache is not None:
+            cache.set(on, specials)
+    if not specials:
+        return []
+
+    sold_out = await _sold_out_item_codes(db)
+    return [
+        SpecialView(
+            code=special.code,
+            name=localize(special.name, language),
+            description=localize(special.description, language)
+            if special.description
+            else None,
+            item_code=special.item_code,
+            item_name=localize(special.item_name, language),
+            regular_price_cents=special.base_price_cents,
+            special_price_cents=special.special_price_cents,
+            saves_cents=special.saves_cents,
+            in_stock=special.item_code not in sold_out,
+        )
+        for special in specials
+    ]
+
+
+async def set_special_active(db: AsyncSession, code: str, is_active: bool) -> None:
+    """End a special early, or bring it back. Raises UnknownSpecial.
+
+    The caller commits, and then invalidates any cache of specials: doing it
+    in that order means a reader can never refill the cache with what was
+    there before the change.
+    """
+    result = await db.execute(
+        update(models.Special)
+        .where(models.Special.code == code)
+        .values(is_active=is_active, updated_at=func.now())
+        .returning(models.Special.id)
+    )
+    if result.scalar_one_or_none() is None:
+        raise UnknownSpecial(code)
 
 
 async def suggest_combo(
@@ -153,6 +250,14 @@ def _category_refs(
         )
         for slot in slots
     ]
+
+
+async def _sold_out_item_codes(db: AsyncSession) -> set[str]:
+    sold_out = await sold_out_item_ids(db)
+    if not sold_out:
+        return set()
+    codes = await db.execute(select(MenuItem.code).where(MenuItem.id.in_(sold_out)))
+    return set(codes.scalars())
 
 
 async def _sellable_categories(db: AsyncSession) -> set[str]:

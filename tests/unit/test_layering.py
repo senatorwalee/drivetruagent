@@ -20,8 +20,10 @@ LAYERS = ["db", "ordering", "policy", "agent", "api"]
 
 # Files that are pure logic: plain values in, plain values out.
 PURE_MODULES = [
+    "cache.py",
     "ordering/selection.py",
     "ordering/pricing.py",
+    "ordering/discounts.py",
     "ordering/search.py",
     "ordering/errors.py",
     "policy/rules.py",

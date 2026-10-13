@@ -176,6 +176,16 @@ class OrderNotFound(OrderingError):
         super().__init__(f"No order with id {order_id}.")
 
 
+class UnknownSpecial(OrderingError):
+    code = "unknown_special"
+
+    def __init__(self, special_code: str) -> None:
+        super().__init__(
+            f"There is no special with code '{special_code}'.",
+            special_code=special_code,
+        )
+
+
 class InsufficientStock(OrderingError):
     """There are not enough of an item left for this session.
 

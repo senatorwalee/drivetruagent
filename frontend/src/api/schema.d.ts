@@ -219,6 +219,9 @@ export interface paths {
          * Open a session
          * @description Start a customer's visit, with an empty cart. Refused if the lane
          *     already has a session in progress.
+         *
+         *     The session keeps today's date, where the restaurant is, for as long as
+         *     it lasts: a special heard about before midnight is still given after it.
          */
         post: operations["open_session_sessions_post"];
         delete?: never;
@@ -436,6 +439,50 @@ export interface paths {
          * @description Run the stored action, now that the customer has confirmed it.
          */
         post: operations["confirm_pending_action_sessions__session_id__pending_actions__pending_action_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/specials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Today's specials
+         * @description The specials running today, where the restaurant is.
+         *
+         *     The list is served from a short-lived cache; `in_stock` is read live. A
+         *     session keeps the specials of the day it opened on, so a cart is priced
+         *     from the session's own date, not from this.
+         */
+        get: operations["read_specials_specials_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/specials/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * End a special early, or bring it back
+         * @description For staff. Takes effect on the next read and the next cart change.
+         */
+        put: operations["set_special_specials__code__put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -861,6 +908,11 @@ export interface components {
         SessionState: "greeting" | "ordering" | "confirming" | "submitted" | "handed_off" | "abandoned" | "terminated";
         /** SessionView */
         SessionView: {
+            /**
+             * Business Date
+             * Format: date
+             */
+            business_date: string;
             /** End Reason */
             end_reason: string | null;
             /** Ended At */
@@ -880,10 +932,47 @@ export interface components {
             started_at: string;
             state: components["schemas"]["SessionState"];
         };
+        /** SetSpecialRequest */
+        SetSpecialRequest: {
+            /** Is Active */
+            is_active: boolean;
+        };
         /** SetStockRequest */
         SetStockRequest: {
             /** On Hand */
             on_hand: number;
+        };
+        /** SpecialStatus */
+        SpecialStatus: {
+            /** Code */
+            code: string;
+            /** Is Active */
+            is_active: boolean;
+        };
+        /**
+         * SpecialView
+         * @description An item that is cheaper today. The saving is applied by the backend to
+         *     every one in the cart; nobody has to ask for it.
+         */
+        SpecialView: {
+            /** Code */
+            code: string;
+            /** Description */
+            description: string | null;
+            /** In Stock */
+            in_stock: boolean;
+            /** Item Code */
+            item_code: string;
+            /** Item Name */
+            item_name: string;
+            /** Name */
+            name: string;
+            /** Regular Price Cents */
+            regular_price_cents: number;
+            /** Saves Cents */
+            saves_cents: number;
+            /** Special Price Cents */
+            special_price_cents: number;
         };
         /** StockLevelView */
         StockLevelView: {
@@ -1877,6 +1966,82 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActionOutcome"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_specials_specials_get: {
+        parameters: {
+            query?: {
+                /** @description The language names are returned in. */
+                language?: components["schemas"]["Language"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpecialView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_special_specials__code__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetSpecialRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpecialStatus"];
                 };
             };
             /** @description Not Found */

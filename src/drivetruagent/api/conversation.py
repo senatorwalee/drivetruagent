@@ -11,7 +11,7 @@ from drivetruagent.agent import events
 from drivetruagent.agent.factory import agent_config, agent_info, model_from_settings
 from drivetruagent.agent.loop import run_turn
 from drivetruagent.agent.model import ModelClient
-from drivetruagent.api.deps import SessionDep, SettingsDep
+from drivetruagent.api.deps import SessionDep, SettingsDep, SpecialsCacheDep
 from drivetruagent.api.errors import NOT_FOUND, UNAVAILABLE
 from drivetruagent.enums import AgentEventKind
 from drivetruagent.ordering.sessions import get_session as get_customer_session
@@ -74,6 +74,7 @@ async def send_message(
     db: SessionDep,
     settings: SettingsDep,
     model: ModelDep,
+    specials_cache: SpecialsCacheDep,
 ) -> MessageResponse:
     """Send what the customer said and get the agent's reply.
 
@@ -81,7 +82,11 @@ async def send_message(
     saved as it happens, and the reply comes with the cart as it now stands.
     """
     reply = await run_turn(
-        db, session_id, body.text, model=model, config=agent_config(settings)
+        db,
+        session_id,
+        body.text,
+        model=model,
+        config=agent_config(settings, specials_cache=specials_cache),
     )
     return MessageResponse(
         reply=reply.text, cart=reply.cart, tools_used=list(reply.tools_used)

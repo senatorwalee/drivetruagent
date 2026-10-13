@@ -5,6 +5,8 @@ a wrong outcome is reported. The real evals, with the real model, are in
 tests/integration/evals and run with `make eval`.
 """
 
+from dataclasses import replace
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -120,3 +122,66 @@ async def test_the_runner_stops_when_the_session_ends(
 
     assert check(scenario, result) == []
     assert len(result.exchanges) == 1
+
+
+# --- The day a scenario is played on ----------------------------------------
+
+
+def a_chicken_burger_order() -> list[ModelTurn]:
+    spice = [{"group": "spice", "options": ["mild"]}]
+    return [
+        call("get_todays_specials"),
+        say("Today's special is the crispy chicken burger."),
+        call("add_item", item_code="chicken_burger", quantity=1, selections=spice),
+        say("One chicken burger. Anything else?"),
+        call("request_confirmation"),
+        say("One chicken burger. Is that right?"),
+        call("submit_order"),
+        say("Thanks! Please pull forward."),
+    ]
+
+
+CHICKEN_BURGER_ORDER = Scenario(
+    name="chicken_burger",
+    customer=("What's the special?", "One of those, mild.", "That's all.", "Yes."),
+    final_state=SessionState.SUBMITTED,
+    lines=(ExpectedLine("chicken_burger", 1, {"spice": "mild"}),),
+    must_use=frozenset({"get_todays_specials"}),
+)
+
+
+@pytest.mark.usefixtures("specials")
+async def test_a_scenario_is_played_on_its_own_day_not_todays(
+    db_session: AsyncSession,
+) -> None:
+    """The same order on a Monday and on a Friday: only Monday has the chicken
+    burger on special. Neither depends on when the test is run."""
+    monday = replace(CHICKEN_BURGER_ORDER, discount_cents=150, total_cents=564)
+    friday = replace(
+        CHICKEN_BURGER_ORDER,
+        business_date=date(2026, 10, 16),
+        discount_cents=0,
+        total_cents=733,
+    )
+
+    on_monday = await run_scenario(
+        db_session,
+        monday,
+        model=ScriptedModel(a_chicken_burger_order()),
+        config=CONFIG,
+        lane="eval-monday",
+    )
+    on_friday = await run_scenario(
+        db_session,
+        friday,
+        model=ScriptedModel(a_chicken_burger_order()),
+        config=CONFIG,
+        lane="eval-friday",
+    )
+
+    assert check(monday, on_monday) == []
+    assert check(friday, on_friday) == []
+    assert check(friday, on_monday) == [
+        "total is 564 cents, expected 733",
+        "discount is 150 cents, expected 0",
+    ]
