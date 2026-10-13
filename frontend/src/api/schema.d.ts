@@ -45,6 +45,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/handoffs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The handoff queue
+         * @description Sessions handed to a person, the longest-waiting first.
+         */
+        get: operations["read_queue_handoffs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/handoffs/{handoff_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One handoff's package
+         * @description Everything the person taking over needs: why, what to do next, the
+         *     cart, the stock it holds, and the recent conversation.
+         */
+        get: operations["read_package_handoffs__handoff_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/handoffs/{handoff_id}/acknowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Say you have picked a handoff up
+         * @description Doing it twice changes nothing and keeps the first person's name.
+         */
+        post: operations["acknowledge_handoffs__handoff_id__acknowledge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/handoffs/{handoff_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Finish a handoff
+         * @description Place the order as it stands (`order_placed`) or drop it (`cancelled`).
+         *
+         *     Placing it is refused if the cart is empty or its stock has gone; the
+         *     handoff then stays as it was. A resolved handoff cannot be changed.
+         */
+        post: operations["resolve_handoffs__handoff_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/live": {
         parameters: {
             query?: never;
@@ -542,6 +626,14 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AcknowledgeRequest */
+        AcknowledgeRequest: {
+            /**
+             * By
+             * @default staff
+             */
+            by: string;
+        };
         /** ActionOutcome */
         ActionOutcome: {
             cart: components["schemas"]["CartSnapshot"];
@@ -753,6 +845,122 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /**
+         * HandoffOutcome
+         * @description How a handed-off session was finished.
+         * @enum {string}
+         */
+        HandoffOutcome: "order_placed" | "cancelled";
+        /**
+         * HandoffPackage
+         * @description Everything the person taking over needs, so the customer is not asked
+         *     to start again.
+         */
+        HandoffPackage: {
+            /** Acknowledged At */
+            acknowledged_at: string | null;
+            /** Acknowledged By */
+            acknowledged_by: string | null;
+            cart: components["schemas"]["CartSnapshot"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Details */
+            details: {
+                [key: string]: unknown;
+            };
+            /** Earlier Lines */
+            earlier_lines: number;
+            /** Earlier Steps */
+            earlier_steps: number;
+            /**
+             * Handoff Id
+             * Format: uuid
+             */
+            handoff_id: string;
+            /** Item Count */
+            item_count: number;
+            /** Lane */
+            lane: string;
+            language: components["schemas"]["Language"];
+            /** Note */
+            note: string | null;
+            order: components["schemas"]["OrderView"] | null;
+            outcome: components["schemas"]["HandoffOutcome"] | null;
+            /** Outstanding */
+            outstanding: string;
+            reason: components["schemas"]["HandoffReason"];
+            /** Resolved At */
+            resolved_at: string | null;
+            /** Session Ended At */
+            session_ended_at: string | null;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Session Started At
+             * Format: date-time
+             */
+            session_started_at: string;
+            status: components["schemas"]["HandoffStatus"];
+            /** Steps */
+            steps: components["schemas"]["Step"][];
+            /** Stock */
+            stock: components["schemas"]["HeldStock"][];
+            /** Total Cents */
+            total_cents: number;
+            /** Transcript */
+            transcript: components["schemas"]["TranscriptLine"][];
+        };
+        /** HandoffReason */
+        HandoffReason: {
+            /** Code */
+            code: string;
+            /** Title */
+            title: string;
+        };
+        /**
+         * HandoffStatus
+         * @description Where a session handed to a person has got to.
+         * @enum {string}
+         */
+        HandoffStatus: "open" | "acknowledged" | "resolved";
+        /**
+         * HandoffSummary
+         * @description One row of the queue.
+         */
+        HandoffSummary: {
+            /** Acknowledged By */
+            acknowledged_by: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Handoff Id
+             * Format: uuid
+             */
+            handoff_id: string;
+            /** Item Count */
+            item_count: number;
+            /** Lane */
+            lane: string;
+            language: components["schemas"]["Language"];
+            reason: components["schemas"]["HandoffReason"];
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            status: components["schemas"]["HandoffStatus"];
+            /** Total Cents */
+            total_cents: number;
+        };
         /** HealthResponse */
         HealthResponse: {
             /**
@@ -760,6 +968,23 @@ export interface components {
              * @enum {string}
              */
             status: "ok" | "unavailable";
+        };
+        /** HeldStock */
+        HeldStock: {
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Held */
+            held: boolean;
+            /** Item Code */
+            item_code: string;
+            /** Item Name */
+            item_name: string;
+            /** Quantity */
+            quantity: number;
+            status: components["schemas"]["ReservationStatus"];
         };
         /** ItemDetails */
         ItemDetails: {
@@ -936,6 +1161,18 @@ export interface components {
              */
             type: "request_confirmation";
         };
+        /**
+         * ReservationStatus
+         * @description What became of stock a session was holding.
+         * @enum {string}
+         */
+        ReservationStatus: "active" | "committed" | "released";
+        /** ResolveRequest */
+        ResolveRequest: {
+            /** Note */
+            note?: string | null;
+            outcome: components["schemas"]["HandoffOutcome"];
+        };
         /** SelectedOptionView */
         SelectedOptionView: {
             /** Group Code */
@@ -1024,6 +1261,29 @@ export interface components {
             /** Special Price Cents */
             special_price_cents: number;
         };
+        /**
+         * Step
+         * @description One thing the agent asked the backend to do, or a timer firing.
+         */
+        Step: {
+            /** Arguments */
+            arguments: {
+                [key: string]: unknown;
+            };
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Decision */
+            decision: string | null;
+            /** Message */
+            message: string | null;
+            /** Rule */
+            rule: string | null;
+            /** Tool */
+            tool: string;
+        };
         /** StockLevelView */
         StockLevelView: {
             /** Available */
@@ -1082,6 +1342,21 @@ export interface components {
             paused_at: string | null;
             /** Paused Seconds */
             paused_seconds: number;
+        };
+        /** TranscriptLine */
+        TranscriptLine: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /**
+             * Speaker
+             * @enum {string}
+             */
+            speaker: "customer" | "agent";
+            /** Text */
+            text: string;
         };
         /** UpdateLine */
         UpdateLine: {
@@ -1173,6 +1448,186 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ComboView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_queue_handoffs_get: {
+        parameters: {
+            query?: {
+                /** @description Only handoffs in this status. */
+                status?: components["schemas"]["HandoffStatus"] | null;
+                /** @description Only the handoff for this session. */
+                session_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoffSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_package_handoffs__handoff_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                handoff_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoffPackage"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    acknowledge_handoffs__handoff_id__acknowledge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                handoff_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["AcknowledgeRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoffPackage"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_handoffs__handoff_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                handoff_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoffPackage"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Validation Error */

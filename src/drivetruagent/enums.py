@@ -71,6 +71,26 @@ class SuggestionStatus(StrEnum):
     CLOSED = "closed"
 
 
+class HandoffStatus(StrEnum):
+    """Where a session handed to a person has got to."""
+
+    # Waiting for someone to pick it up.
+    OPEN = "open"
+    # Someone has said they are dealing with it.
+    ACKNOWLEDGED = "acknowledged"
+    # Finished, one way or the other. It cannot change again.
+    RESOLVED = "resolved"
+
+
+class HandoffOutcome(StrEnum):
+    """How a handed-off session was finished."""
+
+    # The cart was placed as an order, as it stood.
+    ORDER_PLACED = "order_placed"
+    # Nothing was ordered. The stock it held was released.
+    CANCELLED = "cancelled"
+
+
 class AgentEventKind(StrEnum):
     """What one row of the agent's event log records."""
 

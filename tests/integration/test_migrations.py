@@ -75,6 +75,7 @@ def test_upgrade_creates_the_tables(scratch_database_url: str) -> None:
         "order_discounts",
         "session_suggestions",
         "specials",
+        "handoffs",
     }
 
 

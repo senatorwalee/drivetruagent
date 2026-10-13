@@ -46,15 +46,19 @@ from drivetruagent.policy.decisions import (
     PolicyResult,
 )
 from drivetruagent.policy.errors import PendingActionNotFound
+from drivetruagent.policy.handoffs import open_handoff
 from drivetruagent.policy.outcome import ActionOutcome, OutcomeError
-from drivetruagent.policy.rules import SESSION_ENDED, evaluate
+from drivetruagent.policy.rules import (
+    HUMAN_REQUESTED,
+    SESSION_ENDED,
+    SILENCE_TIMEOUT,
+    TIME_LIMIT,
+    evaluate,
+)
 
 PENDING_ACTION_RESOLVED = "pending_action_resolved"
 PENDING_ACTION_STALE = "pending_action_stale"
 PENDING_ACTION_CANCELLED = "pending_action_cancelled"
-HUMAN_REQUESTED = "human_requested"
-TIME_LIMIT = "time_limit"
-SILENCE_TIMEOUT = "silence_timeout"
 SUGGESTION_INSTRUCTION = (
     "Then offer the suggestion once, in a few words, saying what to add and "
     "what it saves."
@@ -115,7 +119,7 @@ async def _evaluate_and_apply(
             pending_action_id=pending.id,
         )
     if result.decision is Decision.ESCALATE:
-        return await _escalate(db, session_id, result, tax_rate)
+        return await _escalate(db, session_id, result, tax_rate, action=action)
     return _rejected(result, snapshot)
 
 
@@ -167,7 +171,7 @@ async def _confirm(
 
     if result.decision is Decision.ESCALATE:
         _resolve(pending, PendingActionStatus.ESCALATED)
-        return await _escalate(db, session_id, result, tax_rate)
+        return await _escalate(db, session_id, result, tax_rate, action=action)
     if result.decision is not Decision.ALLOW:
         _resolve(pending, PendingActionStatus.CANCELLED)
         await db.flush()
@@ -411,13 +415,23 @@ async def _escalate(
     tax_rate: Decimal,
     *,
     end_reason: str | None = None,
+    action: Action | None = None,
 ) -> ActionOutcome:
+    """End the session as handed off, and leave a handoff for the person
+    taking over. Every way a session is handed off comes through here."""
     await _supersede_pending(db, session_id)
     await end_session(
         db,
         session_id,
         SessionState.HANDED_OFF,
         reason=end_reason or result.rule or "escalated",
+    )
+    await open_handoff(
+        db,
+        session_id,
+        result.rule or "escalated",
+        result.details,
+        action.model_dump(mode="json") if action is not None else None,
     )
     snapshot = await cart_rules.get_cart(db, session_id, tax_rate=tax_rate)
     return ActionOutcome(

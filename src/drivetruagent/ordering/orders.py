@@ -8,7 +8,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from drivetruagent.db.models import Order, OrderDiscount, OrderLine, OrderLineOption
+from drivetruagent.db.models import (
+    CustomerSession,
+    Order,
+    OrderDiscount,
+    OrderLine,
+    OrderLineOption,
+)
 from drivetruagent.enums import SessionState
 from drivetruagent.ordering.cart import (
     PricedLine,
@@ -17,9 +23,13 @@ from drivetruagent.ordering.cart import (
     price_discounts,
     snapshot_from_lines,
 )
-from drivetruagent.ordering.errors import EmptyCart, OrderNotFound
+from drivetruagent.ordering.errors import (
+    EmptyCart,
+    OrderNotFound,
+    SessionNotHandedOff,
+)
 from drivetruagent.ordering.inventory import StockNeed, commit_reservations
-from drivetruagent.ordering.sessions import lock_active_session
+from drivetruagent.ordering.sessions import lock_active_session, lock_session
 from drivetruagent.ordering.views import (
     DiscountView,
     LineView,
@@ -43,6 +53,38 @@ async def submit_order(
     together, when the caller commits.
     """
     customer_session = await lock_active_session(db, session_id)
+    order = await _freeze(db, customer_session, tax_rate)
+    customer_session.state = SessionState.SUBMITTED
+    customer_session.ended_at = datetime.now(UTC)
+    customer_session.end_reason = ORDER_SUBMITTED
+    await db.flush()
+    return order
+
+
+async def place_handed_off_order(
+    db: AsyncSession, session_id: uuid.UUID, *, tax_rate: Decimal
+) -> OrderView:
+    """A person finishing a handed-off session: its cart becomes an order.
+
+    The order is made exactly as `submit_order` would make it. The session
+    stays handed off, because an ended session never changes state: that it
+    was handed to a person is part of its history.
+    """
+    customer_session = await lock_session(db, session_id)
+    if customer_session.state is not SessionState.HANDED_OFF:
+        raise SessionNotHandedOff(customer_session.state)
+    return await _freeze(db, customer_session, tax_rate)
+
+
+async def _freeze(
+    db: AsyncSession, customer_session: CustomerSession, tax_rate: Decimal
+) -> OrderView:
+    """Copy the session's cart into order rows and take its stock.
+
+    The caller holds the session's lock and decides what the session's state
+    should be afterwards.
+    """
+    session_id = customer_session.id
     cart = await load_cart(db, session_id)
     lines = await load_priced_lines(db, cart)
     if not lines:
@@ -103,9 +145,6 @@ async def submit_order(
             for position, option in enumerate(view.options)
         )
 
-    customer_session.state = SessionState.SUBMITTED
-    customer_session.ended_at = datetime.now(UTC)
-    customer_session.end_reason = ORDER_SUBMITTED
     await db.flush()
 
     return OrderView(

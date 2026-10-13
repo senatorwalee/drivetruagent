@@ -1,6 +1,20 @@
 {
   "components": {
     "schemas": {
+      "AcknowledgeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "by": {
+            "default": "staff",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "By",
+            "type": "string"
+          }
+        },
+        "title": "AcknowledgeRequest",
+        "type": "object"
+      },
       "ActionOutcome": {
         "properties": {
           "cart": {
@@ -552,6 +566,303 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HandoffOutcome": {
+        "description": "How a handed-off session was finished.",
+        "enum": [
+          "order_placed",
+          "cancelled"
+        ],
+        "title": "HandoffOutcome",
+        "type": "string"
+      },
+      "HandoffPackage": {
+        "description": "Everything the person taking over needs, so the customer is not asked\nto start again.",
+        "properties": {
+          "acknowledged_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged At"
+          },
+          "acknowledged_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged By"
+          },
+          "cart": {
+            "$ref": "#/components/schemas/CartSnapshot"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "earlier_lines": {
+            "title": "Earlier Lines",
+            "type": "integer"
+          },
+          "earlier_steps": {
+            "title": "Earlier Steps",
+            "type": "integer"
+          },
+          "handoff_id": {
+            "format": "uuid",
+            "title": "Handoff Id",
+            "type": "string"
+          },
+          "item_count": {
+            "title": "Item Count",
+            "type": "integer"
+          },
+          "lane": {
+            "title": "Lane",
+            "type": "string"
+          },
+          "language": {
+            "$ref": "#/components/schemas/Language"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrderView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HandoffOutcome"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outstanding": {
+            "title": "Outstanding",
+            "type": "string"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/HandoffReason"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "session_ended_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Ended At"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "session_started_at": {
+            "format": "date-time",
+            "title": "Session Started At",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/HandoffStatus"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/Step"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "stock": {
+            "items": {
+              "$ref": "#/components/schemas/HeldStock"
+            },
+            "title": "Stock",
+            "type": "array"
+          },
+          "total_cents": {
+            "title": "Total Cents",
+            "type": "integer"
+          },
+          "transcript": {
+            "items": {
+              "$ref": "#/components/schemas/TranscriptLine"
+            },
+            "title": "Transcript",
+            "type": "array"
+          }
+        },
+        "required": [
+          "handoff_id",
+          "session_id",
+          "lane",
+          "language",
+          "status",
+          "reason",
+          "created_at",
+          "acknowledged_by",
+          "item_count",
+          "total_cents",
+          "details",
+          "outstanding",
+          "acknowledged_at",
+          "resolved_at",
+          "outcome",
+          "note",
+          "session_started_at",
+          "session_ended_at",
+          "cart",
+          "stock",
+          "transcript",
+          "earlier_lines",
+          "steps",
+          "earlier_steps",
+          "order"
+        ],
+        "title": "HandoffPackage",
+        "type": "object"
+      },
+      "HandoffReason": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "title"
+        ],
+        "title": "HandoffReason",
+        "type": "object"
+      },
+      "HandoffStatus": {
+        "description": "Where a session handed to a person has got to.",
+        "enum": [
+          "open",
+          "acknowledged",
+          "resolved"
+        ],
+        "title": "HandoffStatus",
+        "type": "string"
+      },
+      "HandoffSummary": {
+        "description": "One row of the queue.",
+        "properties": {
+          "acknowledged_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged By"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "handoff_id": {
+            "format": "uuid",
+            "title": "Handoff Id",
+            "type": "string"
+          },
+          "item_count": {
+            "title": "Item Count",
+            "type": "integer"
+          },
+          "lane": {
+            "title": "Lane",
+            "type": "string"
+          },
+          "language": {
+            "$ref": "#/components/schemas/Language"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/HandoffReason"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/HandoffStatus"
+          },
+          "total_cents": {
+            "title": "Total Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "handoff_id",
+          "session_id",
+          "lane",
+          "language",
+          "status",
+          "reason",
+          "created_at",
+          "acknowledged_by",
+          "item_count",
+          "total_cents"
+        ],
+        "title": "HandoffSummary",
+        "type": "object"
+      },
       "HealthResponse": {
         "properties": {
           "status": {
@@ -567,6 +878,44 @@
           "status"
         ],
         "title": "HealthResponse",
+        "type": "object"
+      },
+      "HeldStock": {
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "held": {
+            "title": "Held",
+            "type": "boolean"
+          },
+          "item_code": {
+            "title": "Item Code",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ReservationStatus"
+          }
+        },
+        "required": [
+          "item_code",
+          "item_name",
+          "quantity",
+          "status",
+          "expires_at",
+          "held"
+        ],
+        "title": "HeldStock",
         "type": "object"
       },
       "ItemDetails": {
@@ -976,6 +1325,41 @@
         "title": "RequestConfirmation",
         "type": "object"
       },
+      "ReservationStatus": {
+        "description": "What became of stock a session was holding.",
+        "enum": [
+          "active",
+          "committed",
+          "released"
+        ],
+        "title": "ReservationStatus",
+        "type": "string"
+      },
+      "ResolveRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/HandoffOutcome"
+          }
+        },
+        "required": [
+          "outcome"
+        ],
+        "title": "ResolveRequest",
+        "type": "object"
+      },
       "SelectedOptionView": {
         "properties": {
           "group_code": {
@@ -1206,6 +1590,68 @@
         "title": "SpecialView",
         "type": "object"
       },
+      "Step": {
+        "description": "One thing the agent asked the backend to do, or a timer firing.",
+        "properties": {
+          "arguments": {
+            "additionalProperties": true,
+            "title": "Arguments",
+            "type": "object"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule"
+          },
+          "tool": {
+            "title": "Tool",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "tool",
+          "arguments",
+          "decision",
+          "rule",
+          "message"
+        ],
+        "title": "Step",
+        "type": "object"
+      },
       "StockLevelView": {
         "properties": {
           "available": {
@@ -1352,6 +1798,34 @@
           "hand_off_at"
         ],
         "title": "TimersView",
+        "type": "object"
+      },
+      "TranscriptLine": {
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "speaker": {
+            "enum": [
+              "customer",
+              "agent"
+            ],
+            "title": "Speaker",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "speaker",
+          "text",
+          "at"
+        ],
+        "title": "TranscriptLine",
         "type": "object"
       },
       "UpdateLine": {
@@ -1565,6 +2039,290 @@
         "summary": "The combo deals",
         "tags": [
           "offers"
+        ]
+      }
+    },
+    "/handoffs": {
+      "get": {
+        "description": "Sessions handed to a person, the longest-waiting first.",
+        "operationId": "read_queue_handoffs_get",
+        "parameters": [
+          {
+            "description": "Only handoffs in this status.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/HandoffStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only handoffs in this status.",
+              "title": "Status"
+            }
+          },
+          {
+            "description": "Only the handoff for this session.",
+            "in": "query",
+            "name": "session_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only the handoff for this session.",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/HandoffSummary"
+                  },
+                  "title": "Response Read Queue Handoffs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "The handoff queue",
+        "tags": [
+          "handoffs"
+        ]
+      }
+    },
+    "/handoffs/{handoff_id}": {
+      "get": {
+        "description": "Everything the person taking over needs: why, what to do next, the\ncart, the stock it holds, and the recent conversation.",
+        "operationId": "read_package_handoffs__handoff_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "handoff_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Handoff Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffPackage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "One handoff's package",
+        "tags": [
+          "handoffs"
+        ]
+      }
+    },
+    "/handoffs/{handoff_id}/acknowledge": {
+      "post": {
+        "description": "Doing it twice changes nothing and keeps the first person's name.",
+        "operationId": "acknowledge_handoffs__handoff_id__acknowledge_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "handoff_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Handoff Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AcknowledgeRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffPackage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Say you have picked a handoff up",
+        "tags": [
+          "handoffs"
+        ]
+      }
+    },
+    "/handoffs/{handoff_id}/resolve": {
+      "post": {
+        "description": "Place the order as it stands (`order_placed`) or drop it (`cancelled`).\n\nPlacing it is refused if the cart is empty or its stock has gone; the\nhandoff then stays as it was. A resolved handoff cannot be changed.",
+        "operationId": "resolve_handoffs__handoff_id__resolve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "handoff_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Handoff Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffPackage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Finish a handoff",
+        "tags": [
+          "handoffs"
         ]
       }
     },

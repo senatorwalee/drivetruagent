@@ -176,6 +176,17 @@ class OrderNotFound(OrderingError):
         super().__init__(f"No order with id {order_id}.")
 
 
+class SessionNotHandedOff(OrderingError):
+    """Only a session that was handed to a person can be finished by one."""
+
+    code = "session_not_handed_off"
+
+    def __init__(self, state: SessionState) -> None:
+        super().__init__(
+            f"This session is {state.value}, not handed off.", state=state.value
+        )
+
+
 class UnknownSpecial(OrderingError):
     code = "unknown_special"
 
