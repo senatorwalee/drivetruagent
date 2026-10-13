@@ -17,13 +17,23 @@ from drivetruagent.db.models.inventory import (
     Inventory,
     Reservation,
 )
+from drivetruagent.db.models.offers import (
+    ComboRule,
+    ComboRuleSlot,
+    SessionSuggestion,
+)
 from drivetruagent.db.models.ordering import (
     Cart,
     CartLine,
     CartLineOption,
     CustomerSession,
 )
-from drivetruagent.db.models.orders import Order, OrderLine, OrderLineOption
+from drivetruagent.db.models.orders import (
+    Order,
+    OrderDiscount,
+    OrderLine,
+    OrderLineOption,
+)
 from drivetruagent.db.models.policy import PendingAction
 
 __all__ = [
@@ -31,6 +41,8 @@ __all__ = [
     "Cart",
     "CartLine",
     "CartLineOption",
+    "ComboRule",
+    "ComboRuleSlot",
     "CustomerSession",
     "IdempotencyRecord",
     "Inventory",
@@ -40,8 +52,10 @@ __all__ = [
     "Option",
     "OptionGroup",
     "Order",
+    "OrderDiscount",
     "OrderLine",
     "OrderLineOption",
     "PendingAction",
     "Reservation",
+    "SessionSuggestion",
 ]
