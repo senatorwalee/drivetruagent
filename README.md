@@ -200,6 +200,16 @@ make chat
 Without a key everything else still works; only the conversation endpoint
 answers 503.
 
+### Running it without a key
+
+Set `AGENT_MODEL=demo` in `.env`. The agent then plays one fixed conversation:
+a missing size, two items in one breath, fifteen cookies that are held and
+then corrected to two, the read-back, and the order being placed. Only the
+model is scripted. Every tool call it makes runs through the same policy
+engine and ordering rules, and the totals it speaks are read from what the
+tools returned. `GET /agent` says which model is in use and, for the demo,
+what to type at each turn.
+
 ## Evals
 
 A scenario is what a customer says, turn by turn, plus what must be true
@@ -276,6 +286,8 @@ Run `make dev` and open <http://127.0.0.1:8000/docs> to try these.
 | `POST /sessions/{id}/order` | Submit the cart |
 | `GET /orders/{id}` | Read a submitted order |
 | `POST /sessions/{id}/messages` | Say something to the agent; returns its reply and the cart |
+| `GET /sessions/{id}/events` | The session's event log; `?after=` returns only newer events |
+| `GET /agent` | Which model the agent uses, and whether it is the scripted demo |
 | `POST /sessions/{id}/actions` | Propose an action; returns the policy decision |
 | `POST /sessions/{id}/pending-actions/{pid}/confirm` | The customer said yes to a held action |
 | `POST /sessions/{id}/pending-actions/{pid}/cancel` | The customer said no |

@@ -65,13 +65,21 @@ async def load_messages(db: AsyncSession, session_id: uuid.UUID) -> list[Message
     return [_to_message(event) for event in events]
 
 
-async def load_events(db: AsyncSession, session_id: uuid.UUID) -> list[AgentEvent]:
-    """Every event for a session, oldest first: the full audit trail."""
+async def load_events(
+    db: AsyncSession, session_id: uuid.UUID, after: int | None = None
+) -> list[AgentEvent]:
+    """A session's events, oldest first: the full audit trail.
+
+    With `after`, only events newer than that sequence number. A screen that
+    is following along asks for what it has not seen yet.
+    """
     statement = (
         select(AgentEvent)
         .where(AgentEvent.session_id == session_id)
         .order_by(AgentEvent.seq)
     )
+    if after is not None:
+        statement = statement.where(AgentEvent.seq > after)
     return list((await db.execute(statement)).scalars())
 
 
