@@ -148,7 +148,8 @@
           "model_call",
           "tool_call",
           "tool_result",
-          "assistant_message"
+          "assistant_message",
+          "timer"
         ],
         "title": "AgentEventKind",
         "type": "string"
@@ -1078,6 +1079,9 @@
           },
           "state": {
             "$ref": "#/components/schemas/SessionState"
+          },
+          "timers": {
+            "$ref": "#/components/schemas/TimersView"
           }
         },
         "required": [
@@ -1088,7 +1092,8 @@
           "started_at",
           "ended_at",
           "end_reason",
-          "business_date"
+          "business_date",
+          "timers"
         ],
         "title": "SessionView",
         "type": "object"
@@ -1276,6 +1281,77 @@
           "saves_cents"
         ],
         "title": "SuggestionView",
+        "type": "object"
+      },
+      "TimersView": {
+        "description": "When the backend will next act on its own, if nothing else happens.\n\nA screen counts down to these. It never works the rules out itself. Each\nis None when that timer is not running: all of them once a session has\nended or while it is paused.",
+        "properties": {
+          "closes_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closes At"
+          },
+          "hand_off_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hand Off At"
+          },
+          "nudge_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nudge At"
+          },
+          "paused": {
+            "title": "Paused",
+            "type": "boolean"
+          },
+          "paused_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused At"
+          },
+          "paused_seconds": {
+            "title": "Paused Seconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "paused",
+          "paused_at",
+          "paused_seconds",
+          "nudge_at",
+          "closes_at",
+          "hand_off_at"
+        ],
+        "title": "TimersView",
         "type": "object"
       },
       "UpdateLine": {
@@ -1929,6 +2005,7 @@
     },
     "/sessions/{session_id}": {
       "get": {
+        "description": "The session, with when its timers will next fire. A screen counts\ndown to those times; it never works the timer rules out itself.",
         "operationId": "read_session_sessions__session_id__get",
         "parameters": [
           {
@@ -2677,6 +2754,70 @@
         ]
       }
     },
+    "/sessions/{session_id}/pause": {
+      "post": {
+        "description": "For a presenter who wants to talk without the session timing out.\n\nWhile paused, no timer fires and the time does not count toward the\nsession's length. Pausing twice is the same as pausing once. The session\nalso resumes by itself as soon as the customer says something.",
+        "operationId": "pause_session_sessions__session_id__pause_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stop the session's clocks",
+        "tags": [
+          "ordering"
+        ]
+      }
+    },
     "/sessions/{session_id}/pending-actions/{pending_action_id}/cancel": {
       "post": {
         "operationId": "cancel_pending_action_sessions__session_id__pending_actions__pending_action_id__cancel_post",
@@ -2821,6 +2962,70 @@
         "summary": "The customer said yes",
         "tags": [
           "agent actions"
+        ]
+      }
+    },
+    "/sessions/{session_id}/resume": {
+      "post": {
+        "description": "The customer gets a fresh stretch of silence before being asked\nwhether they are still there.",
+        "operationId": "resume_session_sessions__session_id__resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start the session's clocks again",
+        "tags": [
+          "ordering"
         ]
       }
     },

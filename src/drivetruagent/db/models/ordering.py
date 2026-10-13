@@ -47,6 +47,7 @@ class CustomerSession(UuidPrimaryKey, Timestamps, Base):
             f"(ended_at IS NULL) = (state IN ({_ACTIVE_STATES_SQL}))",
             name="ended_at_matches_state",
         ),
+        CheckConstraint("paused_seconds >= 0", name="paused_seconds_non_negative"),
         # One car per lane at a time: uniqueness applies only to active sessions.
         Index(
             "uq_sessions_one_active_per_lane",
@@ -70,6 +71,20 @@ class CustomerSession(UuidPrimaryKey, Timestamps, Base):
     # The restaurant's calendar date when the car arrived. It decides which
     # specials the session gets, and does not change if midnight passes.
     business_date: Mapped[date]
+
+    # The session's clocks. What they mean is in ordering/timers.py.
+    # When either side last said something. Silence is measured from here.
+    last_activity_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    # When "are you still there?" was said for the current silence.
+    nudged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Set while the agent is working on a reply. The clocks do not run then.
+    turn_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Set while a presenter has paused the session.
+    paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Total time spent paused. It does not count toward the length limit.
+    paused_seconds: Mapped[int] = mapped_column(server_default=text("0"))
 
     cart: Mapped["Cart | None"] = relationship(
         back_populates="session",

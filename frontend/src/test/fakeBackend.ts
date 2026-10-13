@@ -12,6 +12,18 @@ interface Request {
   path: string
 }
 
+/** Timers as the backend reports them for a session that has just started. */
+function runningTimers(): Session['timers'] {
+  return {
+    paused: false,
+    paused_at: null,
+    paused_seconds: 0,
+    nudge_at: new Date(Date.now() + 20_000).toISOString(),
+    closes_at: null,
+    hand_off_at: new Date(Date.now() + 180_000).toISOString(),
+  }
+}
+
 export function installFakeBackend() {
   const requests: Request[] = []
   let sessionCount = 0
@@ -35,6 +47,7 @@ export function installFakeBackend() {
       ended_at: null,
       end_reason: null,
       business_date: '2026-10-12',
+      timers: runningTimers(),
     }
     events = []
     cart = {
@@ -107,12 +120,32 @@ export function installFakeBackend() {
       if (resource === '/cart') return respond(200, cart)
       if (resource === '/events') return respond(200, events)
       if (resource === '/messages' && method === 'POST') return respond(200, takeTurn(body.text))
+      if (resource === '/pause' && method === 'POST') {
+        const paused = { paused: true, paused_at: new Date().toISOString(), paused_seconds: 0, nudge_at: null, closes_at: null, hand_off_at: null }
+        session = { ...session, timers: paused }
+        return respond(200, session)
+      }
+      if (resource === '/resume' && method === 'POST') {
+        session = { ...session, timers: runningTimers() }
+        return respond(200, session)
+      }
       return notFound()
     }),
   )
 
   return {
     requests,
+    /** The backend's timer asks the silent customer if they are there. */
+    nudge: () => {
+      record('timer', { action: 'nudge', rule: 'silence', after_seconds: 20 })
+      record('assistant_message', { text: 'Are you still there?' })
+    },
+    /** The backend's timer closes a session nobody answered in. */
+    abandon: () => {
+      record('timer', { action: 'abandon', rule: 'silence_timeout', after_seconds: 40 })
+      session = { ...session!, state: 'abandoned', ended_at: new Date().toISOString(), end_reason: 'silence_timeout' }
+      cart = { ...cart!, state: 'abandoned' }
+    },
     sessionsOpened: () => requests.filter((request) => request.method === 'POST' && request.path === '/sessions').length,
   }
 }

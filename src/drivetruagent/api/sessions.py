@@ -7,6 +7,7 @@ partial work.
 """
 
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, status
 
@@ -23,11 +24,19 @@ from drivetruagent.api.schemas import (
     UpdateLineRequest,
     UpdateSessionRequest,
 )
+from drivetruagent.config import Settings
+from drivetruagent.db.models import CustomerSession
 from drivetruagent.ordering import cart, orders, sessions
 from drivetruagent.ordering.idempotency import run_once
 from drivetruagent.ordering.views import CartSnapshot, OrderView, SessionView
 
 router = APIRouter(tags=["ordering"])
+
+
+def _view(customer_session: CustomerSession, settings: Settings) -> SessionView:
+    return sessions.to_view(
+        customer_session, now=datetime.now(UTC), timers=settings.session_timers
+    )
 
 
 # --- Sessions ---------------------------------------------------------------
@@ -40,7 +49,10 @@ router = APIRouter(tags=["ordering"])
     summary="Open a session",
 )
 async def open_session(
-    db: SessionDep, today: BusinessDateDep, body: OpenSessionRequest | None = None
+    db: SessionDep,
+    today: BusinessDateDep,
+    settings: SettingsDep,
+    body: OpenSessionRequest | None = None,
 ) -> SessionView:
     """Start a customer's visit, with an empty cart. Refused if the lane
     already has a session in progress.
@@ -50,12 +62,16 @@ async def open_session(
     lane = (body or OpenSessionRequest()).lane
     customer_session = await sessions.open_session(db, lane, business_date=today)
     await db.commit()
-    return SessionView.model_validate(customer_session)
+    return _view(customer_session, settings)
 
 
 @router.get("/sessions/{session_id}", responses=NOT_FOUND, summary="Read a session")
-async def read_session(session_id: uuid.UUID, db: SessionDep) -> SessionView:
-    return SessionView.model_validate(await sessions.get_session(db, session_id))
+async def read_session(
+    session_id: uuid.UUID, db: SessionDep, settings: SettingsDep
+) -> SessionView:
+    """The session, with when its timers will next fire. A screen counts
+    down to those times; it never works the timer rules out itself."""
+    return _view(await sessions.get_session(db, session_id), settings)
 
 
 @router.patch(
@@ -64,12 +80,49 @@ async def read_session(session_id: uuid.UUID, db: SessionDep) -> SessionView:
     summary="Set the session's language",
 )
 async def update_session(
-    session_id: uuid.UUID, body: UpdateSessionRequest, db: SessionDep
+    session_id: uuid.UUID,
+    body: UpdateSessionRequest,
+    db: SessionDep,
+    settings: SettingsDep,
 ) -> SessionView:
     """Names in later cart snapshots, and in the order, follow this language."""
     customer_session = await sessions.set_language(db, session_id, body.language)
     await db.commit()
-    return SessionView.model_validate(customer_session)
+    return _view(customer_session, settings)
+
+
+@router.post(
+    "/sessions/{session_id}/pause",
+    responses=NOT_FOUND | CONFLICT,
+    summary="Stop the session's clocks",
+)
+async def pause_session(
+    session_id: uuid.UUID, db: SessionDep, settings: SettingsDep
+) -> SessionView:
+    """For a presenter who wants to talk without the session timing out.
+
+    While paused, no timer fires and the time does not count toward the
+    session's length. Pausing twice is the same as pausing once. The session
+    also resumes by itself as soon as the customer says something.
+    """
+    customer_session = await sessions.pause(db, session_id, now=datetime.now(UTC))
+    await db.commit()
+    return _view(customer_session, settings)
+
+
+@router.post(
+    "/sessions/{session_id}/resume",
+    responses=NOT_FOUND | CONFLICT,
+    summary="Start the session's clocks again",
+)
+async def resume_session(
+    session_id: uuid.UUID, db: SessionDep, settings: SettingsDep
+) -> SessionView:
+    """The customer gets a fresh stretch of silence before being asked
+    whether they are still there."""
+    customer_session = await sessions.resume(db, session_id, now=datetime.now(UTC))
+    await db.commit()
+    return _view(customer_session, settings)
 
 
 # --- Cart -------------------------------------------------------------------

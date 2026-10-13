@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 
 import type { Decision, DecisionKind } from '../../session/types'
-import { AlertIcon, CheckIcon, CrossIcon, EyeIcon, HandoffIcon } from './icons'
+import { AlertIcon, CheckIcon, ClockIcon, CrossIcon, EyeIcon, HandoffIcon } from './icons'
 
 /**
  * How each kind of decision is named and marked. Every kind has a word and
@@ -13,6 +13,7 @@ export const DECISION_META: Record<DecisionKind, { label: string; meaning: strin
   confirm: { label: 'confirm', meaning: 'ask the customer', icon: <AlertIcon size={11} /> },
   escalate: { label: 'escalate', meaning: 'hand to a person', icon: <HandoffIcon size={11} /> },
   read: { label: 'read', meaning: 'looked something up', icon: <EyeIcon size={11} /> },
+  timer: { label: 'clock', meaning: 'the clock acted, not the model', icon: <ClockIcon size={11} /> },
 }
 
 /** An error or rule code as words: "missing_required_options" reads badly aloud. */

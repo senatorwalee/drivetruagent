@@ -53,6 +53,8 @@ PENDING_ACTION_RESOLVED = "pending_action_resolved"
 PENDING_ACTION_STALE = "pending_action_stale"
 PENDING_ACTION_CANCELLED = "pending_action_cancelled"
 HUMAN_REQUESTED = "human_requested"
+TIME_LIMIT = "time_limit"
+SILENCE_TIMEOUT = "silence_timeout"
 SUGGESTION_INSTRUCTION = (
     "Then offer the suggestion once, in a few words, saying what to add and "
     "what it saves."
@@ -237,6 +239,38 @@ async def hand_to_human(
         tax_rate,
         end_reason=f"{HUMAN_REQUESTED}: {reason}"[:200],
     )
+
+
+async def time_out(
+    db: AsyncSession, session_id: uuid.UUID, *, tax_rate: Decimal
+) -> ActionOutcome:
+    """The session has run too long: a person takes over, with its cart.
+
+    The caller has already established that the session is in progress and
+    holds its lock.
+    """
+    return await _escalate(
+        db,
+        session_id,
+        PolicyResult(
+            Decision.ESCALATE,
+            TIME_LIMIT,
+            "This order has taken a while, so a team member is taking over.",
+        ),
+        tax_rate,
+    )
+
+
+async def abandon(
+    db: AsyncSession, session_id: uuid.UUID, *, tax_rate: Decimal
+) -> CartSnapshot:
+    """Nobody is there any more: close the session and free what it held.
+
+    Any question still waiting for an answer goes with it.
+    """
+    await _supersede_pending(db, session_id)
+    await end_session(db, session_id, SessionState.ABANDONED, reason=SILENCE_TIMEOUT)
+    return await cart_rules.get_cart(db, session_id, tax_rate=tax_rate)
 
 
 # --- Applying a decision ----------------------------------------------------

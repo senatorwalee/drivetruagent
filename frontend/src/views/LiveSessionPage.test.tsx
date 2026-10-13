@@ -90,6 +90,46 @@ describe('the live session page', () => {
     expect(backend.sessionsOpened()).toBe(1)
   })
 
+  it('pauses on the backend, because its timers are what must stop', async () => {
+    render(<App />)
+    await sayThroughThePage('A cookie')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Pause' }))
+
+    expect(await screen.findByRole('button', { name: 'Resume' })).toHaveAttribute('aria-pressed', 'true')
+    expect(backend.requests.filter((request) => request.path.endsWith('/pause'))).toHaveLength(1)
+    expect(screen.getByText(/timers paused/)).toBeInTheDocument()
+    expect(screen.getByLabelText('What the customer says')).toBeDisabled()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Resume' }))
+
+    expect(await screen.findByRole('button', { name: 'Pause' })).toBeInTheDocument()
+    expect(backend.requests.filter((request) => request.path.endsWith('/resume'))).toHaveLength(1)
+    expect(await screen.findByText(/hand-off in/)).toBeInTheDocument()
+  })
+
+  it('shows something the backend said by itself, without anyone typing', async () => {
+    render(<App />)
+    await sayThroughThePage('A cookie')
+    expect(await screen.findByText('One cookie. Anything else?')).toBeInTheDocument()
+
+    backend.nudge()
+
+    expect(await screen.findByText('Are you still there?', {}, { timeout: 4000 })).toBeInTheDocument()
+  })
+
+  it('notices when the backend closes the session for silence', async () => {
+    render(<App />)
+    await sayThroughThePage('A cookie')
+    await screen.findByText('One cookie. Anything else?')
+
+    backend.abandon()
+
+    expect(await screen.findByText('Abandoned', {}, { timeout: 4000 })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByLabelText('What the customer says')).toBeDisabled())
+    expect(screen.queryByText(/hand-off in/)).not.toBeInTheDocument()
+  })
+
   it('starts a fresh session on request', async () => {
     render(<App />)
     await sayThroughThePage('A cookie please')

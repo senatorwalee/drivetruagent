@@ -17,12 +17,12 @@ screen sees each change as it happens.
 import time
 import uuid
 from dataclasses import dataclass, replace
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from drivetruagent.agent import events
+from drivetruagent.agent import events, timekeeper
 from drivetruagent.agent.messages import AssistantMessage, ToolResult, UserMessage
 from drivetruagent.agent.model import ModelClient, ModelTurn
 from drivetruagent.agent.prompt import build_instructions
@@ -31,7 +31,8 @@ from drivetruagent.enums import AgentEventKind
 from drivetruagent.ordering.cart import get_cart
 from drivetruagent.ordering.inventory import DEFAULT_RESERVATION_TTL
 from drivetruagent.ordering.offers import SpecialsCache, close_suggestions
-from drivetruagent.ordering.sessions import get_session
+from drivetruagent.ordering.sessions import begin_turn, end_turn, get_session
+from drivetruagent.ordering.timers import TimerSettings
 from drivetruagent.ordering.views import CartSnapshot
 from drivetruagent.policy.decisions import PolicyLimits
 
@@ -49,6 +50,8 @@ class AgentConfig:
     reservation_ttl: timedelta = DEFAULT_RESERVATION_TTL
     # Shared between sessions by whoever runs the loop. None: no caching.
     specials_cache: SpecialsCache | None = None
+    # The session length limit, checked as each turn starts. None: no limit.
+    timers: TimerSettings | None = None
 
 
 @dataclass(frozen=True)
@@ -77,8 +80,56 @@ async def run_turn(
     # The customer has answered, one way or another, anything they were
     # offered last turn. It is not offered again.
     await close_suggestions(db, session_id)
+    # From here until the reply, the session's clocks stand still: the agent
+    # taking its time is not the customer being silent.
+    await begin_turn(db, session_id, now=datetime.now(UTC))
     await db.commit()
 
+    try:
+        handed_off = await _hand_off_if_over_time(db, session_id, config)
+        if handed_off is not None:
+            return AgentReply(
+                text=handed_off,
+                cart=await get_cart(db, session_id, tax_rate=config.tax_rate),
+                turn_id=turn_id,
+                tools_used=(),
+            )
+        return await _converse(db, session_id, turn_id, model=model, config=config)
+    finally:
+        # Whatever happened, the turn is over. Anything left unsaved by a
+        # failure is dropped first, so this always has a usable transaction.
+        await db.rollback()
+        await end_turn(db, session_id, now=datetime.now(UTC))
+        await db.commit()
+
+
+async def _hand_off_if_over_time(
+    db: AsyncSession, session_id: uuid.UUID, config: AgentConfig
+) -> str | None:
+    """The length limit, checked here so it holds even if no sweep is
+    running. Returns what to say if the session was just handed off."""
+    if config.timers is None:
+        return None
+    sentence = await timekeeper.hand_off_if_over_time(
+        db,
+        session_id,
+        now=datetime.now(UTC),
+        timers=config.timers,
+        tax_rate=config.tax_rate,
+    )
+    await db.commit()
+    return sentence
+
+
+async def _converse(
+    db: AsyncSession,
+    session_id: uuid.UUID,
+    turn_id: uuid.UUID,
+    *,
+    model: ModelClient,
+    config: AgentConfig,
+) -> AgentReply:
+    """Ask the model, run the tools it asks for, and repeat until it answers."""
     instructions = await build_instructions(db, config.restaurant_name)
     context = ToolContext(
         db,

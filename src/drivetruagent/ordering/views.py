@@ -9,7 +9,7 @@ import uuid
 from collections.abc import Mapping
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel
 
 from drivetruagent.enums import DiscountKind, Language, SessionState
 
@@ -89,11 +89,29 @@ class OrderView(BaseModel):
     submitted_at: datetime
 
 
-class SessionView(BaseModel):
-    # Built straight from the database row.
-    model_config = ConfigDict(from_attributes=True)
+class TimersView(BaseModel):
+    """When the backend will next act on its own, if nothing else happens.
 
-    session_id: uuid.UUID = Field(validation_alias="id")
+    A screen counts down to these. It never works the rules out itself. Each
+    is None when that timer is not running: all of them once a session has
+    ended or while it is paused.
+    """
+
+    paused: bool
+    # When the current pause began, and how long the session has spent paused
+    # before it. With these a screen can show how long the session has run.
+    paused_at: datetime | None
+    paused_seconds: int
+    # The customer will be asked whether they are still there.
+    nudge_at: datetime | None
+    # They were asked and have not answered: the session will be closed.
+    closes_at: datetime | None
+    # The session will have run too long, and a person will take over.
+    hand_off_at: datetime | None
+
+
+class SessionView(BaseModel):
+    session_id: uuid.UUID
     lane: str
     state: SessionState
     # None until the customer's language has been detected or set.
@@ -103,6 +121,7 @@ class SessionView(BaseModel):
     end_reason: str | None
     # The restaurant's date when the car arrived. Decides the day's specials.
     business_date: date
+    timers: TimersView
 
 
 # --- Menu -------------------------------------------------------------------

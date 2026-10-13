@@ -19,6 +19,8 @@ function event(kind: AgentEvent['kind'], payload: Record<string, unknown>): Agen
   return { seq: nextSeq++, turn_id: TURN_ID, kind, payload, created_at: '2026-10-13T12:00:00Z' }
 }
 
+/** The backend acting on a clock: 'nudge', 'abandon' or 'hand_off'. */
+export const timer = (action: string, rule: string, after_seconds: number) => event('timer', { action, rule, after_seconds })
 export const said = (text: string) => event('user_message', { text })
 export const replied = (text: string) => event('assistant_message', { text })
 export const modelCall = () => event('model_call', { model: 'demo-script', latency_ms: 3, tool_calls: 1 })
@@ -48,6 +50,14 @@ export const session: Session = {
   ended_at: null,
   end_reason: null,
   business_date: '2026-10-13',
+  timers: {
+    paused: false,
+    paused_at: null,
+    paused_seconds: 0,
+    nudge_at: '2026-10-13T12:01:02Z',
+    closes_at: null,
+    hand_off_at: '2026-10-13T12:03:00Z',
+  },
 }
 
 /** One large fries and one medium cola. */
@@ -147,6 +157,7 @@ export function liveSession(overrides: Partial<LiveSession> = {}): LiveSession {
     timeline: buildTimeline(eventsUpToHeldCookies()),
     agentState: 'speaking',
     elapsedSeconds: 42,
+    timerNote: 'hand-off in 2:18',
     suggestedLine: 'No, just two.',
     itemName: (code) => ITEM_NAMES[code] ?? code,
     paused: false,

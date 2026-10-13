@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { eventsUpToHeldCookies, replied, resetSeq, said, size, toolRound } from '../test/fixtures'
+import { eventsUpToHeldCookies, replied, resetSeq, said, size, timer, toolRound } from '../test/fixtures'
 import { buildTimeline, summarise } from './timeline'
 
 beforeEach(resetSeq)
@@ -42,6 +42,37 @@ describe('buildTimeline', () => {
       ['cheeseburger', 'Burger combo'],
       ['cookie', null],
     ])
+  })
+
+  it('shows the backend asking a silent customer if they are there', () => {
+    const { transcript, decisions } = buildTimeline([said('Hi'), replied('Welcome!'), timer('nudge', 'silence', 20), replied('Are you still there?')])
+
+    expect(transcript.at(-1)).toMatchObject({ speaker: 'agent', text: 'Are you still there?' })
+    expect(decisions.map((d) => [d.tool, d.summary, d.kind, d.reason])).toEqual([['timer', 'asked after 20s of silence', 'timer', null]])
+  })
+
+  it('shows a session closed for silence as the clock acting', () => {
+    const { decisions } = buildTimeline([timer('nudge', 'silence', 20), timer('abandon', 'silence_timeout', 40)])
+
+    expect(decisions.map((d) => [d.summary, d.kind, d.reason])).toEqual([
+      ['asked after 20s of silence', 'timer', null],
+      ['closed after 40s of silence', 'timer', null],
+    ])
+  })
+
+  it('shows the three-minute hand-off as an escalation', () => {
+    const { decisions } = buildTimeline([timer('hand_off', 'time_limit', 180)])
+
+    expect(decisions.map((d) => [d.tool, d.summary, d.kind, d.reason])).toEqual([['timer', 'handed off at 3:00', 'escalate', 'time_limit']])
+  })
+
+  it('stops waiting for a yes once a timer has ended the session', () => {
+    const held = eventsUpToHeldCookies()
+
+    expect(buildTimeline(held).pending).not.toBeNull()
+    expect(buildTimeline([...held, timer('nudge', 'silence', 20)]).pending).not.toBeNull()
+    expect(buildTimeline([...held, timer('abandon', 'silence_timeout', 40)]).pending).toBeNull()
+    expect(buildTimeline([...held, timer('hand_off', 'time_limit', 180)]).pending).toBeNull()
   })
 
   it('leaves model-call bookkeeping out of what is shown', () => {

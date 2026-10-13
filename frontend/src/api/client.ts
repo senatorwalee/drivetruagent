@@ -75,4 +75,7 @@ export const api = {
   events: (sessionId: string) => request<AgentEvent[]>(`/sessions/${sessionId}/events`),
   sendMessage: (sessionId: string, text: string) =>
     post<MessageReply>(`/sessions/${sessionId}/messages`, { text }),
+  /** Stop the session's timers, for a presenter who wants to talk. */
+  pause: (sessionId: string) => post<Session>(`/sessions/${sessionId}/pause`),
+  resume: (sessionId: string) => post<Session>(`/sessions/${sessionId}/resume`),
 }

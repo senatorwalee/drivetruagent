@@ -66,6 +66,7 @@ function Readouts({ live }: { live: LiveSession }) {
     { label: 'Cart version', value: live.cart ? String(live.cart.version) : '—' },
     { label: 'Model', value: live.agent?.model ?? 'none' },
     { label: 'Session time', value: clock(live.elapsedSeconds) },
+    { label: 'Timer', value: live.timerNote ?? '—' },
   ]
   return (
     <dl className={styles.readouts}>

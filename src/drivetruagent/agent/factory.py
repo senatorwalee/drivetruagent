@@ -61,4 +61,5 @@ def agent_config(
         max_tool_rounds=settings.agent_max_tool_rounds,
         reservation_ttl=settings.reservation_ttl,
         specials_cache=specials_cache,
+        timers=settings.session_timers,
     )

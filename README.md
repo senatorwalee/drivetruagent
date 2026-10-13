@@ -26,7 +26,8 @@ built piece by piece.
 | 07 | Stock reservations and idempotency keys | Done |
 | 08a | Combos: discounts worked out from the cart, and suggested once | Done |
 | 08b | Today's specials, with a cached read | Done |
-| Later | Session timers, voice, human handoff, knowledge search, tracing | Planned |
+| 09 | Session timers: the silence nudge, the three-minute hand-off, and pause | Done |
+| Later | Voice, human handoff, knowledge search, tracing | Planned |
 
 ## Stack
 
@@ -414,6 +415,47 @@ right shape for when the source is slower (a remote menu service), not as a
 latency win today. Writing its tests did catch a real bug: an empty cache has
 a length of zero, so `if cache:` treated it as no cache at all.
 
+## Session timers: the backend owns the clock
+
+- **20 seconds of silence:** the agent asks "Are you still there?". If there
+  is still no answer 20 seconds later, the session is closed as abandoned and
+  its stock is released.
+- **Three minutes without an order:** the session is handed to a person, with
+  its cart and stock intact.
+
+The model never estimates time. What the customer hears is fixed text in
+their language, so a timer still works when the model is slow or down.
+
+How it is built:
+
+- **Timers are arithmetic, not sleeping tasks.** A session row holds a few
+  timestamps. One pure function, `due_action(clock, now, settings)`, says what
+  is due. A background task wakes once a second and applies it. Nothing is
+  held in memory per session, so any server process can do it.
+- **Two processes cannot nudge twice.** Each session is handled under its row
+  lock and the decision is made again once the lock is held. A test races
+  four sweeps on separate connections and gets one nudge; with the lock
+  removed it fails.
+- **The clocks stop while the agent is replying.** A customer who says "yes,
+  that's right" at 2:58 gets their order placed, not a hand-off at 3:00 while
+  the model is still answering. A turn marker older than a minute is ignored,
+  so a crashed turn cannot freeze a session.
+- **The three-minute rule holds without the background task.** Each customer
+  turn checks the limit before the model is called.
+- **Pause is the backend's state.** `POST /sessions/{id}/pause` stops the
+  clocks for a presenter; paused time counts toward nothing. The screen's
+  Pause button calls it.
+- **The screen counts down to times the backend gives it** (`timers` on the
+  session). It never works the rules out itself, and it keeps polling between
+  turns so a nudge or a timed-out session shows up on its own.
+- **No test waits for a timer.** Every call is told what time it is.
+
+The sweep also releases stock holds that have expired, which until now
+nothing ran.
+
+When presenting, use Pause, or raise `SILENCE_NUDGE_SECONDS` and
+`SESSION_MAX_SECONDS` in `.env`.
+
 ## Policy engine
 
 The model proposes; code decides. Every action the agent proposes goes
@@ -460,6 +502,8 @@ Run `make dev` and open <http://127.0.0.1:8000/docs> to try these.
 | `POST /sessions` | Open a session and its cart |
 | `GET /sessions/{id}` | Read a session |
 | `PATCH /sessions/{id}` | Set the session's language |
+| `POST /sessions/{id}/pause` | Stop the session's timers |
+| `POST /sessions/{id}/resume` | Start them again |
 | `GET /sessions/{id}/cart` | Read the cart, priced |
 | `POST /sessions/{id}/cart/lines` | Add an item |
 | `PATCH /sessions/{id}/cart/lines/{line_no}` | Change quantity, options, or both |

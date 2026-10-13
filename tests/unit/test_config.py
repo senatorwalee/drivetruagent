@@ -74,3 +74,38 @@ def test_the_specials_cache_lasts_a_minute_by_default() -> None:
     assert make_settings(specials_cache_ttl_seconds=0).specials_cache_ttl == timedelta(
         0
     )
+
+
+# --- Session timers ---------------------------------------------------------
+
+
+def test_the_timers_default_to_what_the_brief_asks_for() -> None:
+    timers = make_settings().session_timers
+
+    assert timers.nudge_after == timedelta(seconds=20)
+    assert timers.close_after == timedelta(seconds=20)
+    assert timers.max_duration == timedelta(minutes=3)
+    assert make_settings().timekeeper_interval_seconds == 1.0
+
+
+def test_the_timers_can_be_changed_from_the_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SILENCE_NUDGE_SECONDS", "45")
+    monkeypatch.setenv("SESSION_MAX_SECONDS", "600")
+    monkeypatch.setenv("TIMEKEEPER_INTERVAL_SECONDS", "0")
+
+    settings = make_settings()
+
+    assert settings.session_timers.nudge_after == timedelta(seconds=45)
+    assert settings.session_timers.max_duration == timedelta(minutes=10)
+    assert settings.timekeeper_interval_seconds == 0
+
+
+@pytest.mark.parametrize(
+    "field", ["silence_nudge_seconds", "silence_close_seconds", "session_max_seconds"]
+)
+def test_a_timer_of_zero_seconds_is_rejected(field: str) -> None:
+    """It would fire on every sweep."""
+    with pytest.raises(ValidationError, match=field):
+        make_settings(**{field: 0})

@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from drivetruagent.ordering.timers import TimerSettings
 from drivetruagent.policy.decisions import PolicyLimits
 
 
@@ -31,6 +32,17 @@ class Settings(BaseSettings):
     # How long stock stays held for a session with no activity. It must
     # outlast the longest session plus the time a handoff takes.
     reservation_ttl_seconds: int = Field(default=600, ge=1)
+
+    # Session timers. After this much silence the customer is asked whether
+    # they are still there.
+    silence_nudge_seconds: int = Field(default=20, ge=1)
+    # If they then stay silent this much longer, the session is closed.
+    silence_close_seconds: int = Field(default=20, ge=1)
+    # A session that has run this long is handed to a person.
+    session_max_seconds: int = Field(default=180, ge=1)
+    # How often the background task checks the timers. 0 turns it off; the
+    # length limit is then still checked whenever the customer speaks.
+    timekeeper_interval_seconds: float = Field(default=1.0, ge=0)
 
     # The agent. Without a key the ordering API still works; only the
     # conversation endpoint is unavailable.
@@ -73,6 +85,14 @@ class Settings(BaseSettings):
         """The restaurant's calendar date at `now` (default: this moment)."""
         zone = ZoneInfo(self.restaurant_timezone)
         return (now.astimezone(zone) if now else datetime.now(zone)).date()
+
+    @property
+    def session_timers(self) -> TimerSettings:
+        return TimerSettings(
+            nudge_after=timedelta(seconds=self.silence_nudge_seconds),
+            close_after=timedelta(seconds=self.silence_close_seconds),
+            max_duration=timedelta(seconds=self.session_max_seconds),
+        )
 
     @property
     def specials_cache_ttl(self) -> timedelta:

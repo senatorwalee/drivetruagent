@@ -8,9 +8,10 @@ export type AgentState = 'ready' | 'listening' | 'working' | 'speaking' | 'pause
 
 /**
  * What the backend decided about a tool call. `read` is a lookup that changes
- * nothing, so the policy engine was not involved.
+ * nothing, so the policy engine was not involved. `timer` is the backend
+ * acting on its own because a clock ran out, with no model involved at all.
  */
-export type DecisionKind = 'allow' | 'reject' | 'confirm' | 'escalate' | 'read'
+export type DecisionKind = 'allow' | 'reject' | 'confirm' | 'escalate' | 'read' | 'timer'
 
 export interface TranscriptLine {
   id: number

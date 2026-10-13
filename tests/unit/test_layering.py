@@ -24,6 +24,7 @@ PURE_MODULES = [
     "ordering/selection.py",
     "ordering/pricing.py",
     "ordering/discounts.py",
+    "ordering/timers.py",
     "ordering/search.py",
     "ordering/errors.py",
     "policy/rules.py",

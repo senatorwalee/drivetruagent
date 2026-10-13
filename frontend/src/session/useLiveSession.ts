@@ -10,13 +10,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { api, ApiError, type AgentInfo, type Cart, type Menu, type Session } from '../api/client'
-import { deriveAgentState, isFinal, speakingMilliseconds } from './presentation'
+import { deriveAgentState, isFinal, runningSeconds, speakingMilliseconds, timerNote } from './presentation'
 import { buildTimeline } from './timeline'
 import type { AgentState, Timeline } from './types'
 
 const STORED_SESSION = 'drivetruagent.sessionId'
 /** While a turn is in progress, how often to look for new steps. */
 const FOLLOW_INTERVAL_MS = 400
+/**
+ * Between turns, how often to look for something the backend did by itself:
+ * asking a silent customer if they are still there, or ending the session.
+ */
+const IDLE_INTERVAL_MS = 1000
 
 const EMPTY_TIMELINE: Timeline = { transcript: [], decisions: [], pending: null, order: null }
 
@@ -30,11 +35,15 @@ export interface LiveSession {
   cart: Cart | null
   timeline: Timeline
   agentState: AgentState
+  /** How long the session has run, leaving out time spent paused. */
   elapsedSeconds: number
+  /** What the backend's timers are counting down to, in words. Null if nothing. */
+  timerNote: string | null
   /** For the scripted demo: the next line to type. Null with a real model. */
   suggestedLine: string | null
   /** Display names for item codes, for things not in the cart yet. */
   itemName: (itemCode: string) => string
+  /** The backend's timers are stopped. Set by the backend, not kept here. */
   paused: boolean
   canSend: boolean
   send: (text: string) => void
@@ -66,7 +75,6 @@ export function useLiveSession(): LiveSession {
   const queryClient = useQueryClient()
   // Bumping the generation makes the query below run again: a new session.
   const [generation, setGeneration] = useState(0)
-  const [paused, setPaused] = useState(false)
   const [customerActive, setCustomerActive] = useState(false)
   const [speaking, setSpeaking] = useState(false)
   const speakingTimer = useRef<number | undefined>(undefined)
@@ -92,14 +100,27 @@ export function useLiveSession(): LiveSession {
   })
   useEffect(() => () => window.clearTimeout(speakingTimer.current), [])
 
-  // While a turn is running, each tool's work is saved as it finishes, so
-  // polling shows items arriving one by one instead of all at the end.
-  const follow = { enabled: Boolean(sessionId), refetchInterval: message.isPending ? FOLLOW_INTERVAL_MS : false } as const
+  const sessionKey = ['session', sessionId, 'state']
   const sessionQuery = useQuery({
-    queryKey: ['session', sessionId, 'state'],
+    queryKey: sessionKey,
     queryFn: () => api.session(sessionId!),
     initialData: opened.data,
-    ...follow,
+    enabled: Boolean(sessionId),
+    // While a turn is running, each tool's work is saved as it finishes, so
+    // polling shows items arriving one by one instead of all at the end.
+    // Between turns the backend's timers may act, so the screen keeps
+    // looking, more slowly. A paused or finished session cannot change.
+    refetchInterval: (query) => followInterval(query.state.data, message.isPending),
+  })
+  const follow = {
+    enabled: Boolean(sessionId),
+    refetchInterval: followInterval(sessionQuery.data, message.isPending),
+  } as const
+  // Pausing is the backend's state: its timers are what must stop. The
+  // answer replaces the session held here, so the button follows at once.
+  const pause = useMutation({
+    mutationFn: (shouldPause: boolean) => (shouldPause ? api.pause(sessionId!) : api.resume(sessionId!)),
+    onSuccess: (session) => queryClient.setQueryData(sessionKey, session),
   })
   const cartQuery = useQuery({ queryKey: ['session', sessionId, 'cart'], queryFn: () => api.cart(sessionId!), ...follow })
   const eventsQuery = useQuery({
@@ -116,7 +137,22 @@ export function useLiveSession(): LiveSession {
   const timeline = useMemo(() => (eventsQuery.data ? buildTimeline(eventsQuery.data) : EMPTY_TIMELINE), [eventsQuery.data])
   const itemName = useItemNames(menuQuery.data)
   const ended = session ? isFinal(session.state) : false
-  const elapsedSeconds = useElapsedSeconds(session, paused)
+  const paused = session?.timers.paused ?? false
+  const now = useNow()
+
+  // Something the agent said without being asked, such as "Are you still
+  // there?", is shown as speech too.
+  const lastAgentLine = timeline.transcript.findLast((line) => line.speaker === 'agent')?.id
+  const spokenLine = useRef(lastAgentLine)
+  useEffect(() => {
+    if (lastAgentLine === undefined || lastAgentLine === spokenLine.current) return
+    const firstLoad = spokenLine.current === undefined && !eventsQuery.isFetchedAfterMount
+    spokenLine.current = lastAgentLine
+    if (firstLoad || message.isPending) return
+    setSpeaking(true)
+    window.clearTimeout(speakingTimer.current)
+    speakingTimer.current = window.setTimeout(() => setSpeaking(false), 2500)
+  }, [lastAgentLine, message.isPending, eventsQuery.isFetchedAfterMount])
 
   const agent = agentQuery.data ?? null
   const customerTurns = timeline.transcript.filter((line) => line.speaker === 'customer').length
@@ -134,7 +170,6 @@ export function useLiveSession(): LiveSession {
     window.sessionStorage.removeItem(STORED_SESSION)
     window.clearTimeout(speakingTimer.current)
     setSpeaking(false)
-    setPaused(false)
     message.reset()
     setGeneration((current) => current + 1)
   }, [message])
@@ -153,14 +188,17 @@ export function useLiveSession(): LiveSession {
       speaking,
       customerActive,
     }),
-    elapsedSeconds,
+    elapsedSeconds: session ? runningSeconds(session, now) : 0,
+    timerNote: ended ? null : timerNote(session?.timers, now),
     suggestedLine: agent?.scripted && !ended ? (agent.suggested_lines[customerTurns] ?? null) : null,
     itemName,
     paused,
     canSend,
     send,
     startNewSession,
-    togglePause: useCallback(() => setPaused((current) => !current), []),
+    togglePause: useCallback(() => {
+      if (sessionId && !ended) pause.mutate(!paused)
+    }, [sessionId, ended, paused, pause]),
     setCustomerActive,
   }
 }
@@ -186,18 +224,25 @@ function useItemNames(menu: Menu | undefined): (itemCode: string) => string {
   }, [menu])
 }
 
-/** Seconds since the session started, ticking once a second while it runs. */
-function useElapsedSeconds(session: Session | null, paused: boolean): number {
+/** How often to refetch, given what the session is doing. False: not at all. */
+function followInterval(session: Session | undefined, turnInProgress: boolean): number | false {
+  if (turnInProgress) return FOLLOW_INTERVAL_MS
+  if (!session || isFinal(session.state) || session.timers.paused) return false
+  return IDLE_INTERVAL_MS
+}
+
+/**
+ * The time now, updated once a second. It keeps ticking while a session is
+ * paused or over: the countdowns come from the backend's times, so a stopped
+ * session simply has nothing for the tick to change.
+ */
+function useNow(): number {
   const [now, setNow] = useState(() => Date.now())
-  const running = Boolean(session) && !session?.ended_at && !paused
 
   useEffect(() => {
-    if (!running) return
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(timer)
-  }, [running])
+  }, [])
 
-  if (!session) return 0
-  const end = session.ended_at ? Date.parse(session.ended_at) : now
-  return Math.max(0, (end - Date.parse(session.started_at)) / 1000)
+  return now
 }

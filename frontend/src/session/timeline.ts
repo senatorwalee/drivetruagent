@@ -7,6 +7,7 @@
  * conversation that could drift from the truth.
  */
 import type { AgentEvent } from '../api/client'
+import { clock } from './presentation'
 import type { Decision, DecisionKind, PendingItem, PlacedOrder, Timeline, TranscriptLine } from './types'
 
 type Json = Record<string, unknown>
@@ -64,6 +65,14 @@ export function buildTimeline(events: readonly AgentEvent[]): Timeline {
         order = placedOrder(result) ?? order
         break
       }
+      case 'timer': {
+        const decision = timerDecision(event)
+        decisions.push(decision)
+        // Anything but a nudge ended the session, so nothing is waiting for
+        // a yes any more.
+        if (event.payload['action'] !== 'nudge') pending = null
+        break
+      }
       default:
         // model_call events are bookkeeping; the screen does not show them.
         break
@@ -71,6 +80,31 @@ export function buildTimeline(events: readonly AgentEvent[]): Timeline {
   }
 
   return { transcript, decisions, pending, order }
+}
+
+const TIMER_WORDS: Record<string, string> = { nudge: 'asked', abandon: 'closed' }
+
+/**
+ * A timer event as an entry in the decision log. These are the backend acting
+ * by itself: asking a silent customer if they are there, closing a session
+ * nobody answered in, or handing a long one to a person.
+ */
+function timerDecision(event: AgentEvent): Decision {
+  const action = event.payload['action']
+  const seconds = typeof event.payload['after_seconds'] === 'number' ? event.payload['after_seconds'] : 0
+  const rule = event.payload['rule']
+  const handOff = action === 'hand_off'
+  return {
+    id: event.seq,
+    tool: 'timer',
+    summary: handOff ? `handed off at ${clock(seconds)}` : `${TIMER_WORDS[String(action)] ?? action} after ${seconds}s of silence`,
+    // Handing off is the same outcome as any other escalation, so it is
+    // shown the same way, with the rule that caused it.
+    kind: handOff ? 'escalate' : 'timer',
+    reason: handOff && typeof rule === 'string' ? rule : null,
+    suggestion: null,
+    cartVersion: null,
+  }
 }
 
 function textOf(event: AgentEvent): string {
