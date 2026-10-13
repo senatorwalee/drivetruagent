@@ -19,7 +19,7 @@ migrate:
 seed:
 	uv run python -m drivetruagent.seed
 
-# Talk to the agent in the terminal. Needs OPENAI_API_KEY in .env.
+# Talk to the agent in the terminal. Needs a model key in .env (OpenAI or Gemini).
 chat:
 	uv run python -m drivetruagent.agent.chat
 
@@ -50,8 +50,8 @@ test:
 test-unit:
 	uv run pytest -m "not integration and not eval"
 
-# Evals: whole conversations with the real model. Needs OPENAI_API_KEY and
-# costs money, so it is never part of `make test` or CI.
+# Evals: whole conversations with the real model. Needs a model key (OpenAI
+# or Gemini) and calls a real service, so it is never part of `make test` or CI.
 eval:
 	uv run pytest -m eval -v
 

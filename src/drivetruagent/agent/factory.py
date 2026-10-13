@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from drivetruagent.agent import demo_model
 from drivetruagent.agent.demo_model import DemoModel
+from drivetruagent.agent.gemini_model import GeminiModel
 from drivetruagent.agent.loop import AgentConfig
 from drivetruagent.agent.model import ModelClient, ModelUnavailable
 from drivetruagent.agent.openai_model import OpenAIModel
@@ -32,10 +33,20 @@ def model_from_settings(settings: Settings) -> ModelClient:
     """The model the agent talks to. Raises ModelUnavailable if none is set up."""
     if settings.agent_model == "demo":
         return DemoModel()
+    if settings.agent_model == "gemini":
+        if settings.gemini_api_key is None:
+            raise ModelUnavailable(
+                "AGENT_MODEL is gemini but GEMINI_API_KEY is not set. Add the "
+                "key, or set AGENT_MODEL=demo to use the scripted demo."
+            )
+        return GeminiModel(
+            api_key=settings.gemini_api_key.get_secret_value(),
+            model=settings.gemini_text_model,
+        )
     if settings.openai_api_key is None:
         raise ModelUnavailable(
-            "No model is configured. Set OPENAI_API_KEY, or set AGENT_MODEL=demo "
-            "to use the scripted demo."
+            "No model is configured. Set OPENAI_API_KEY, set AGENT_MODEL=gemini "
+            "with GEMINI_API_KEY, or set AGENT_MODEL=demo to use the scripted demo."
         )
     return OpenAIModel(
         api_key=settings.openai_api_key.get_secret_value(),
@@ -46,6 +57,10 @@ def model_from_settings(settings: Settings) -> ModelClient:
 def agent_info(settings: Settings) -> AgentInfo:
     if settings.agent_model == "demo":
         return AgentInfo(True, demo_model.MODEL_NAME, True, demo_model.SUGGESTED_LINES)
+    if settings.agent_model == "gemini":
+        if settings.gemini_api_key is None:
+            return AgentInfo(False, None, False, ())
+        return AgentInfo(True, settings.gemini_text_model, False, ())
     if settings.openai_api_key is None:
         return AgentInfo(False, None, False, ())
     return AgentInfo(True, settings.openai_text_model, False, ())
