@@ -25,7 +25,8 @@ built piece by piece.
 | 06 | Web app: the live session screen in three switchable views | Done |
 | 07 | Stock reservations and idempotency keys | Done |
 | 08a | Combos: discounts worked out from the cart, and suggested once | Done |
-| Later | Today's specials, session timers, voice, human handoff, knowledge search, tracing | Planned |
+| 08b | Today's specials, with a cached read | Done |
+| Later | Session timers, voice, human handoff, knowledge search, tracing | Planned |
 
 ## Stack
 
@@ -192,6 +193,7 @@ Design points:
 | Tool | Runs |
 |---|---|
 | `search_menu`, `get_item_details`, `get_cart` | Read-only lookups |
+| `get_todays_specials` | Today's specials and the combo deals, read through a cache |
 | `add_item`, `update_item`, `remove_item` | The policy gateway |
 | `request_confirmation`, `submit_order` | The policy gateway |
 | `confirm_pending_action`, `cancel_pending_action` | The customer's answer to a held action |
@@ -210,7 +212,7 @@ answers 503.
 ### Running it without a key
 
 Set `AGENT_MODEL=demo` in `.env`. The agent then plays one fixed conversation:
-a combo offered and taken up, a missing size, two items in one breath, fifteen
+today's special, a combo offered and taken up, a missing size, two items in one breath, fifteen
 cookies that are held and then corrected to two, the read-back, and the order
 being placed. Only the
 model is scripted. Every tool call it makes runs through the same policy
@@ -276,6 +278,10 @@ order, the session state and the tools used, never at the agent's wording.
 | `order_in_french` | Language is set and the order is right |
 | `combo_taken_up` | The combo is offered, the customer adds a drink, and the saving is charged |
 | `combo_declined` | Saying no adds nothing and costs nothing |
+| `asks_for_the_special` | The special is looked up, ordered, and charged at its price |
+
+Every scenario is played on a fixed Monday, so a total never depends on which
+day the evals happen to be run.
 
 ```bash
 make eval
@@ -378,6 +384,36 @@ there is anything to suggest; the model only chooses the words.
 "Do not nag" is enforced in code, not asked of the model. With that rule
 removed, two tests fail.
 
+## Today's special
+
+An item is cheaper on certain days of the week (`specials` in
+`data/menu.json`). Like a combo, the saving is worked out by the backend for
+every one in the cart, and it stacks with a combo.
+
+**Which day is "today"?** The date where the restaurant is
+(`RESTAURANT_TIMEZONE`), fixed when the session opens. A car that hears about
+the special at 23:59 still gets it at 00:01, and no clock is read while
+pricing, which keeps prices repeatable.
+
+**The cache.** "What's today's special?" is asked all day, so the agent's
+`get_todays_specials` tool and `GET /specials` read the day's list from an
+in-memory cache with a time to live.
+
+- What is cached is the list, which rarely changes. Stock changes with every
+  order, so `in_stock` is read live and laid over the cached list.
+- A change made through `PUT /specials/{code}` clears the cache after it is
+  committed, so it shows on the very next read.
+- The time to live (60 seconds by default) covers changes this process is not
+  told about, such as a re-seed. With several workers it would move to Redis.
+- **Pricing never reads the cache.** A stale cache can make the agent mention
+  a special that ended a moment ago; it cannot make a cart charge for one.
+
+An honest note on what the cache buys: the database read it saves takes about
+a millisecond, and the slow part of answering is the model. It is here as the
+right shape for when the source is slower (a remote menu service), not as a
+latency win today. Writing its tests did catch a real bug: an empty cache has
+a length of zero, so `if cache:` treated it as no cache at all.
+
 ## Policy engine
 
 The model proposes; code decides. Every action the agent proposes goes
@@ -442,6 +478,8 @@ Run `make dev` and open <http://127.0.0.1:8000/docs> to try these.
 | `GET /menu/search?q=` | Find items matching what a customer said |
 | `GET /menu/items/{code}` | One item with its choices |
 | `GET /combos` | The combo deals |
+| `GET /specials` | Today's specials, with live stock |
+| `PUT /specials/{code}` | End a special early, or bring it back |
 
 The three action endpoints are the agent's path and go through the policy
 engine. The cart endpoints act directly and are for staff and back-office
