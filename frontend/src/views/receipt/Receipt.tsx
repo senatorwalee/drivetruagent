@@ -2,6 +2,8 @@ import '@fontsource-variable/archivo'
 import '@fontsource/space-mono/400.css'
 import '@fontsource/space-mono/700.css'
 
+import { STAFF_PATH } from '../../app/navigation'
+import { PageLink } from '../../app/PageLink'
 import { clock, progressSteps } from '../../session/presentation'
 import type { LiveSession } from '../../session/useLiveSession'
 import { MicrophoneIcon } from '../shared/icons'
@@ -30,6 +32,9 @@ export function Receipt({ live, view, onViewChange }: LiveSessionViewProps) {
             onChange={onViewChange}
             classes={{ group: styles.switcher, option: styles.switcherOption, selected: styles.switcherSelected }}
           />
+          <PageLink to={STAFF_PATH} className={styles.button}>
+            Staff
+          </PageLink>
           <button type="button" className={styles.button} aria-pressed={live.paused} onClick={live.togglePause}>
             {live.paused ? 'Resume' : 'Pause'}
           </button>

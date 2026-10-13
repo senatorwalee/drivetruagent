@@ -1,6 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 
+import { STAFF_PATH, usePath } from './app/navigation'
+import { StaffPage } from './staff/StaffPage'
 import { LiveSessionPage } from './views/LiveSessionPage'
 
 function createQueryClient(): QueryClient {
@@ -18,9 +20,9 @@ export function App() {
   // one instance (or one test) can leak into another.
   const [queryClient] = useState(createQueryClient)
 
+  const path = usePath()
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <LiveSessionPage />
-    </QueryClientProvider>
+    <QueryClientProvider client={queryClient}>{path === STAFF_PATH ? <StaffPage /> : <LiveSessionPage />}</QueryClientProvider>
   )
 }

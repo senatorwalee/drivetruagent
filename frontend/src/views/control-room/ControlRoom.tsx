@@ -2,6 +2,8 @@ import '@fontsource-variable/sora'
 import '@fontsource/ibm-plex-mono/400.css'
 import '@fontsource/ibm-plex-mono/500.css'
 
+import { STAFF_PATH } from '../../app/navigation'
+import { PageLink } from '../../app/PageLink'
 import { clock } from '../../session/presentation'
 import type { LiveSession } from '../../session/useLiveSession'
 import { MicrophoneIcon } from '../shared/icons'
@@ -29,6 +31,9 @@ export function ControlRoom({ live, view, onViewChange }: LiveSessionViewProps) 
             onChange={onViewChange}
             classes={{ group: styles.switcher, option: styles.switcherOption, selected: styles.switcherSelected }}
           />
+          <PageLink to={STAFF_PATH} className={styles.button}>
+            Staff
+          </PageLink>
           <button type="button" className={styles.button} aria-pressed={live.paused} onClick={live.togglePause}>
             {live.paused ? 'Resume' : 'Pause'}
           </button>

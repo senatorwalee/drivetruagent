@@ -111,6 +111,7 @@ export function installFakeBackend() {
 
       if (path === '/agent') return respond(200, agentInfo)
       if (path === '/menu') return respond(200, { categories: [] })
+      if (path === '/handoffs') return respond(200, [])
       if (path === '/sessions' && method === 'POST') return respond(201, openSession(body.lane))
 
       const match = /^\/sessions\/([^/]+)(\/\w+)?$/.exec(path)

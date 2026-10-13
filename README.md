@@ -28,7 +28,8 @@ built piece by piece.
 | 08b | Today's specials, with a cached read | Done |
 | 09 | Session timers: the silence nudge, the three-minute hand-off, and pause | Done |
 | 10a | Handoff package: what a person taking over is shown, and closing a handoff | Done |
-| Later | Staff screen, voice, knowledge search, tracing | Planned |
+| 10b | Staff screen: the handoff queue and the package, in the web app | Done |
+| Later | Voice, knowledge search, tracing | Planned |
 
 ## Stack
 
@@ -496,6 +497,23 @@ picked a handoff up, and close it one of two ways:
 A resolved handoff cannot be changed. Two people closing the same one place
 one order: a test races five of them on separate connections, and fails with
 the row lock removed.
+
+### The staff screen
+
+<http://localhost:5174/staff>, or the Staff link on the live session screen.
+The queue is on the left, longest waiting first; the selected package is on
+the right, with "What to do" at the top and the two ways of closing it. It
+polls, so a session handed off on the live screen appears by itself.
+
+- After an order is placed or cancelled the screen stays on that handoff and
+  shows the outcome. It does not jump to the next one in the queue.
+- A refusal is explained in words the person can act on: the stock has gone,
+  the cart is empty, or someone else closed it first.
+- It lives in `frontend/src/staff/`, with the same split as the live screen:
+  one hook that fetches and acts (`useStaffDesk`), pure helpers for wording
+  (`words.ts`), and components that only draw.
+- The two screens are two paths in one app. Routing is a twenty-line module
+  (`app/navigation.ts`), not a library.
 
 ## Policy engine
 

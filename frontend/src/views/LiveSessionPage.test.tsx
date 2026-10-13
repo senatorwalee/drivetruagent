@@ -130,6 +130,16 @@ describe('the live session page', () => {
     expect(screen.queryByText(/hand-off in/)).not.toBeInTheDocument()
   })
 
+  it('links to the staff screen', async () => {
+    render(<App />)
+
+    await userEvent.click(await screen.findByRole('link', { name: 'Staff' }))
+
+    expect(window.location.pathname).toBe('/staff')
+    expect(await screen.findByRole('heading', { name: /Staff/ })).toBeInTheDocument()
+    expect(await screen.findByText(/Nobody is waiting/)).toBeInTheDocument()
+  })
+
   it('starts a fresh session on request', async () => {
     render(<App />)
     await sayThroughThePage('A cookie please')

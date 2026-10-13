@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, ApiError, type AgentInfo, type Cart, type Menu, type Session } from '../api/client'
 import { deriveAgentState, isFinal, runningSeconds, speakingMilliseconds, timerNote } from './presentation'
 import { buildTimeline } from './timeline'
+import { useNow } from './useNow'
 import type { AgentState, Timeline } from './types'
 
 const STORED_SESSION = 'drivetruagent.sessionId'
@@ -229,20 +230,4 @@ function followInterval(session: Session | undefined, turnInProgress: boolean): 
   if (turnInProgress) return FOLLOW_INTERVAL_MS
   if (!session || isFinal(session.state) || session.timers.paused) return false
   return IDLE_INTERVAL_MS
-}
-
-/**
- * The time now, updated once a second. It keeps ticking while a session is
- * paused or over: the countdowns come from the backend's times, so a stopped
- * session simply has nothing for the tick to change.
- */
-function useNow(): number {
-  const [now, setNow] = useState(() => Date.now())
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000)
-    return () => window.clearInterval(timer)
-  }, [])
-
-  return now
 }
