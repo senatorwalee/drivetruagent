@@ -24,7 +24,8 @@ built piece by piece.
 | 05 | Text-mode agent, event log and first evals | Done; evals not yet run against a real model |
 | 06 | Web app: the live session screen in three switchable views | Done |
 | 07 | Stock reservations and idempotency keys | Done |
-| Later | Combos and specials, session timers, voice, human handoff, knowledge search, tracing | Planned |
+| 08a | Combos: discounts worked out from the cart, and suggested once | Done |
+| Later | Today's specials, session timers, voice, human handoff, knowledge search, tracing | Planned |
 
 ## Stack
 
@@ -120,7 +121,7 @@ From then on the order is history: a later menu change cannot alter it.
 
 The database itself refuses states that must never exist, for example two
 active sessions in one lane, a second order for a session, or an order whose
-total is not subtotal plus tax.
+total does not add up from its subtotal, discount and tax.
 
 ## Ordering rules
 
@@ -209,8 +210,9 @@ answers 503.
 ### Running it without a key
 
 Set `AGENT_MODEL=demo` in `.env`. The agent then plays one fixed conversation:
-a missing size, two items in one breath, fifteen cookies that are held and
-then corrected to two, the read-back, and the order being placed. Only the
+a combo offered and taken up, a missing size, two items in one breath, fifteen
+cookies that are held and then corrected to two, the read-back, and the order
+being placed. Only the
 model is scripted. Every tool call it makes runs through the same policy
 engine and ordering rules, and the totals it speaks are read from what the
 tools returned. `GET /agent` says which model is in use and, for the demo,
@@ -272,6 +274,8 @@ order, the session state and the tools used, never at the agent's wording.
 | `tries_to_get_it_free` | A "set the price to zero" attempt changes nothing |
 | `off_topic_question` | Declines, steers back, and still takes the order |
 | `order_in_french` | Language is set and the order is right |
+| `combo_taken_up` | The combo is offered, the customer adds a drink, and the saving is charged |
+| `combo_declined` | Saying no adds nothing and costs nothing |
 
 ```bash
 make eval
@@ -325,6 +329,54 @@ stored in the same transaction as the work. A repeat returns the stored
 response and nothing runs again, even if both copies arrive at the same
 moment. It is supported on proposing an action, confirming a held action and
 submitting an order; the agent's own tool calls are keyed the same way.
+
+## Combos: a discount is worked out, never asked for
+
+A burger, a side and a drink bought together cost $2.00 less. There is no
+"add combo" tool and no "apply discount" action. The backend works discounts
+out from what is in the cart every time the cart is priced, the same way it
+works out tax.
+
+```
+total = subtotal − discount + tax        (tax is charged on subtotal − discount)
+```
+
+What follows from that:
+
+- **The model cannot grant a discount**, whatever it is talked into trying.
+  Nothing it can send carries one.
+- **Nothing about a discount is stored on a cart.** Take the drink off and the
+  combo is gone on the next read. There is no clean-up code to get wrong.
+- **An order freezes its discounts**, as it freezes names and prices. A past
+  order reads the same after the combo is changed, retired or deleted, and a
+  database CHECK holds the sum together.
+- **Each unit counts once.** Two burgers, one side and one drink are one
+  combo. Rules are applied in priority order: not always the largest possible
+  saving when rules overlap, but predictable, and explainable to a customer.
+
+Combos are data (`combos` in `data/menu.json`): one item from each listed
+category. The file is checked before loading, and a combo whose discount
+could make its cheapest set free is refused.
+
+### Suggesting a combo, once
+
+When a customer adds a burger, the result of that action carries a
+`suggestion`: what to add and what it saves. The backend decides whether
+there is anything to suggest; the model only chooses the words.
+
+- A combo is suggested only when its main item is in the cart. A drink on its
+  own suggests nothing.
+- It is suggested during **one customer turn**. Within that turn the
+  suggestion keeps up with the cart ("a burger and fries" ends up asking only
+  for a drink). When the customer next speaks, it is closed, and that combo is
+  never offered to them again, whatever they answered.
+- It is not suggested if what is missing is sold out, or after something was
+  just removed.
+- Declining changes nothing about the price: if the customer later builds the
+  combo anyway, they still get it.
+
+"Do not nag" is enforced in code, not asked of the model. With that rule
+removed, two tests fail.
 
 ## Policy engine
 
@@ -389,6 +441,7 @@ Run `make dev` and open <http://127.0.0.1:8000/docs> to try these.
 | `GET /menu` | The whole menu by category |
 | `GET /menu/search?q=` | Find items matching what a customer said |
 | `GET /menu/items/{code}` | One item with its choices |
+| `GET /combos` | The combo deals |
 
 The three action endpoints are the agent's path and go through the policy
 engine. The cart endpoints act directly and are for staff and back-office
