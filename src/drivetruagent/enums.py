@@ -42,6 +42,17 @@ class PendingActionStatus(StrEnum):
     ESCALATED = "escalated"
 
 
+class ReservationStatus(StrEnum):
+    """What became of stock a session was holding."""
+
+    # Held for a session that is still ordering.
+    ACTIVE = "active"
+    # The order was placed and the stock was taken.
+    COMMITTED = "committed"
+    # Given back: the line was removed, the session ended, or the hold expired.
+    RELEASED = "released"
+
+
 class AgentEventKind(StrEnum):
     """What one row of the agent's event log records."""
 

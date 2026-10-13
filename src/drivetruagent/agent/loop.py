@@ -16,7 +16,8 @@ screen sees each change as it happens.
 
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import timedelta
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,6 +29,7 @@ from drivetruagent.agent.prompt import build_instructions
 from drivetruagent.agent.tools import TOOL_DEFINITIONS, ToolContext, run_tool
 from drivetruagent.enums import AgentEventKind
 from drivetruagent.ordering.cart import get_cart
+from drivetruagent.ordering.inventory import DEFAULT_RESERVATION_TTL
 from drivetruagent.ordering.sessions import get_session
 from drivetruagent.ordering.views import CartSnapshot
 from drivetruagent.policy.decisions import PolicyLimits
@@ -43,6 +45,7 @@ class AgentConfig:
     tax_rate: Decimal
     limits: PolicyLimits
     max_tool_rounds: int
+    reservation_ttl: timedelta = DEFAULT_RESERVATION_TTL
 
 
 @dataclass(frozen=True)
@@ -71,7 +74,9 @@ async def run_turn(
     await db.commit()
 
     instructions = await build_instructions(db, config.restaurant_name)
-    context = ToolContext(db, session_id, config.tax_rate, config.limits)
+    context = ToolContext(
+        db, session_id, config.tax_rate, config.limits, config.reservation_ttl
+    )
     tools_used: list[str] = []
     reply: str | None = None
 
@@ -90,7 +95,12 @@ async def run_turn(
             break
 
         for tool_call in turn.tool_calls:
-            result = await run_tool(context, tool_call.name, tool_call.arguments)
+            # Keyed by this turn and the model's own call id, so if the same
+            # call is ever run again it takes effect once.
+            call_context = replace(
+                context, idempotency_key=f"{turn_id}:{tool_call.call_id}"
+            )
+            result = await run_tool(call_context, tool_call.name, tool_call.arguments)
             # The call and its result are recorded together, so the log never
             # holds a call without its answer.
             await events.record_message(db, session_id, turn_id, tool_call)

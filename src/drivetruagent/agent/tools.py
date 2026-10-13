@@ -16,6 +16,7 @@ Rules that hold for every tool:
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -28,6 +29,7 @@ from drivetruagent.ordering import cart as cart_rules
 from drivetruagent.ordering import menu as menu_rules
 from drivetruagent.ordering import sessions as session_rules
 from drivetruagent.ordering.errors import OrderingError
+from drivetruagent.ordering.inventory import DEFAULT_RESERVATION_TTL
 from drivetruagent.ordering.views import DEFAULT_LANGUAGE
 from drivetruagent.policy import gateway
 from drivetruagent.policy.actions import (
@@ -53,6 +55,9 @@ class ToolContext:
     session_id: uuid.UUID
     tax_rate: Decimal
     limits: PolicyLimits
+    reservation_ttl: timedelta = DEFAULT_RESERVATION_TTL
+    # Identifies this one tool call, so running it twice changes things once.
+    idempotency_key: str | None = None
 
 
 # --- Arguments --------------------------------------------------------------
@@ -137,6 +142,8 @@ async def _propose(context: ToolContext, action: Action) -> ToolOutput:
         action,
         tax_rate=context.tax_rate,
         limits=context.limits,
+        reservation_ttl=context.reservation_ttl,
+        idempotency_key=context.idempotency_key,
     )
     return outcome.model_dump(mode="json", exclude_none=True)
 
@@ -200,6 +207,8 @@ async def _confirm_pending_action(
         args.pending_action_id,
         tax_rate=context.tax_rate,
         limits=context.limits,
+        reservation_ttl=context.reservation_ttl,
+        idempotency_key=context.idempotency_key,
     )
     return outcome.model_dump(mode="json", exclude_none=True)
 

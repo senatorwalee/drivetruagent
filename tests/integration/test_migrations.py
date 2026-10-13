@@ -67,6 +67,9 @@ def test_upgrade_creates_the_tables(scratch_database_url: str) -> None:
         "order_line_options",
         "pending_actions",
         "agent_events",
+        "inventory",
+        "reservations",
+        "idempotency_records",
     }
 
 

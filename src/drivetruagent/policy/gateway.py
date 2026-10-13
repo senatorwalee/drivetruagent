@@ -11,7 +11,7 @@ Nothing here commits. The caller owns the transaction.
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import select, update
@@ -26,6 +26,8 @@ from drivetruagent.enums import (
 from drivetruagent.ordering import cart as cart_rules
 from drivetruagent.ordering import orders as order_rules
 from drivetruagent.ordering.errors import OrderingError
+from drivetruagent.ordering.idempotency import run_once
+from drivetruagent.ordering.inventory import DEFAULT_RESERVATION_TTL
 from drivetruagent.ordering.sessions import end_session, lock_session
 from drivetruagent.ordering.views import CartSnapshot, OrderView
 from drivetruagent.policy.actions import (
@@ -60,8 +62,35 @@ async def execute(
     *,
     tax_rate: Decimal,
     limits: PolicyLimits,
+    reservation_ttl: timedelta = DEFAULT_RESERVATION_TTL,
+    idempotency_key: str | None = None,
 ) -> ActionOutcome:
-    """Evaluate a proposed action and apply the decision."""
+    """Evaluate a proposed action and apply the decision.
+
+    With an idempotency key, a repeat of the same request returns the first
+    outcome and changes nothing.
+    """
+    return await run_once(
+        db,
+        session_id,
+        idempotency_key,
+        operation="execute",
+        request=action.model_dump(mode="json"),
+        response_model=ActionOutcome,
+        run=lambda: _evaluate_and_apply(
+            db, session_id, action, tax_rate, limits, reservation_ttl
+        ),
+    )
+
+
+async def _evaluate_and_apply(
+    db: AsyncSession,
+    session_id: uuid.UUID,
+    action: Action,
+    tax_rate: Decimal,
+    limits: PolicyLimits,
+    reservation_ttl: timedelta,
+) -> ActionOutcome:
     # The lock is held until the caller's transaction ends, so the decision
     # and its effect cannot be separated by another change to this session.
     await lock_session(db, session_id)
@@ -69,7 +98,7 @@ async def execute(
     result = evaluate(action, _context(snapshot), limits)
 
     if result.decision is Decision.ALLOW:
-        return await _run(db, session_id, action, tax_rate)
+        return await _run(db, session_id, action, tax_rate, reservation_ttl)
     if result.decision is Decision.CONFIRM:
         pending = await _hold_for_confirmation(db, session_id, action, result, snapshot)
         return ActionOutcome(
@@ -91,11 +120,34 @@ async def confirm(
     *,
     tax_rate: Decimal,
     limits: PolicyLimits,
+    reservation_ttl: timedelta = DEFAULT_RESERVATION_TTL,
+    idempotency_key: str | None = None,
 ) -> ActionOutcome:
     """The customer said yes to a held action.
 
     What runs is the stored copy of the action, evaluated again as confirmed.
     """
+    return await run_once(
+        db,
+        session_id,
+        idempotency_key,
+        operation="confirm",
+        request={"pending_action_id": str(pending_action_id)},
+        response_model=ActionOutcome,
+        run=lambda: _confirm(
+            db, session_id, pending_action_id, tax_rate, limits, reservation_ttl
+        ),
+    )
+
+
+async def _confirm(
+    db: AsyncSession,
+    session_id: uuid.UUID,
+    pending_action_id: uuid.UUID,
+    tax_rate: Decimal,
+    limits: PolicyLimits,
+    reservation_ttl: timedelta,
+) -> ActionOutcome:
     await lock_session(db, session_id)
     pending = await _load_pending(db, session_id, pending_action_id)
     snapshot = await cart_rules.get_cart(db, session_id, tax_rate=tax_rate)
@@ -117,7 +169,7 @@ async def confirm(
 
     _resolve(pending, PendingActionStatus.CONFIRMED)
     await db.flush()
-    outcome = await _run(db, session_id, action, tax_rate)
+    outcome = await _run(db, session_id, action, tax_rate, reservation_ttl)
     if outcome.decision is Decision.REJECT:
         # Confirmed, but it could not run after all (the item became
         # unavailable, say). Record that it did not happen.
@@ -187,14 +239,20 @@ async def hand_to_human(
 
 
 async def _run(
-    db: AsyncSession, session_id: uuid.UUID, action: Action, tax_rate: Decimal
+    db: AsyncSession,
+    session_id: uuid.UUID,
+    action: Action,
+    tax_rate: Decimal,
+    reservation_ttl: timedelta,
 ) -> ActionOutcome:
     """Run an allowed action. An ordering error becomes a rejection."""
     try:
         # A savepoint: if the ordering rules refuse, anything they had started
         # is undone, and the caller's transaction carries on.
         async with db.begin_nested():
-            snapshot, order = await _perform(db, session_id, action, tax_rate)
+            snapshot, order = await _perform(
+                db, session_id, action, tax_rate, reservation_ttl
+            )
     except OrderingError as error:
         snapshot = await cart_rules.get_cart(db, session_id, tax_rate=tax_rate)
         return ActionOutcome(
@@ -218,7 +276,11 @@ async def _run(
 
 
 async def _perform(
-    db: AsyncSession, session_id: uuid.UUID, action: Action, tax_rate: Decimal
+    db: AsyncSession,
+    session_id: uuid.UUID,
+    action: Action,
+    tax_rate: Decimal,
+    reservation_ttl: timedelta,
 ) -> tuple[CartSnapshot, OrderView | None]:
     if isinstance(action, AddItem):
         snapshot = await cart_rules.add_item(
@@ -228,6 +290,7 @@ async def _perform(
             action.quantity,
             action.selections,
             tax_rate=tax_rate,
+            reservation_ttl=reservation_ttl,
         )
         return snapshot, None
     if isinstance(action, UpdateLine):
@@ -238,16 +301,21 @@ async def _perform(
             action.quantity,
             action.selections,
             tax_rate=tax_rate,
+            reservation_ttl=reservation_ttl,
         )
         return snapshot, None
     if isinstance(action, RemoveLine):
         snapshot = await cart_rules.remove_line(
-            db, session_id, action.line_no, tax_rate=tax_rate
+            db,
+            session_id,
+            action.line_no,
+            tax_rate=tax_rate,
+            reservation_ttl=reservation_ttl,
         )
         return snapshot, None
     if isinstance(action, RequestConfirmation):
         snapshot = await cart_rules.request_confirmation(
-            db, session_id, tax_rate=tax_rate
+            db, session_id, tax_rate=tax_rate, reservation_ttl=reservation_ttl
         )
         return snapshot, None
 

@@ -95,6 +95,8 @@ class MenuItemSummary(BaseModel):
     # Codes of the choices the customer has to be asked about. Empty means the
     # item can be added straight away.
     must_ask: list[str]
+    # False when none are left that another session is not already holding.
+    in_stock: bool = True
 
 
 class MenuMatch(MenuItemSummary):

@@ -176,6 +176,36 @@ class OrderNotFound(OrderingError):
         super().__init__(f"No order with id {order_id}.")
 
 
+class InsufficientStock(OrderingError):
+    """There are not enough of an item left for this session.
+
+    `available` is what this session could have, after what other sessions
+    are holding. The cart logic adds `alternatives`: items from the same
+    category that are in stock, so the agent has something to offer.
+    """
+
+    code = "insufficient_stock"
+
+    def __init__(self, item_code: str, requested: int, available: int) -> None:
+        left = "none are left" if available == 0 else f"only {available} are left"
+        super().__init__(
+            f"{requested} of '{item_code}' were asked for, but {left}.",
+            item_code=item_code,
+            requested=requested,
+            available=available,
+        )
+
+
+class IdempotencyKeyReused(OrderingError):
+    code = "idempotency_key_reused"
+
+    def __init__(self, key: str) -> None:
+        super().__init__(
+            f"The idempotency key '{key}' was already used for a different request.",
+            key=key,
+        )
+
+
 class EmptyCart(OrderingError):
     code = "empty_cart"
 

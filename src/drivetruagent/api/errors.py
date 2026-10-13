@@ -27,6 +27,7 @@ _CONFLICT = {
     "item_unavailable",
     "option_unavailable",
     "empty_cart",
+    "insufficient_stock",
 }
 
 

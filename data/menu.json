@@ -18,6 +18,7 @@
             "fr": "Galette de bœuf, laitue, tomate, cornichons et sauce maison."
           },
           "base_price_cents": 549,
+          "stock": 100,
           "aliases": {
             "en": [
               "burger",
@@ -80,6 +81,7 @@
             "fr": "Galette de bœuf avec fromage fondu, cornichons et sauce maison."
           },
           "base_price_cents": 599,
+          "stock": 100,
           "aliases": {
             "en": [
               "burger",
@@ -133,6 +135,7 @@
             "fr": "Deux galettes de bœuf avec deux tranches de fromage."
           },
           "base_price_cents": 799,
+          "stock": 100,
           "aliases": {
             "en": [
               "burger",
@@ -181,6 +184,7 @@
             "fr": "Filet de poulet pané avec laitue et mayonnaise."
           },
           "base_price_cents": 649,
+          "stock": 100,
           "aliases": {
             "en": [
               "burger",
@@ -235,6 +239,7 @@
             "fr": "Galette végétale avec laitue, tomate et sauce maison."
           },
           "base_price_cents": 629,
+          "stock": 100,
           "aliases": {
             "en": [
               "burger",
@@ -287,6 +292,7 @@
             "fr": "Frites"
           },
           "base_price_cents": 249,
+          "stock": 100,
           "aliases": {
             "en": [
               "fry",
@@ -403,6 +409,7 @@
             "fr": "Rondelles d'oignon"
           },
           "base_price_cents": 329,
+          "stock": 100,
           "aliases": {
             "en": [
               "rings",
@@ -449,6 +456,7 @@
             "fr": "Croquettes de poulet"
           },
           "base_price_cents": 449,
+          "stock": 100,
           "aliases": {
             "en": [
               "nuggets",
@@ -544,6 +552,7 @@
             "fr": "Salade d'accompagnement"
           },
           "base_price_cents": 349,
+          "stock": 100,
           "aliases": {
             "en": [
               "salad",
@@ -606,6 +615,7 @@
             "fr": "Cola"
           },
           "base_price_cents": 199,
+          "stock": 100,
           "aliases": {
             "en": [
               "coke",
@@ -663,6 +673,7 @@
             "fr": "Boisson gazeuse citron-lime"
           },
           "base_price_cents": 199,
+          "stock": 100,
           "aliases": {
             "en": [
               "sprite",
@@ -722,6 +733,7 @@
             "fr": "Thé glacé"
           },
           "base_price_cents": 219,
+          "stock": 100,
           "aliases": {
             "en": [
               "ice tea",
@@ -802,6 +814,7 @@
             "fr": "Jus d'orange"
           },
           "base_price_cents": 259,
+          "stock": 100,
           "aliases": {
             "en": [
               "oj",
@@ -847,6 +860,7 @@
             "fr": "Café"
           },
           "base_price_cents": 179,
+          "stock": 100,
           "aliases": {
             "en": [
               "hot coffee",
@@ -941,6 +955,7 @@
             "fr": "Bouteille d'eau"
           },
           "base_price_cents": 149,
+          "stock": 100,
           "aliases": {
             "en": [
               "water",
@@ -960,6 +975,7 @@
             "fr": "Lait frappé"
           },
           "base_price_cents": 399,
+          "stock": 100,
           "aliases": {
             "en": [
               "shake",
@@ -1047,6 +1063,7 @@
             "fr": "Tarte aux pommes"
           },
           "base_price_cents": 199,
+          "stock": 100,
           "aliases": {
             "en": [
               "pie"
@@ -1065,6 +1082,7 @@
             "fr": "Sundae"
           },
           "base_price_cents": 299,
+          "stock": 100,
           "aliases": {
             "en": [
               "ice cream sundae"
@@ -1115,6 +1133,7 @@
             "fr": "Biscuit aux pépites de chocolat"
           },
           "base_price_cents": 149,
+          "stock": 100,
           "aliases": {
             "en": [
               "cookie",
@@ -1134,6 +1153,7 @@
             "fr": "Cornet de crème glacée molle"
           },
           "base_price_cents": 179,
+          "stock": 100,
           "aliases": {
             "en": [
               "ice cream cone",

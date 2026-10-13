@@ -61,6 +61,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stock levels
+         * @description Every stock-tracked item. Items not listed are not tracked and are
+         *     treated as unlimited.
+         */
+        get: operations["read_stock_inventory_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/{item_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set how many of an item are on hand
+         * @description Record a count, starting to track the item if it was not tracked.
+         *
+         *     Setting stock below what sessions already hold does not cancel their
+         *     holds. Those orders are checked again when they are submitted.
+         */
+        put: operations["set_stock_inventory__item_code__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/menu": {
         parameters: {
             query?: never;
@@ -326,6 +370,9 @@ export interface paths {
         /**
          * Submit the cart as an order
          * @description Freeze the cart into an order and end the session.
+         *
+         *     Send an `Idempotency-Key` header if the request might be retried: a repeat
+         *     with the same key returns the same order instead of an error.
          */
         post: operations["submit_order_sessions__session_id__order_post"];
         delete?: never;
@@ -562,6 +609,11 @@ export interface components {
             choices: components["schemas"]["ChoiceGroupView"][];
             /** Description */
             description: string | null;
+            /**
+             * In Stock
+             * @default true
+             */
+            in_stock: boolean;
             /** Item Code */
             item_code: string;
             /** Item Name */
@@ -595,6 +647,11 @@ export interface components {
         MenuItemSummary: {
             /** Base Price Cents */
             base_price_cents: number;
+            /**
+             * In Stock
+             * @default true
+             */
+            in_stock: boolean;
             /** Item Code */
             item_code: string;
             /** Item Name */
@@ -608,6 +665,11 @@ export interface components {
             base_price_cents: number;
             /** Category Code */
             category_code: string;
+            /**
+             * In Stock
+             * @default true
+             */
+            in_stock: boolean;
             /** Item Code */
             item_code: string;
             /** Item Name */
@@ -746,6 +808,22 @@ export interface components {
             started_at: string;
             state: components["schemas"]["SessionState"];
         };
+        /** SetStockRequest */
+        SetStockRequest: {
+            /** On Hand */
+            on_hand: number;
+        };
+        /** StockLevelView */
+        StockLevelView: {
+            /** Available */
+            available: number;
+            /** Item Code */
+            item_code: string;
+            /** On Hand */
+            on_hand: number;
+            /** Reserved */
+            reserved: number;
+        };
         /** SubmitOrder */
         SubmitOrder: {
             /**
@@ -870,6 +948,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    read_stock_inventory_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockLevelView"][];
+                };
+            };
+        };
+    };
+    set_stock_inventory__item_code__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetStockRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockLevelView"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1161,7 +1303,10 @@ export interface operations {
     propose_action_sessions__session_id__actions_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Send the same value when retrying a request. */
+                "Idempotency-Key"?: string | null;
+            };
             path: {
                 session_id: string;
             };
@@ -1498,7 +1643,10 @@ export interface operations {
     submit_order_sessions__session_id__order_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Send the same value when retrying a request. */
+                "Idempotency-Key"?: string | null;
+            };
             path: {
                 session_id: string;
             };
@@ -1588,7 +1736,10 @@ export interface operations {
     confirm_pending_action_sessions__session_id__pending_actions__pending_action_id__confirm_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Send the same value when retrying a request. */
+                "Idempotency-Key"?: string | null;
+            };
             path: {
                 session_id: string;
                 pending_action_id: string;

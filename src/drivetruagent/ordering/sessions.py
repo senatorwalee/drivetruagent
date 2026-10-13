@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from drivetruagent.db.models import Cart, CustomerSession
 from drivetruagent.enums import FINAL_SESSION_STATES, Language, SessionState
 from drivetruagent.ordering.errors import LaneBusy, SessionEnded, SessionNotFound
+from drivetruagent.ordering.inventory import release_reservations
 
 ONE_ACTIVE_SESSION_PER_LANE = "uq_sessions_one_active_per_lane"
 
@@ -95,5 +96,9 @@ async def end_session(
     customer_session.state = state
     customer_session.ended_at = datetime.now(UTC)
     customer_session.end_reason = reason
+    if state is not SessionState.HANDED_OFF:
+        # Nobody is coming back for this order. A handed-off session keeps its
+        # stock, because a person is about to finish it.
+        await release_reservations(db, session_id, reason=state.value)
     await db.flush()
     return customer_session

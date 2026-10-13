@@ -11,11 +11,13 @@ from sqlalchemy.orm import selectinload
 from drivetruagent.db.models import Order, OrderLine, OrderLineOption
 from drivetruagent.enums import SessionState
 from drivetruagent.ordering.cart import (
+    PricedLine,
     load_cart,
     load_priced_lines,
     snapshot_from_lines,
 )
 from drivetruagent.ordering.errors import EmptyCart, OrderNotFound
+from drivetruagent.ordering.inventory import StockNeed, commit_reservations
 from drivetruagent.ordering.sessions import lock_active_session
 from drivetruagent.ordering.views import LineView, OrderView, SelectedOptionView
 
@@ -39,6 +41,10 @@ async def submit_order(
     if not lines:
         raise EmptyCart()
     snapshot = snapshot_from_lines(customer_session, cart, lines, tax_rate)
+
+    # Stock is checked again and taken before any order row is written, so a
+    # refusal here leaves no trace.
+    await commit_reservations(db, session_id, _stock_needs(lines))
 
     order = Order(
         session_id=session_id,
@@ -93,6 +99,16 @@ async def submit_order(
         total_cents=snapshot.total_cents,
         submitted_at=order.submitted_at,
     )
+
+
+def _stock_needs(lines: list[PricedLine]) -> list[StockNeed]:
+    """The total needed of each item, across however many lines it is on."""
+    totals: dict[uuid.UUID, StockNeed] = {}
+    for line in lines:
+        held = totals.get(line.item.id)
+        quantity = line.quantity + (held.quantity if held else 0)
+        totals[line.item.id] = StockNeed(line.item.id, line.item.code, quantity)
+    return list(totals.values())
 
 
 async def get_order(db: AsyncSession, order_id: uuid.UUID) -> OrderView:

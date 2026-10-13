@@ -1,3 +1,4 @@
+from datetime import timedelta
 from decimal import Decimal
 from functools import lru_cache
 from typing import Literal, Self
@@ -18,6 +19,10 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     # Sales tax as a fraction of the subtotal. The default is Ontario's HST.
     tax_rate: Decimal = Field(default=Decimal("0.13"), ge=0, lt=1)
+
+    # How long stock stays held for a session with no activity. It must
+    # outlast the longest session plus the time a handoff takes.
+    reservation_ttl_seconds: int = Field(default=600, ge=1)
 
     # The agent. Without a key the ordering API still works; only the
     # conversation endpoint is unavailable.
@@ -46,6 +51,10 @@ class Settings(BaseSettings):
                 "line_quantity_confirm_above"
             )
         return self
+
+    @property
+    def reservation_ttl(self) -> timedelta:
+        return timedelta(seconds=self.reservation_ttl_seconds)
 
     @property
     def policy_limits(self) -> PolicyLimits:
