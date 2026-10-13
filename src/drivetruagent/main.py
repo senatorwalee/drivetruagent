@@ -8,6 +8,7 @@ from drivetruagent.agent import timekeeper
 from drivetruagent.api import (
     actions,
     conversation,
+    handoffs,
     health,
     inventory,
     menu,
@@ -58,6 +59,7 @@ def create_app() -> FastAPI:
     app.include_router(menu.router)
     app.include_router(inventory.router)
     app.include_router(offers.router)
+    app.include_router(handoffs.router)
     register_error_handlers(app)
     return app
 

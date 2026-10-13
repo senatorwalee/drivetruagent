@@ -19,6 +19,7 @@ _NOT_FOUND = {
     "unknown_cart_line",
     "order_not_found",
     "pending_action_not_found",
+    "handoff_not_found",
 }
 # The request is well formed, but the current state does not allow it.
 _CONFLICT = {
@@ -28,6 +29,8 @@ _CONFLICT = {
     "option_unavailable",
     "empty_cart",
     "insufficient_stock",
+    "handoff_resolved",
+    "session_not_handed_off",
 }
 
 

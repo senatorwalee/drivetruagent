@@ -23,6 +23,11 @@ SESSION_ENDED = "session_ended"
 ORDER_NOT_CONFIRMED = "order_not_confirmed"
 UNUSUAL_QUANTITY = "unusual_quantity"
 EXTREME_QUANTITY = "extreme_quantity"
+# Reasons a session ends that are not decided by the rules below, but are
+# named here with the rest so every reason code lives in one place.
+HUMAN_REQUESTED = "human_requested"
+TIME_LIMIT = "time_limit"
+SILENCE_TIMEOUT = "silence_timeout"
 
 
 def evaluate(
