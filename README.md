@@ -29,6 +29,7 @@ built piece by piece.
 | 09 | Session timers: the silence nudge, the three-minute hand-off, and pause | Done |
 | 10a | Handoff package: what a person taking over is shown, and closing a handoff | Done |
 | 10b | Staff screen: the handoff queue and the package, in the web app | Done |
+| 11 | A second model provider: Gemini, which has a free tier | Done; not yet run against Google's API |
 | Later | Voice, knowledge search, tracing | Planned |
 
 ## Stack
@@ -38,7 +39,7 @@ built piece by piece.
 | Language and API | Python 3.13, FastAPI, Pydantic |
 | Database | PostgreSQL 17 with pgvector |
 | Database access | SQLAlchemy 2.0 (async), Alembic migrations |
-| Model | OpenAI, through the Responses API; the model name is a setting |
+| Model | OpenAI (Responses API) or Google Gemini, behind one interface; chosen in `.env` |
 | Voice (planned) | OpenAI Realtime, relayed through the backend |
 | Tests | pytest, with a real Postgres started by testcontainers |
 | Web app | React, TypeScript and Vite; TanStack Query; types generated from the API |
@@ -71,8 +72,8 @@ collide with a Postgres installed directly on your machine.
 | `make dev` | Run the API with auto-reload |
 | `make migrate` | Apply all database migrations |
 | `make seed` | Load `data/menu.json` into the database; safe to run repeatedly |
-| `make chat` | Talk to the agent in the terminal (needs `OPENAI_API_KEY`) |
-| `make eval` | Run the evals against the real model (needs `OPENAI_API_KEY`) |
+| `make chat` | Talk to the agent in the terminal (needs an OpenAI or Gemini key) |
+| `make eval` | Run the evals against the real model (needs an OpenAI or Gemini key) |
 | `make ui` | Run the web app on <http://localhost:5174> (needs `make dev` running too) |
 | `make gen-api` | Regenerate the web app's API types after changing an endpoint |
 | `make check-ui` | Everything CI runs for the web app: lint, type check, tests, build |
@@ -203,7 +204,7 @@ Design points:
 | `set_language` | Sets the session language |
 | `request_human` | Hands the session to a person |
 
-To talk to it, put `OPENAI_API_KEY` in `.env`, then:
+To talk to it, put `OPENAI_API_KEY` in `.env` (or use Gemini, below), then:
 
 ```bash
 make chat
@@ -211,6 +212,38 @@ make chat
 
 Without a key everything else still works; only the conversation endpoint
 answers 503.
+
+### Running it on Gemini, for free
+
+Google's Gemini API has a free tier. Get a key from Google AI Studio, then in
+`.env`:
+
+```
+AGENT_MODEL=gemini
+GEMINI_API_KEY=...
+```
+
+`make chat`, `make eval` and the web app then use Gemini. The default model is
+`gemini-2.5-flash-lite`, the cheapest Google lists and the one with the
+highest free limits; `GEMINI_TEXT_MODEL` changes it. Two things to know about
+the free tier: requests are rate-limited (a few a minute), and Google may use
+what is sent to improve its products.
+
+The adapter is `agent/gemini_model.py`. Adding it touched the adapter, the
+settings and the factory, and one thing in shared code: a tool call can now
+carry `provider_data`, opaque values the provider needs to be given back on
+the next request. Gemini attaches an encrypted "thought signature" to a
+function call and newer models check that it returns with the call. The event
+log is the only conversation store, so it is stored there with the call. The
+adapter also regroups parallel calls: the log records call, result, call,
+result, and Gemini wants all the calls of one response in one turn, then all
+their results in the next.
+
+**Not yet verified against Google's API.** There is no key on the machine it
+was written on. It is written against the SDK's own types, which the type
+checker enforces, and tested through the real agent loop with stand-in
+responses. The first real run may need adjustments, most likely to which JSON
+Schema keywords Gemini accepts in tool definitions.
 
 ### Running it without a key
 
