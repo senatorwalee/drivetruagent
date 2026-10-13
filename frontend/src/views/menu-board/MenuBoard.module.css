@@ -820,3 +820,10 @@
     height: 90px;
   }
 }
+
+/* The same control drawn as a link, for moving to another page. */
+a.button {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}

@@ -19,6 +19,11 @@ export type Language = Schemas['Language']
 export type AgentEvent = Schemas['EventView']
 export type MessageReply = Schemas['MessageResponse']
 export type Menu = Schemas['MenuView']
+export type HandoffSummary = Schemas['HandoffSummary']
+export type HandoffPackage = Schemas['HandoffPackage']
+export type HandoffStep = Schemas['Step']
+export type HeldStock = Schemas['HeldStock']
+export type HandoffOutcome = Schemas['HandoffOutcome']
 
 const BASE = '/api'
 
@@ -78,4 +83,12 @@ export const api = {
   /** Stop the session's timers, for a presenter who wants to talk. */
   pause: (sessionId: string) => post<Session>(`/sessions/${sessionId}/pause`),
   resume: (sessionId: string) => post<Session>(`/sessions/${sessionId}/resume`),
+
+  /** Sessions handed to a person, the longest-waiting first. */
+  handoffs: () => request<HandoffSummary[]>('/handoffs'),
+  handoff: (handoffId: string) => request<HandoffPackage>(`/handoffs/${handoffId}`),
+  acknowledgeHandoff: (handoffId: string, by: string) =>
+    post<HandoffPackage>(`/handoffs/${handoffId}/acknowledge`, { by }),
+  resolveHandoff: (handoffId: string, outcome: HandoffOutcome, note: string | null) =>
+    post<HandoffPackage>(`/handoffs/${handoffId}/resolve`, { outcome, note }),
 }
