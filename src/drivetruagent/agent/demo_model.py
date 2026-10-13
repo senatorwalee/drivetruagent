@@ -1,13 +1,13 @@
 """A stand-in model that plays one fixed conversation, for demos without a key.
 
 Select it with AGENT_MODEL=demo. Whatever the customer types, the model makes
-the next move of a set script: a missing size, two items in one breath, an
-unusual quantity that is held and then corrected, the read-back, and the
-order being placed.
+the next move of a set script: a combo offered and taken up, a missing size,
+two items in one breath, an unusual quantity that is held and then corrected,
+the read-back, and the order being placed.
 
 Only the model is scripted. Every tool call it makes runs for real through
 the same policy engine and ordering rules, and everything it says about
-totals and order numbers is read from what the tools returned.
+totals, savings and order numbers is read from what the tools returned.
 """
 
 from collections.abc import Callable, Sequence
@@ -22,7 +22,8 @@ MODEL_NAME = "demo-script"
 # script advances whatever is typed; these are shown to the presenter.
 SUGGESTED_LINES: tuple[str, ...] = (
     "Hi",
-    "Can I get some fries?",
+    "A cheeseburger, please.",
+    "Sure, some fries.",
     "Large, and a medium cola.",
     "Fifteen cookies.",
     "No, just two.",
@@ -73,15 +74,45 @@ def _cancel_held_action(results: list[ToolResult]) -> ModelTurn:
     )
 
 
+def _offer_what_was_suggested(results: list[ToolResult]) -> ModelTurn:
+    # Whether there is anything to offer is the backend's call. The model
+    # only puts words to it.
+    suggestion = results[-1].result.get("suggestion")
+    if suggestion is None:
+        return ModelTurn(text="One cheeseburger. Anything else?", model=MODEL_NAME)
+    missing = " and ".join(
+        f"a {_singular(category['category_name'])}"
+        for category in suggestion["missing"]
+    )
+    return ModelTurn(
+        text=f"One cheeseburger. Add {missing} to make it a "
+        f"{suggestion['name'].lower()} and save {_money(suggestion['saves_cents'])}?",
+        model=MODEL_NAME,
+    )
+
+
+def _say_what_was_saved(results: list[ToolResult]) -> ModelTurn:
+    cart = results[-1].result.get("cart", {})
+    text = "Large fries and a medium cola."
+    for discount in cart.get("discounts", []):
+        text += (
+            f" That makes it a {discount['name'].lower()}, so you save "
+            f"{_money(discount['amount_cents'])}."
+        )
+    return ModelTurn(text=f"{text} Anything else?", model=MODEL_NAME)
+
+
 def _read_back(results: list[ToolResult]) -> ModelTurn:
     cart = results[-1].result.get("cart", {})
     items = ", ".join(
         f"{line['quantity']} {line['item_name'].lower()}"
         for line in cart.get("lines", [])
     )
+    saved = cart.get("discount_cents", 0)
+    savings = f" You saved {_money(saved)}." if saved else ""
     return ModelTurn(
-        text=f"So that's {items}. Your total is {_money(cart.get('total_cents', 0))}. "
-        "Is that right?",
+        text=f"So that's {items}.{savings} Your total is "
+        f"{_money(cart.get('total_cents', 0))}. Is that right?",
         model=MODEL_NAME,
     )
 
@@ -104,13 +135,23 @@ def _money(cents: int) -> str:
     return f"${cents // 100}.{cents % 100:02d}"
 
 
+def _singular(category_name: str) -> str:
+    """ "Sides" -> "side". Enough for the demo's two categories."""
+    return category_name.lower().removesuffix("s")
+
+
 # For each customer turn: tool results seen so far this turn -> the next move.
 _SCRIPT: tuple[dict[int, Move], ...] = (
     {0: _say("Welcome! What can I get you today?")},
     {
+        # A burger on its own: the backend suggests the combo.
+        0: _call("add_item", item_code="cheeseburger", quantity=1, selections=[]),
+        1: _offer_what_was_suggested,
+    },
+    {
         # No size given: the backend refuses and says what to ask.
         0: _call("add_item", item_code="fries", quantity=1, selections=[]),
-        1: _say("Sure. What size would you like?"),
+        1: _say("Sure. What size fries?"),
     },
     {
         0: lambda results: _tool_calls(
@@ -123,7 +164,8 @@ _SCRIPT: tuple[dict[int, Move], ...] = (
                 {"item_code": "cola", "quantity": 1, "selections": _size("medium")},
             ),
         ),
-        2: _say("Large fries and a medium cola. Anything else?"),
+        # The third part of the combo: the saving appears in the cart.
+        2: _say_what_was_saved,
     },
     {
         # More than ten of one item: the policy engine holds it for a yes.
@@ -143,6 +185,10 @@ _SCRIPT: tuple[dict[int, Move], ...] = (
         1: _order_placed,
     },
 )
+
+
+# The turn where the customer says no to the fifteen cookies.
+_CANCEL_TURN = 5
 
 
 class DemoModel:
@@ -167,9 +213,9 @@ class DemoModel:
         if turn_index >= len(_SCRIPT):
             return ModelTurn(text=FINISHED, model=MODEL_NAME)
 
-        # Turn five starts by cancelling the held action, which needs an id
+        # This turn starts by cancelling the held action, which needs an id
         # from the previous turn's results, so it looks at the whole history.
-        if turn_index == 4 and not results_this_turn:
+        if turn_index == _CANCEL_TURN and not results_this_turn:
             return _cancel_held_action(
                 [m for m in messages if isinstance(m, ToolResult)]
             )
