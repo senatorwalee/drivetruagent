@@ -21,6 +21,9 @@ class Settings(BaseSettings):
 
     # The agent. Without a key the ordering API still works; only the
     # conversation endpoint is unavailable.
+    # "openai" talks to a real model. "demo" plays one fixed conversation with
+    # no key and no cost; its tool calls still run through the real backend.
+    agent_model: Literal["openai", "demo"] = "openai"
     openai_api_key: SecretStr | None = None
     openai_text_model: str = "gpt-6-luna"
     restaurant_name: str = "Maple Lane Burgers"
