@@ -486,3 +486,28 @@ async def test_a_french_conversation(
     assert reply.cart.language.value == "fr"
     assert reply.cart.lines[0].item_name == "Frites"
     assert reply.cart.lines[0].options[0].option_name == "Grand"
+
+
+# --- What a provider attaches to a call -------------------------------------
+
+
+async def test_provider_data_on_a_tool_call_survives_the_event_log(
+    db_session: AsyncSession, session_id: uuid.UUID
+) -> None:
+    """Some providers attach values to a call that they need given back
+    unchanged. The log is the only conversation store, so it keeps them."""
+    attached = {"provider": "example", "signature": "b3BhcXVl", "nested": {"n": 1}}
+    with_data = ToolCall("c1", "get_cart", {}, provider_data=attached)
+    without = ToolCall("c2", "get_cart", {})
+    turn_id = uuid.uuid4()
+
+    await events.record_message(db_session, session_id, turn_id, with_data)
+    await events.record_message(db_session, session_id, turn_id, without)
+
+    assert await events.load_messages(db_session, session_id) == [with_data, without]
+    stored = [
+        event.payload for event in await events.load_events(db_session, session_id)
+    ]
+    assert stored[0]["provider_data"] == attached
+    # A call with nothing attached is stored exactly as it was before.
+    assert "provider_data" not in stored[1]
