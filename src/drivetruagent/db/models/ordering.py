@@ -6,7 +6,7 @@ stale total. Prices are frozen only when the cart becomes an order.
 """
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     CheckConstraint,
@@ -67,6 +67,9 @@ class CustomerSession(UuidPrimaryKey, Timestamps, Base):
     )
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     end_reason: Mapped[str | None]
+    # The restaurant's calendar date when the car arrived. It decides which
+    # specials the session gets, and does not change if midnight passes.
+    business_date: Mapped[date]
 
     cart: Mapped["Cart | None"] = relationship(
         back_populates="session",

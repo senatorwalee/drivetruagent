@@ -1,7 +1,7 @@
 """Starting and ending a customer's session."""
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -15,17 +15,26 @@ from drivetruagent.ordering.inventory import release_reservations
 ONE_ACTIVE_SESSION_PER_LANE = "uq_sessions_one_active_per_lane"
 
 
-async def open_session(db: AsyncSession, lane: str = "lane-1") -> CustomerSession:
+async def open_session(
+    db: AsyncSession, lane: str = "lane-1", *, business_date: date | None = None
+) -> CustomerSession:
     """Create a session and its empty cart. Raises LaneBusy if the lane is taken.
 
     The database's unique index decides whether the lane is free. Checking
     first and inserting second would let two cars through at the same moment.
+
+    `business_date` is the restaurant's own calendar date, which decides the
+    specials this session gets. Anything serving customers passes it. Left
+    out, it is today's date in UTC, which is good enough where specials do
+    not matter.
     """
     try:
         # A savepoint: if the insert is refused, only this block is undone and
         # the caller's transaction stays usable.
         async with db.begin_nested():
-            customer_session = CustomerSession(lane=lane)
+            customer_session = CustomerSession(
+                lane=lane, business_date=business_date or datetime.now(UTC).date()
+            )
             db.add(customer_session)
             await db.flush()
             db.add(Cart(session_id=customer_session.id))

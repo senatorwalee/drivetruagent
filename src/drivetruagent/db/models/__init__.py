@@ -21,6 +21,7 @@ from drivetruagent.db.models.offers import (
     ComboRule,
     ComboRuleSlot,
     SessionSuggestion,
+    Special,
 )
 from drivetruagent.db.models.ordering import (
     Cart,
@@ -58,4 +59,5 @@ __all__ = [
     "PendingAction",
     "Reservation",
     "SessionSuggestion",
+    "Special",
 ]
