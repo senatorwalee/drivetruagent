@@ -21,6 +21,7 @@ export function Receipt({ live, view, onViewChange }: LiveSessionViewProps) {
         <span className={styles.brandName}>{live.agent?.restaurant_name ?? 'Drive-through'}</span>
         <span className={styles.meta}>
           {live.cart?.language ?? 'en'} / {clock(live.elapsedSeconds)}
+          {live.timerNote && ` / ${live.timerNote}`}
         </span>
         <ProgressSteps live={live} />
         <div className={styles.controls}>

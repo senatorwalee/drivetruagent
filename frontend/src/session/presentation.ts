@@ -2,7 +2,7 @@
  * Small pure helpers every view uses to turn state into words and numbers:
  * money, elapsed time, the agent indicator's state, and the progress steps.
  */
-import type { Discount, SessionState } from '../api/client'
+import type { Discount, Session, SessionState } from '../api/client'
 import type { AgentState } from './types'
 
 export function money(cents: number): string {
@@ -23,6 +23,36 @@ export function plainAmount(cents: number): string {
 /** A saving's name, with how many times it applied when that is more than once. */
 export function discountLabel(discount: Pick<Discount, 'name' | 'times'>): string {
   return discount.times > 1 ? `${discount.name} × ${discount.times}` : discount.name
+}
+
+/**
+ * How long a session has actually been running: time since it started, less
+ * any time it spent paused. It stops when the session ends or is paused.
+ */
+export function runningSeconds(session: Pick<Session, 'started_at' | 'ended_at' | 'timers'>, nowMs: number): number {
+  const stoppedAt = session.ended_at ?? session.timers.paused_at
+  const until = stoppedAt ? Date.parse(stoppedAt) : nowMs
+  return Math.max(0, (until - Date.parse(session.started_at)) / 1000 - session.timers.paused_seconds)
+}
+
+/** Seconds from now until a time the backend gave, or null if it gave none. */
+export function secondsUntil(when: string | null | undefined, nowMs: number): number | null {
+  return when ? Math.max(0, (Date.parse(when) - nowMs) / 1000) : null
+}
+
+/**
+ * What the backend's timers are counting down to, in a few words. The times
+ * come from the backend; the screen only subtracts. Null when no timer is
+ * running, which is the case once a session has ended.
+ */
+export function timerNote(timers: Session['timers'] | undefined, nowMs: number): string | null {
+  if (!timers) return null
+  if (timers.paused) return 'timers paused'
+  const closesIn = secondsUntil(timers.closes_at, nowMs)
+  if (closesIn !== null) return `closes in ${clock(Math.ceil(closesIn))}`
+  const handOffIn = secondsUntil(timers.hand_off_at, nowMs)
+  if (handOffIn !== null) return `hand-off in ${clock(Math.ceil(handOffIn))}`
+  return null
 }
 
 export function itemsLabel(count: number): string {

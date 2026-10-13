@@ -80,6 +80,9 @@ class AgentEventKind(StrEnum):
     TOOL_CALL = "tool_call"
     TOOL_RESULT = "tool_result"
     ASSISTANT_MESSAGE = "assistant_message"
+    # Something the backend did because of a clock, not because of the model:
+    # asked if the customer was still there, or ended the session.
+    TIMER = "timer"
 
 
 # A session in one of these states is still in progress. Every other state is

@@ -8,7 +8,7 @@ import type { ComponentType } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { buildTimeline } from '../session/timeline'
-import { cart, comboCart, liveSession, resetSeq, session, toolRound } from '../test/fixtures'
+import { cart, comboCart, liveSession, replied, resetSeq, session, timer, toolRound } from '../test/fixtures'
 import { ControlRoom } from './control-room/ControlRoom'
 import { MenuBoard } from './menu-board/MenuBoard'
 import { Receipt } from './receipt/Receipt'
@@ -159,6 +159,28 @@ describe.each(VIEWS)('%s view', (viewId, View) => {
 
     expect(screen.getByLabelText('What the customer says')).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
+  })
+
+  it('shows what the backend timer is counting down to', () => {
+    show({ timerNote: 'hand-off in 2:18' })
+
+    expect(screen.getByText(/hand-off in 2:18/)).toBeInTheDocument()
+  })
+
+  it('shows nothing about timers when none is running', () => {
+    show({ timerNote: null })
+
+    expect(screen.queryByText(/hand-off in|closes in|timers paused/)).not.toBeInTheDocument()
+  })
+
+  it('shows when the clock, not the model, did something', () => {
+    resetSeq()
+    const timeline = buildTimeline([timer('nudge', 'silence', 20), replied('Are you still there?')])
+    show({ timeline })
+
+    expect(screen.getAllByText('clock').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText(/asked after 20s of silence/)).toBeInTheDocument()
+    expect(screen.getByText('Are you still there?')).toBeInTheDocument()
   })
 
   it('pauses and resumes', async () => {

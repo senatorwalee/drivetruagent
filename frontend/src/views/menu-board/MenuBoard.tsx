@@ -22,6 +22,7 @@ export function MenuBoard({ live, view, onViewChange }: LiveSessionViewProps) {
           <span className={styles.brandName}>{live.agent?.restaurant_name ?? 'Drive-through'}</span>
           <span className={styles.meta}>
             {(live.cart?.language ?? 'en').toUpperCase()} · {clock(live.elapsedSeconds)}
+            {live.timerNote && ` · ${live.timerNote}`}
           </span>
         </div>
         <ProgressSteps live={live} />

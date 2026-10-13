@@ -9,7 +9,10 @@ import {
   money,
   plainAmount,
   progressSteps,
+  runningSeconds,
+  secondsUntil,
   speakingMilliseconds,
+  timerNote,
 } from './presentation'
 
 const quiet = { paused: false, ended: false, waitingForReply: false, speaking: false, customerActive: false }
@@ -39,6 +42,86 @@ describe('discountLabel', () => {
 
   it('says how many times when it applied more than once', () => {
     expect(discountLabel({ name: 'Burger combo', times: 3 })).toBe('Burger combo × 3')
+  })
+})
+
+const START = '2026-10-13T12:00:00Z'
+const at = (seconds: number) => Date.parse(START) + seconds * 1000
+const iso = (seconds: number) => new Date(at(seconds)).toISOString()
+const timers = (overrides: Partial<Parameters<typeof runningSeconds>[0]['timers']> = {}) => ({
+  paused: false,
+  paused_at: null,
+  paused_seconds: 0,
+  nudge_at: iso(20),
+  closes_at: null,
+  hand_off_at: iso(180),
+  ...overrides,
+})
+
+describe('runningSeconds', () => {
+  const session = (overrides = {}, ended_at: string | null = null) => ({ started_at: START, ended_at, timers: timers(overrides) })
+
+  it('is the time since the session started', () => {
+    expect(runningSeconds(session(), at(42))).toBe(42)
+  })
+
+  it('leaves out time spent paused', () => {
+    expect(runningSeconds(session({ paused_seconds: 30 }), at(100))).toBe(70)
+  })
+
+  it('stands still while paused', () => {
+    const paused = session({ paused: true, paused_at: iso(50), paused_seconds: 10 })
+
+    expect(runningSeconds(paused, at(60))).toBe(40)
+    expect(runningSeconds(paused, at(6000))).toBe(40)
+  })
+
+  it('stops when the session ends', () => {
+    expect(runningSeconds(session({ paused_seconds: 5 }, iso(90)), at(500))).toBe(85)
+  })
+
+  it('is never negative', () => {
+    expect(runningSeconds(session(), at(-5))).toBe(0)
+  })
+})
+
+describe('secondsUntil', () => {
+  it('counts down to a time the backend gave', () => {
+    expect(secondsUntil(iso(180), at(42))).toBe(138)
+  })
+
+  it('stops at zero once the time has passed', () => {
+    expect(secondsUntil(iso(20), at(25))).toBe(0)
+  })
+
+  it('is null when the backend gave no time', () => {
+    expect(secondsUntil(null, at(0))).toBeNull()
+    expect(secondsUntil(undefined, at(0))).toBeNull()
+  })
+})
+
+describe('timerNote', () => {
+  it('counts down to the hand-off while the session is running', () => {
+    expect(timerNote(timers(), at(42))).toBe('hand-off in 2:18')
+  })
+
+  it('counts down to closing once the customer has been asked', () => {
+    expect(timerNote(timers({ nudge_at: null, closes_at: iso(40) }), at(26.5))).toBe('closes in 0:14')
+  })
+
+  it('says the timers are paused, and counts down to nothing', () => {
+    const paused = timers({ paused: true, paused_at: iso(30), nudge_at: null, hand_off_at: null })
+
+    expect(timerNote(paused, at(500))).toBe('timers paused')
+  })
+
+  it('says nothing when no timer is running', () => {
+    expect(timerNote(timers({ nudge_at: null, hand_off_at: null }), at(0))).toBeNull()
+    expect(timerNote(undefined, at(0))).toBeNull()
+  })
+
+  it('rounds up, so the last second reads 0:01 and not 0:00', () => {
+    expect(timerNote(timers(), at(179.4))).toBe('hand-off in 0:01')
   })
 })
 

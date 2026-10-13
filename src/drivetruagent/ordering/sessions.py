@@ -1,4 +1,8 @@
-"""Starting and ending a customer's session."""
+"""Starting and ending a customer's session, and keeping its clocks.
+
+The clocks are plain timestamps on the session row. What they add up to
+(a nudge, a timeout) is decided in `timers`, never here.
+"""
 
 import uuid
 from datetime import UTC, date, datetime
@@ -11,6 +15,12 @@ from drivetruagent.db.models import Cart, CustomerSession
 from drivetruagent.enums import FINAL_SESSION_STATES, Language, SessionState
 from drivetruagent.ordering.errors import LaneBusy, SessionEnded, SessionNotFound
 from drivetruagent.ordering.inventory import release_reservations
+from drivetruagent.ordering.timers import (
+    SessionClock,
+    TimerSettings,
+    deadlines,
+)
+from drivetruagent.ordering.views import SessionView, TimersView
 
 ONE_ACTIVE_SESSION_PER_LANE = "uq_sessions_one_active_per_lane"
 
@@ -111,3 +121,121 @@ async def end_session(
         await release_reservations(db, session_id, reason=state.value)
     await db.flush()
     return customer_session
+
+
+# --- Clocks -----------------------------------------------------------------
+
+
+def clock_of(customer_session: CustomerSession) -> SessionClock:
+    return SessionClock(
+        started_at=customer_session.started_at,
+        last_activity_at=customer_session.last_activity_at,
+        nudged_at=customer_session.nudged_at,
+        turn_started_at=customer_session.turn_started_at,
+        paused_at=customer_session.paused_at,
+        paused_seconds=customer_session.paused_seconds,
+    )
+
+
+def to_view(
+    customer_session: CustomerSession, *, now: datetime, timers: TimerSettings
+) -> SessionView:
+    """A session as callers see it, with when its timers will next fire."""
+    if customer_session.state in FINAL_SESSION_STATES:
+        timers_view = TimersView(
+            paused=False,
+            paused_at=None,
+            paused_seconds=customer_session.paused_seconds,
+            nudge_at=None,
+            closes_at=None,
+            hand_off_at=None,
+        )
+    else:
+        clock = clock_of(customer_session)
+        due = deadlines(clock, now, timers)
+        timers_view = TimersView(
+            paused=clock.paused,
+            paused_at=clock.paused_at,
+            paused_seconds=clock.paused_seconds,
+            nudge_at=due.nudge_at,
+            closes_at=due.closes_at,
+            hand_off_at=due.hand_off_at,
+        )
+    return SessionView(
+        session_id=customer_session.id,
+        lane=customer_session.lane,
+        state=customer_session.state,
+        language=customer_session.language,
+        started_at=customer_session.started_at,
+        ended_at=customer_session.ended_at,
+        end_reason=customer_session.end_reason,
+        business_date=customer_session.business_date,
+        timers=timers_view,
+    )
+
+
+async def begin_turn(
+    db: AsyncSession, session_id: uuid.UUID, *, now: datetime
+) -> CustomerSession:
+    """The customer has said something and the agent is about to answer.
+
+    That is activity, so the silence clock starts again and any nudge is
+    answered. The clocks then stop until `end_turn`: time the agent spends
+    replying is not the customer being silent. A paused session resumes,
+    because a customer speaking is a session that is under way.
+    """
+    customer_session = await lock_session(db, session_id)
+    if customer_session.state in FINAL_SESSION_STATES:
+        return customer_session
+    _resume(customer_session, now)
+    customer_session.last_activity_at = now
+    customer_session.nudged_at = None
+    customer_session.turn_started_at = now
+    await db.flush()
+    return customer_session
+
+
+async def end_turn(db: AsyncSession, session_id: uuid.UUID, *, now: datetime) -> None:
+    """The agent has finished replying. Silence is measured from now."""
+    customer_session = await lock_session(db, session_id)
+    customer_session.turn_started_at = None
+    if customer_session.state not in FINAL_SESSION_STATES:
+        customer_session.last_activity_at = now
+    await db.flush()
+
+
+async def pause(
+    db: AsyncSession, session_id: uuid.UUID, *, now: datetime
+) -> CustomerSession:
+    """Stop the session's clocks, for a presenter who wants to talk.
+
+    Pausing a session that is already paused changes nothing.
+    """
+    customer_session = await lock_active_session(db, session_id)
+    if customer_session.paused_at is None:
+        customer_session.paused_at = now
+        await db.flush()
+    return customer_session
+
+
+async def resume(
+    db: AsyncSession, session_id: uuid.UUID, *, now: datetime
+) -> CustomerSession:
+    """Start the clocks again. Time spent paused counts toward nothing, and
+    the customer gets a fresh stretch of silence before any nudge."""
+    customer_session = await lock_active_session(db, session_id)
+    if _resume(customer_session, now):
+        customer_session.last_activity_at = now
+        customer_session.nudged_at = None
+        await db.flush()
+    return customer_session
+
+
+def _resume(customer_session: CustomerSession, now: datetime) -> bool:
+    """Add the pause just ended to the total. False if it was not paused."""
+    if customer_session.paused_at is None:
+        return False
+    paused_for = max(0, round((now - customer_session.paused_at).total_seconds()))
+    customer_session.paused_seconds += paused_for
+    customer_session.paused_at = None
+    return True

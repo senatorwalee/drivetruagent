@@ -237,7 +237,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read a session */
+        /**
+         * Read a session
+         * @description The session, with when its timers will next fire. A screen counts
+         *     down to those times; it never works the timer rules out itself.
+         */
         get: operations["read_session_sessions__session_id__get"];
         put?: never;
         post?: never;
@@ -408,6 +412,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop the session's clocks
+         * @description For a presenter who wants to talk without the session timing out.
+         *
+         *     While paused, no timer fires and the time does not count toward the
+         *     session's length. Pausing twice is the same as pausing once. The session
+         *     also resumes by itself as soon as the customer says something.
+         */
+        post: operations["pause_session_sessions__session_id__pause_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sessions/{session_id}/pending-actions/{pending_action_id}/cancel": {
         parameters: {
             query?: never;
@@ -439,6 +467,27 @@ export interface paths {
          * @description Run the stored action, now that the customer has confirmed it.
          */
         post: operations["confirm_pending_action_sessions__session_id__pending_actions__pending_action_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start the session's clocks again
+         * @description The customer gets a fresh stretch of silence before being asked
+         *     whether they are still there.
+         */
+        post: operations["resume_session_sessions__session_id__resume_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -545,7 +594,7 @@ export interface components {
          * @description What one row of the agent's event log records.
          * @enum {string}
          */
-        AgentEventKind: "user_message" | "model_call" | "tool_call" | "tool_result" | "assistant_message";
+        AgentEventKind: "user_message" | "model_call" | "tool_call" | "tool_result" | "assistant_message" | "timer";
         /** AgentInfoResponse */
         AgentInfoResponse: {
             /** Available */
@@ -931,6 +980,7 @@ export interface components {
              */
             started_at: string;
             state: components["schemas"]["SessionState"];
+            timers: components["schemas"]["TimersView"];
         };
         /** SetSpecialRequest */
         SetSpecialRequest: {
@@ -1010,6 +1060,28 @@ export interface components {
             name: string;
             /** Saves Cents */
             saves_cents: number;
+        };
+        /**
+         * TimersView
+         * @description When the backend will next act on its own, if nothing else happens.
+         *
+         *     A screen counts down to these. It never works the rules out itself. Each
+         *     is None when that timer is not running: all of them once a session has
+         *     ended or while it is paused.
+         */
+        TimersView: {
+            /** Closes At */
+            closes_at: string | null;
+            /** Hand Off At */
+            hand_off_at: string | null;
+            /** Nudge At */
+            nudge_at: string | null;
+            /** Paused */
+            paused: boolean;
+            /** Paused At */
+            paused_at: string | null;
+            /** Paused Seconds */
+            paused_seconds: number;
         };
         /** UpdateLine */
         UpdateLine: {
@@ -1903,6 +1975,55 @@ export interface operations {
             };
         };
     };
+    pause_session_sessions__session_id__pause_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionView"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     cancel_pending_action_sessions__session_id__pending_actions__pending_action_id__cancel_post: {
         parameters: {
             query?: never;
@@ -1970,6 +2091,55 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_session_sessions__session_id__resume_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionView"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
