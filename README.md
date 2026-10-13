@@ -22,7 +22,9 @@ built piece by piece.
 | 03 | Ordering API and menu search | Done |
 | 04 | Policy engine: allow, reject, confirm, escalate | Done |
 | 05 | Text-mode agent, event log and first evals | Done; evals not yet run against a real model |
-| Later | Stock reservations, voice, human handoff, knowledge search, tracing | Planned |
+| 06 | Web app: the live session screen in three switchable views | Done |
+| 07 | Stock reservations and idempotency keys | Done |
+| Later | Combos and specials, session timers, voice, human handoff, knowledge search, tracing | Planned |
 
 ## Stack
 
@@ -279,6 +281,51 @@ Evals call the real model, so they need a key and cost money. They are left
 out of `make test` and CI, and are skipped if no key is set. The scenario
 checker and runner themselves are tested with the scripted model.
 
+## Stock: two cars cannot buy the last item
+
+Each stock-tracked item has a count on hand. While a session is ordering, it
+holds what is in its cart as a reservation, so another car cannot be sold the
+same units.
+
+```
+available to a session = on hand − what other sessions hold in live reservations
+```
+
+How overselling is prevented:
+
+- **One lock, one check.** Every change to a reservation first locks that
+  item's inventory row, then counts what other sessions hold, then decides.
+  Two cars asking for the last unit at the same moment are handled one after
+  the other: the first gets it, the second is told there is none.
+- **Reservations expire, and expired ones count for nothing.** The query that
+  counts them ignores them, so correctness never depends on a cleanup job.
+  Activity in a session refreshes its reservations.
+- **Submitting checks again.** If a session went quiet, its reservation
+  expired and someone else took the stock, placing the order is refused
+  instead of selling something that is gone.
+- **The database has the last word.** A CHECK constraint refuses stock below
+  zero, whatever the code does.
+
+When there is not enough, the request is refused with `insufficient_stock`:
+how many are available, and up to three in-stock alternatives from the same
+category for the agent to offer. Menu reads carry an `in_stock` flag.
+
+The tests include real races on separate database connections: two cars for
+the last cookie, ten cars for three cookies, and everyone submitting at once.
+With the row lock removed, those tests fail.
+
+A session that is abandoned releases its stock at once. One that is handed to
+staff keeps it, because a person is about to finish that order.
+
+### Requests that are sent twice
+
+A caller that is unsure whether a request got through can send it again with
+the same `Idempotency-Key` header. The first request runs and its response is
+stored in the same transaction as the work. A repeat returns the stored
+response and nothing runs again, even if both copies arrive at the same
+moment. It is supported on proposing an action, confirming a held action and
+submitting an order; the agent's own tool calls are keyed the same way.
+
 ## Policy engine
 
 The model proposes; code decides. Every action the agent proposes goes
@@ -334,6 +381,8 @@ Run `make dev` and open <http://127.0.0.1:8000/docs> to try these.
 | `POST /sessions/{id}/messages` | Say something to the agent; returns its reply and the cart |
 | `GET /sessions/{id}/events` | The session's event log; `?after=` returns only newer events |
 | `GET /agent` | Which model the agent uses, and whether it is the scripted demo |
+| `GET /inventory` | Stock levels: on hand, reserved, available |
+| `PUT /inventory/{code}` | Set how many of an item are on hand |
 | `POST /sessions/{id}/actions` | Propose an action; returns the policy decision |
 | `POST /sessions/{id}/pending-actions/{pid}/confirm` | The customer said yes to a held action |
 | `POST /sessions/{id}/pending-actions/{pid}/cancel` | The customer said no |
@@ -364,7 +413,7 @@ Every expected failure has one shape, and a caller reacts to the code:
 | Status | Meaning |
 |---|---|
 | 404 | The session, cart line or order does not exist |
-| 409 | The current state does not allow it: lane busy, session ended, item unavailable, empty cart |
+| 409 | The current state does not allow it: lane busy, session ended, item unavailable or out of stock, empty cart |
 | 422 | The menu or the rules do not allow it: unknown item or option, a missing choice, too many options |
 
 ### Menu search
