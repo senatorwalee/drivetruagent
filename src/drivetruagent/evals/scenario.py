@@ -26,6 +26,8 @@ class Scenario:
     lines: tuple[ExpectedLine, ...] | None = None
     # The total that must be charged. None: not checked.
     total_cents: int | None = None
+    # What must have been taken off by combos and specials. None: not checked.
+    discount_cents: int | None = None
     language: Language | None = None
     # Tools that must, and must not, have been used at some point.
     must_use: frozenset[str] = frozenset()
@@ -85,6 +87,15 @@ def check(scenario: Scenario, result: ScenarioResult) -> list[str]:
     if scenario.total_cents is not None and cart.total_cents != scenario.total_cents:
         failures.append(
             f"total is {cart.total_cents} cents, expected {scenario.total_cents}"
+        )
+
+    if (
+        scenario.discount_cents is not None
+        and cart.discount_cents != scenario.discount_cents
+    ):
+        failures.append(
+            f"discount is {cart.discount_cents} cents, "
+            f"expected {scenario.discount_cents}"
         )
 
     used = result.tools_used

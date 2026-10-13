@@ -1171,5 +1171,13 @@
         }
       ]
     }
+  ],
+  "combos": [
+    {
+      "code": "burger_combo",
+      "name": { "en": "Burger combo", "fr": "Trio burger" },
+      "discount_cents": 200,
+      "slots": ["burgers", "sides", "drinks"]
+    }
   ]
 }

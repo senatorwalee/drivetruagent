@@ -57,6 +57,8 @@ export const cart: Cart = {
   version: 2,
   item_count: 2,
   subtotal_cents: 618,
+  discounts: [],
+  discount_cents: 0,
   tax_cents: 80,
   total_cents: 698,
   lines: [
@@ -83,6 +85,22 @@ export const cart: Cart = {
         { group_code: 'size', group_name: 'Size', option_code: 'medium', option_name: 'Medium', price_delta_cents: 40 },
       ],
     },
+  ],
+}
+
+/** The same cart after a cheeseburger made it a combo: 200 off, taxed on the rest. */
+export const comboCart: Cart = {
+  ...cart,
+  version: 3,
+  item_count: 3,
+  subtotal_cents: 1217,
+  discounts: [{ kind: 'combo', code: 'burger_combo', name: 'Burger combo', times: 1, amount_cents: 200 }],
+  discount_cents: 200,
+  tax_cents: 132,
+  total_cents: 1149,
+  lines: [
+    ...cart.lines,
+    { line_no: 3, item_code: 'cheeseburger', item_name: 'Cheeseburger', quantity: 1, unit_price_cents: 599, line_total_cents: 599, options: [] },
   ],
 }
 

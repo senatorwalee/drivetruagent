@@ -8,7 +8,7 @@ import type { ComponentType } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { buildTimeline } from '../session/timeline'
-import { cart, liveSession, resetSeq, session, toolRound } from '../test/fixtures'
+import { cart, comboCart, liveSession, resetSeq, session, toolRound } from '../test/fixtures'
 import { ControlRoom } from './control-room/ControlRoom'
 import { MenuBoard } from './menu-board/MenuBoard'
 import { Receipt } from './receipt/Receipt'
@@ -53,6 +53,40 @@ describe.each(VIEWS)('%s view', (viewId, View) => {
     expect(within(order).getByText(/Large . Regular/)).toBeInTheDocument()
     expect(within(order).getByText(/1 (× )?Cola/)).toBeInTheDocument()
     expect(within(order).getByText('$6.98')).toBeInTheDocument()
+  })
+
+  it('shows a combo saving between the subtotal and the total', () => {
+    const { order } = show({ cart: comboCart })
+
+    expect(within(order).getByText('Burger combo')).toBeInTheDocument()
+    expect(within(order).getByText(/^−\$?2\.00$/)).toBeInTheDocument()
+    expect(within(order).getByText('$11.49')).toBeInTheDocument()
+  })
+
+  it('says how many times a saving applied when it is more than once', () => {
+    const twice = [{ ...comboCart.discounts[0]!, times: 2, amount_cents: 400 }]
+    const { order } = show({ cart: { ...comboCart, discounts: twice, discount_cents: 400 } })
+
+    expect(within(order).getByText('Burger combo × 2')).toBeInTheDocument()
+    expect(within(order).getByText(/^−\$?4\.00$/)).toBeInTheDocument()
+  })
+
+  it('shows no saving row on an order that earned none', () => {
+    const { order } = show()
+
+    expect(within(order).queryByText(/combo/i)).not.toBeInTheDocument()
+    expect(within(order).queryByText(/−/)).not.toBeInTheDocument()
+  })
+
+  it('shows when the backend suggested offering a combo', () => {
+    resetSeq()
+    const suggestion = { kind: 'combo', code: 'burger_combo', name: 'Burger combo', saves_cents: 200, missing: [] }
+    const timeline = buildTimeline(
+      toolRound('add_item', { item_code: 'cheeseburger', quantity: 1, selections: [] }, { decision: 'allow', suggestion, cart: { version: 1 } }),
+    )
+    show({ timeline })
+
+    expect(screen.getByText(/suggests burger combo/)).toBeInTheDocument()
   })
 
   it('shows a held item apart from the cart, by name', () => {

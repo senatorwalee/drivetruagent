@@ -58,6 +58,8 @@ class ItemSpec:
     id: uuid.UUID
     code: str
     name: Mapping[str, str]
+    # Which part of the menu it belongs to. Combos are defined by category.
+    category_code: str
     base_price_cents: int
     is_active: bool
     groups: tuple[GroupSpec, ...]

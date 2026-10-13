@@ -1,5 +1,5 @@
 import type { Decision } from '../../session/types'
-import { DECISION_META, readableReason } from '../shared/decisionMeta'
+import { DECISION_META, decisionWhy } from '../shared/decisionMeta'
 import styles from './MenuBoard.module.css'
 
 /** How many recent decisions fit comfortably in the strip. */
@@ -25,7 +25,7 @@ export function DecisionStrip({ decisions }: { decisions: Decision[] }) {
                 </span>
               </div>
               <div className={styles.decisionDetail}>
-                {[decision.summary, readableReason(decision.reason)].filter(Boolean).join(' · ') || '—'}
+                {[decision.summary, decisionWhy(decision)].filter(Boolean).join(' · ') || '—'}
               </div>
             </li>
           ))}

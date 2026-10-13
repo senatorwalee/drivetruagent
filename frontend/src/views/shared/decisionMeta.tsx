@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import type { DecisionKind } from '../../session/types'
+import type { Decision, DecisionKind } from '../../session/types'
 import { AlertIcon, CheckIcon, CrossIcon, EyeIcon, HandoffIcon } from './icons'
 
 /**
@@ -16,6 +16,15 @@ export const DECISION_META: Record<DecisionKind, { label: string; meaning: strin
 }
 
 /** An error or rule code as words: "missing_required_options" reads badly aloud. */
-export function readableReason(reason: string | null): string | null {
+function readableReason(reason: string | null): string | null {
   return reason ? reason.replaceAll('_', ' ') : null
+}
+
+/**
+ * Why a decision went the way it did, in words: the rule or error behind it,
+ * or what the backend suggested offering alongside it.
+ */
+export function decisionWhy(decision: Pick<Decision, 'reason' | 'suggestion'>): string | null {
+  if (decision.reason) return readableReason(decision.reason)
+  return decision.suggestion ? `suggests ${decision.suggestion.toLowerCase()}` : null
 }

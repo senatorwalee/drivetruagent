@@ -646,6 +646,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* A saving reads as good news: the colour of an allowed action. */
+.totals .saving {
+  color: var(--allow);
+}
+
 .totals .totalLabel,
 .totals .totalValue {
   padding-top: 12px;

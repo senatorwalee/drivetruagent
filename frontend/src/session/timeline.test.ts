@@ -31,6 +31,19 @@ describe('buildTimeline', () => {
     ])
   })
 
+  it('notes what the backend suggested offering, by name', () => {
+    const suggestion = { kind: 'combo', code: 'burger_combo', name: 'Burger combo', saves_cents: 200, missing: [] }
+    const { decisions } = buildTimeline([
+      ...toolRound('add_item', { item_code: 'cheeseburger', quantity: 1, selections: [] }, { decision: 'allow', suggestion, cart: { version: 1 } }),
+      ...toolRound('add_item', { item_code: 'cookie', quantity: 1, selections: [] }, { decision: 'allow', cart: { version: 2 } }),
+    ])
+
+    expect(decisions.map((d) => [d.summary, d.suggestion])).toEqual([
+      ['cheeseburger', 'Burger combo'],
+      ['cookie', null],
+    ])
+  })
+
   it('leaves model-call bookkeeping out of what is shown', () => {
     const timeline = buildTimeline(eventsUpToHeldCookies())
 

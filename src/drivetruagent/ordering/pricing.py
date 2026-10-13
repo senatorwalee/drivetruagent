@@ -1,8 +1,8 @@
 """Prices. Pure logic: no database.
 
 All money is integer cents. Tax is the only place a fraction appears, and it
-is rounded exactly once, on the cart subtotal, so that subtotal + tax = total
-always holds to the cent.
+is rounded exactly once, on what is left of the subtotal after discounts, so
+that subtotal - discount + tax = total always holds to the cent.
 """
 
 from collections.abc import Iterable
@@ -12,9 +12,11 @@ from decimal import ROUND_HALF_UP, Decimal
 
 @dataclass(frozen=True)
 class CartTotals:
+    # The sum of the lines, before anything is taken off.
     subtotal_cents: int
     tax_cents: int
     total_cents: int
+    discount_cents: int = 0
 
 
 def unit_price_cents(base_price_cents: int, option_deltas_cents: Iterable[int]) -> int:
@@ -36,9 +38,20 @@ def tax_cents(subtotal_cents: int, tax_rate: Decimal) -> int:
     return int(exact.quantize(Decimal(1), rounding=ROUND_HALF_UP))
 
 
-def cart_totals(line_totals_cents: Iterable[int], tax_rate: Decimal) -> CartTotals:
+def cart_totals(
+    line_totals_cents: Iterable[int], tax_rate: Decimal, discount_cents: int = 0
+) -> CartTotals:
+    """Add a cart up. Tax is charged on the subtotal less the discount.
+
+    A discount larger than the subtotal is cut down to it: whatever the
+    discount rules say, a cart never goes below zero.
+    """
     subtotal = sum(line_totals_cents)
-    tax = tax_cents(subtotal, tax_rate)
+    discount = min(max(discount_cents, 0), subtotal)
+    tax = tax_cents(subtotal - discount, tax_rate)
     return CartTotals(
-        subtotal_cents=subtotal, tax_cents=tax, total_cents=subtotal + tax
+        subtotal_cents=subtotal,
+        tax_cents=tax,
+        total_cents=subtotal - discount + tax,
+        discount_cents=discount,
     )

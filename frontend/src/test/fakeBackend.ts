@@ -43,6 +43,8 @@ export function installFakeBackend() {
       version: 0,
       item_count: 0,
       subtotal_cents: 0,
+      discounts: [],
+      discount_cents: 0,
       tax_cents: 0,
       total_cents: 0,
       lines: [],

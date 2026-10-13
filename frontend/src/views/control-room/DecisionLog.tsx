@@ -1,5 +1,5 @@
 import type { Decision, DecisionKind } from '../../session/types'
-import { DECISION_META } from '../shared/decisionMeta'
+import { DECISION_META, decisionWhy } from '../shared/decisionMeta'
 import styles from './ControlRoom.module.css'
 
 const LEGEND: DecisionKind[] = ['allow', 'reject', 'confirm', 'escalate']
@@ -45,8 +45,10 @@ export function DecisionLog({ decisions }: { decisions: Decision[] }) {
   )
 }
 
-/** The second line of an entry: the rule or error code, and the cart it left. */
+/** The second line of an entry: the rule, error code or suggestion, and the cart it left. */
 function outcomeOf(decision: Decision): string {
-  const parts = [decision.reason, decision.cartVersion === null ? null : `cart v${decision.cartVersion}`]
+  // The code itself here, not its readable form: this view is for engineers.
+  const why = decision.reason ?? decisionWhy(decision)
+  const parts = [why, decision.cartVersion === null ? null : `cart v${decision.cartVersion}`]
   return parts.filter(Boolean).join(' · ') || DECISION_META[decision.kind].meaning
 }

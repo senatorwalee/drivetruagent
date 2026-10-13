@@ -1,5 +1,6 @@
 import { itemsLabel, money } from '../../session/presentation'
 import type { LiveSession } from '../../session/useLiveSession'
+import { DiscountRows } from '../shared/DiscountRows'
 import { AlertIcon, CheckIcon } from '../shared/icons'
 import styles from './MenuBoard.module.css'
 
@@ -57,6 +58,7 @@ export function OrderPanel({ live }: { live: LiveSession }) {
       <dl className={styles.totals}>
         <dt>Subtotal</dt>
         <dd>{money(cart?.subtotal_cents ?? 0)}</dd>
+        <DiscountRows discounts={cart?.discounts} className={styles.saving} />
         <dt>Tax</dt>
         <dd>{money(cart?.tax_cents ?? 0)}</dd>
         <dt className={styles.totalLabel}>Total</dt>

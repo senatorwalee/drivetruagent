@@ -57,6 +57,7 @@ export function buildTimeline(events: readonly AgentEvent[]): Timeline {
           summary: summarise(args),
           kind,
           reason: reasonOf(result),
+          suggestion: suggestionOf(result),
           cartVersion: cartVersionOf(result),
         })
         pending = nextPending(pending, name, kind, args)
@@ -90,6 +91,11 @@ function reasonOf(result: Json): string | null {
   if (typeof result['rule'] === 'string') return result['rule']
   const error = result['error'] as { code?: unknown } | undefined
   return typeof error?.code === 'string' ? error.code : null
+}
+
+function suggestionOf(result: Json): string | null {
+  const suggestion = result['suggestion'] as { name?: unknown } | undefined
+  return typeof suggestion?.name === 'string' ? suggestion.name : null
 }
 
 function cartVersionOf(result: Json): number | null {

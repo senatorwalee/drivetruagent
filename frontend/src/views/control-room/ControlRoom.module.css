@@ -624,6 +624,10 @@
   font-variant-numeric: tabular-nums;
 }
 
+.totals .saving {
+  color: var(--allow);
+}
+
 .totals .totalLabel,
 .totals .totalValue {
   padding-top: 10px;

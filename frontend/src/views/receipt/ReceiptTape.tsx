@@ -1,5 +1,6 @@
-import { money } from '../../session/presentation'
+import { money, plainAmount } from '../../session/presentation'
 import type { LiveSession } from '../../session/useLiveSession'
+import { DiscountRows } from '../shared/DiscountRows'
 import styles from './Receipt.module.css'
 
 /** The order printed as a till receipt, with a stamp for anything on hold. */
@@ -51,6 +52,7 @@ export function ReceiptTape({ live }: { live: LiveSession }) {
         <dl className={styles.totals}>
           <dt>Subtotal</dt>
           <dd>{((cart?.subtotal_cents ?? 0) / 100).toFixed(2)}</dd>
+          <DiscountRows discounts={cart?.discounts} className={styles.saving} format={plainAmount} />
           <dt>Tax</dt>
           <dd>{((cart?.tax_cents ?? 0) / 100).toFixed(2)}</dd>
           <dt className={styles.totalLabel}>Total</dt>

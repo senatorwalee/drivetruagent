@@ -1,5 +1,5 @@
 import type { Decision } from '../../session/types'
-import { DECISION_META, readableReason } from '../shared/decisionMeta'
+import { DECISION_META, decisionWhy } from '../shared/decisionMeta'
 import styles from './Receipt.module.css'
 
 /** How many recent rows the ledger shows. */
@@ -42,7 +42,7 @@ export function Ledger({ decisions }: { decisions: Decision[] }) {
                     {DECISION_META[decision.kind].label}
                   </span>
                 </td>
-                <td className={styles.why}>{readableReason(decision.reason) ?? ''}</td>
+                <td className={styles.why}>{decisionWhy(decision) ?? ''}</td>
               </tr>
             ))}
           </tbody>

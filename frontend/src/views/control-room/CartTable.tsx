@@ -1,5 +1,6 @@
-import { money } from '../../session/presentation'
+import { money, plainAmount } from '../../session/presentation'
 import type { LiveSession } from '../../session/useLiveSession'
+import { DiscountRows } from '../shared/DiscountRows'
 import styles from './ControlRoom.module.css'
 
 /** The cart, compact: line number, item, options and amount. */
@@ -43,6 +44,7 @@ export function CartTable({ live }: { live: LiveSession }) {
       <dl className={styles.totals}>
         <dt>subtotal</dt>
         <dd>{((cart?.subtotal_cents ?? 0) / 100).toFixed(2)}</dd>
+        <DiscountRows discounts={cart?.discounts} className={styles.saving} format={plainAmount} />
         <dt>tax</dt>
         <dd>{((cart?.tax_cents ?? 0) / 100).toFixed(2)}</dd>
         <dt className={styles.totalLabel}>Total</dt>
