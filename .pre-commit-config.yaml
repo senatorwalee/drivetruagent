@@ -29,7 +29,7 @@ repos:
 
       - id: unit-tests
         name: unit tests
-        entry: uv run pytest -m "not integration" -q
+        entry: uv run pytest -m "not integration and not eval" -q
         language: system
         pass_filenames: false
         always_run: true

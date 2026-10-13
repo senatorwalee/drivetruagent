@@ -10,6 +10,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from drivetruagent.agent.model import ModelUnavailable
 from drivetruagent.ordering.errors import OrderingError
 
 # The thing asked for does not exist.
@@ -27,6 +28,9 @@ _CONFLICT = {
     "option_unavailable",
     "empty_cart",
 }
+
+
+AGENT_UNAVAILABLE = "agent_unavailable"
 
 
 class ErrorBody(BaseModel):
@@ -67,6 +71,19 @@ def register_error_handlers(app: FastAPI) -> None:
     ) -> JSONResponse:
         return error_response(error)
 
+    @app.exception_handler(ModelUnavailable)
+    async def handle_model_unavailable(  # pyright: ignore[reportUnusedFunction]
+        request: Request, error: ModelUnavailable
+    ) -> JSONResponse:
+        # The ordering API keeps working; only the conversation is down.
+        body = ErrorResponse(
+            error=ErrorBody(code=AGENT_UNAVAILABLE, message=str(error), details={})
+        )
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content=body.model_dump(mode="json"),
+        )
+
 
 # For the `responses=` argument of a route, so /docs shows the error shapes.
 type Responses = dict[int | str, dict[str, Any]]
@@ -74,3 +91,4 @@ type Responses = dict[int | str, dict[str, Any]]
 NOT_FOUND: Responses = {status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}}
 CONFLICT: Responses = {status.HTTP_409_CONFLICT: {"model": ErrorResponse}}
 REFUSED: Responses = {status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": ErrorResponse}}
+UNAVAILABLE: Responses = {status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ErrorResponse}}
