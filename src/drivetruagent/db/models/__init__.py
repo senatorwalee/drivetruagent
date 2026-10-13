@@ -12,6 +12,7 @@ from drivetruagent.db.models.catalog import (
     OptionGroup,
 )
 from drivetruagent.db.models.events import AgentEvent
+from drivetruagent.db.models.handoff import Handoff
 from drivetruagent.db.models.inventory import (
     IdempotencyRecord,
     Inventory,
@@ -45,6 +46,7 @@ __all__ = [
     "ComboRule",
     "ComboRuleSlot",
     "CustomerSession",
+    "Handoff",
     "IdempotencyRecord",
     "Inventory",
     "MenuCategory",
