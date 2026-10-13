@@ -5,8 +5,8 @@ from typing import Annotated
 from fastapi import APIRouter, Query, status
 from fastapi.responses import JSONResponse
 
+from drivetruagent.api.deps import SessionDep
 from drivetruagent.api.errors import NOT_FOUND, error_response
-from drivetruagent.db.session import SessionDep
 from drivetruagent.enums import Language
 from drivetruagent.ordering import menu
 from drivetruagent.ordering.errors import UnknownItem

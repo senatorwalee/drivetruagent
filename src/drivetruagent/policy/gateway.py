@@ -25,7 +25,7 @@ from drivetruagent.enums import (
 )
 from drivetruagent.ordering import cart as cart_rules
 from drivetruagent.ordering import orders as order_rules
-from drivetruagent.ordering.errors import OrderingError, PendingActionNotFound
+from drivetruagent.ordering.errors import OrderingError
 from drivetruagent.ordering.sessions import end_session, lock_session
 from drivetruagent.ordering.views import CartSnapshot, OrderView
 from drivetruagent.policy.actions import (
@@ -43,6 +43,7 @@ from drivetruagent.policy.decisions import (
     PolicyLimits,
     PolicyResult,
 )
+from drivetruagent.policy.errors import PendingActionNotFound
 from drivetruagent.policy.outcome import ActionOutcome, OutcomeError
 from drivetruagent.policy.rules import SESSION_ENDED, evaluate
 

@@ -12,9 +12,8 @@ state and the tools used, not at the agent's wording.
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from drivetruagent.agent.loop import AgentConfig
+from drivetruagent.agent.factory import agent_config, model_from_settings
 from drivetruagent.agent.model import ModelClient
-from drivetruagent.agent.openai_model import OpenAIModel
 from drivetruagent.config import Settings
 from drivetruagent.evals.runner import run_scenario
 from drivetruagent.evals.scenario import Scenario, check
@@ -35,24 +34,16 @@ def settings() -> Settings:
 def model(settings: Settings) -> ModelClient:
     if settings.openai_api_key is None:
         pytest.skip("OPENAI_API_KEY is not set")
-    return OpenAIModel(
-        api_key=settings.openai_api_key.get_secret_value(),
-        model=settings.openai_text_model,
-    )
+    return model_from_settings(settings)
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda scenario: scenario.name)
 async def test_scenario(
     db_session: AsyncSession, scenario: Scenario, model: ModelClient, settings: Settings
 ) -> None:
-    config = AgentConfig(
-        restaurant_name=settings.restaurant_name,
-        tax_rate=settings.tax_rate,
-        limits=settings.policy_limits,
-        max_tool_rounds=settings.agent_max_tool_rounds,
+    result = await run_scenario(
+        db_session, scenario, model=model, config=agent_config(settings)
     )
-
-    result = await run_scenario(db_session, scenario, model=model, config=config)
 
     failures = check(scenario, result)
     assert not failures, "\n".join(

@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from drivetruagent.db.models import MenuItem, Order, PendingAction
 from drivetruagent.enums import PendingActionStatus, SessionState
 from drivetruagent.ordering.cart import add_item
-from drivetruagent.ordering.errors import PendingActionNotFound, SessionNotFound
+from drivetruagent.ordering.errors import SessionNotFound
 from drivetruagent.ordering.sessions import open_session
 from drivetruagent.policy import gateway
 from drivetruagent.policy.actions import (
@@ -26,6 +26,7 @@ from drivetruagent.policy.actions import (
     UpdateLine,
 )
 from drivetruagent.policy.decisions import Decision, PolicyLimits
+from drivetruagent.policy.errors import PendingActionNotFound
 from drivetruagent.policy.outcome import ActionOutcome
 
 TAX = Decimal("0.13")

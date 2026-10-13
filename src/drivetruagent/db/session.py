@@ -1,7 +1,5 @@
-from collections.abc import AsyncIterator
-from typing import Annotated
+"""The database engine and session factory. Knows nothing about the web layer."""
 
-from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -27,15 +25,3 @@ def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSessi
     # expire_on_commit=False keeps loaded objects usable after a commit; the
     # default would trigger a lazy reload, which fails in async code.
     return async_sessionmaker(engine, expire_on_commit=False)
-
-
-async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
-    """FastAPI dependency: one session per request, always closed afterwards."""
-    session_factory: async_sessionmaker[AsyncSession] = (
-        request.app.state.session_factory
-    )
-    async with session_factory() as session:
-        yield session
-
-
-SessionDep = Annotated[AsyncSession, Depends(get_session)]

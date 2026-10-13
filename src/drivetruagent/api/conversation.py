@@ -6,13 +6,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict, Field
 
-from drivetruagent.agent.loop import AgentConfig, run_turn
-from drivetruagent.agent.model import ModelClient, ModelUnavailable
-from drivetruagent.agent.openai_model import OpenAIModel
-from drivetruagent.api.deps import SettingsDep
+from drivetruagent.agent.factory import agent_config, model_from_settings
+from drivetruagent.agent.loop import run_turn
+from drivetruagent.agent.model import ModelClient
+from drivetruagent.api.deps import SessionDep, SettingsDep
 from drivetruagent.api.errors import NOT_FOUND, UNAVAILABLE
-from drivetruagent.config import Settings
-from drivetruagent.db.session import SessionDep
 from drivetruagent.ordering.views import CartSnapshot
 
 router = APIRouter(prefix="/sessions/{session_id}", tags=["conversation"])
@@ -33,21 +31,7 @@ class MessageResponse(BaseModel):
 
 def get_model_client(settings: SettingsDep) -> ModelClient:
     """The model the agent talks to. Tests replace this with a scripted one."""
-    if settings.openai_api_key is None:
-        raise ModelUnavailable("No model is configured. Set OPENAI_API_KEY.")
-    return OpenAIModel(
-        api_key=settings.openai_api_key.get_secret_value(),
-        model=settings.openai_text_model,
-    )
-
-
-def agent_config(settings: Settings) -> AgentConfig:
-    return AgentConfig(
-        restaurant_name=settings.restaurant_name,
-        tax_rate=settings.tax_rate,
-        limits=settings.policy_limits,
-        max_tool_rounds=settings.agent_max_tool_rounds,
-    )
+    return model_from_settings(settings)
 
 
 ModelDep = Annotated[ModelClient, Depends(get_model_client)]
