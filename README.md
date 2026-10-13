@@ -27,7 +27,8 @@ built piece by piece.
 | 08a | Combos: discounts worked out from the cart, and suggested once | Done |
 | 08b | Today's specials, with a cached read | Done |
 | 09 | Session timers: the silence nudge, the three-minute hand-off, and pause | Done |
-| Later | Voice, human handoff, knowledge search, tracing | Planned |
+| 10a | Handoff package: what a person taking over is shown, and closing a handoff | Done |
+| Later | Staff screen, voice, knowledge search, tracing | Planned |
 
 ## Stack
 
@@ -456,6 +457,46 @@ nothing ran.
 When presenting, use Pause, or raise `SILENCE_NUDGE_SECONDS` and
 `SESSION_MAX_SECONDS` in `.env`.
 
+## Handing a session to a person
+
+A session is handed off in three ways: a very large order the customer
+confirmed, a request for a person, and the three-minute limit. Each leaves a
+**handoff**, written in the same transaction that ends the session, so the
+two exist together or not at all.
+
+The person taking over reads a **package** (`GET /handoffs/{id}`):
+
+| | |
+|---|---|
+| Why | The rule's code and a readable title |
+| What to do | One or two sentences, such as: *The customer asked for 400 of Chocolate chip cookie and confirmed it. That is more than the agent may take, so it was not added. Check the quantity with them. The cart holds 2 items and can be placed as it stands.* |
+| The cart | Priced as usual, with any combo or special the customer had earned |
+| Stock | What the cart is holding, and whether each hold still counts |
+| The conversation | The last 12 things said |
+| What the backend decided | The last 10 tool calls and timer events, each with its decision |
+
+Two choices worth knowing:
+
+- **The package is built when it is read, not saved.** A handed-off session
+  can never change again and its event log only grows, so there is nothing to
+  go stale. A snapshot taken at the moment of the handoff would also miss the
+  tool call that caused it and the agent's last words, which are recorded
+  just after.
+- **"What to do" is fixed wording filled in from data, not written by a
+  model.** Someone acting on it should be reading what the backend knows.
+
+Staff do not join the conversation or edit the cart. They can say they have
+picked a handoff up, and close it one of two ways:
+
+- **Place the order as it stands.** It is frozen exactly as a normal submit
+  would freeze it, and its stock is taken. If the cart is empty or the stock
+  has gone, the handoff stays open and the error says why.
+- **Cancel it.** The stock it held is free at once.
+
+A resolved handoff cannot be changed. Two people closing the same one place
+one order: a test races five of them on separate connections, and fails with
+the row lock removed.
+
 ## Policy engine
 
 The model proposes; code decides. Every action the agent proposes goes
@@ -521,6 +562,10 @@ Run `make dev` and open <http://127.0.0.1:8000/docs> to try these.
 | `GET /menu` | The whole menu by category |
 | `GET /menu/search?q=` | Find items matching what a customer said |
 | `GET /menu/items/{code}` | One item with its choices |
+| `GET /handoffs` | The handoff queue, longest waiting first; `?status=`, `?session_id=` |
+| `GET /handoffs/{id}` | One handoff's package |
+| `POST /handoffs/{id}/acknowledge` | Say you have picked it up |
+| `POST /handoffs/{id}/resolve` | Place the order as it stands, or cancel it |
 | `GET /combos` | The combo deals |
 | `GET /specials` | Today's specials, with live stock |
 | `PUT /specials/{code}` | End a special early, or bring it back |
