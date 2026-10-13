@@ -23,8 +23,9 @@ from sqlalchemy.orm import selectinload
 
 from drivetruagent.db.models import Cart, CartLine, CartLineOption, CustomerSession
 from drivetruagent.enums import Language, SessionState
-from drivetruagent.ordering import pricing
+from drivetruagent.ordering import offers, pricing
 from drivetruagent.ordering.catalog import load_item_by_code, load_items_by_id
+from drivetruagent.ordering.discounts import Discount, apply_combos
 from drivetruagent.ordering.errors import (
     EmptyCart,
     InsufficientStock,
@@ -52,8 +53,10 @@ from drivetruagent.ordering.sessions import get_session, lock_active_session
 from drivetruagent.ordering.views import (
     DEFAULT_LANGUAGE,
     CartSnapshot,
+    DiscountView,
     LineView,
     SelectedOptionView,
+    SuggestionView,
     localize,
 )
 
@@ -226,7 +229,8 @@ async def request_confirmation(
     customer_session.state = SessionState.CONFIRMING
     await extend_reservations(db, session_id, ttl=reservation_ttl)
     await db.flush()
-    return snapshot_from_lines(customer_session, cart, lines, tax_rate)
+    discounts = await price_discounts(db, lines)
+    return snapshot_from_lines(customer_session, cart, lines, discounts, tax_rate)
 
 
 # --- Reads ------------------------------------------------------------------
@@ -239,6 +243,16 @@ async def get_cart(
     customer_session = await get_session(db, session_id)
     cart = await load_cart(db, session_id)
     return await build_snapshot(db, customer_session, cart, tax_rate)
+
+
+async def suggestion_for(
+    db: AsyncSession, session_id: uuid.UUID
+) -> SuggestionView | None:
+    """Something worth offering the customer given their cart, or None."""
+    customer_session = await get_session(db, session_id)
+    cart = await load_cart(db, session_id)
+    lines = await load_priced_lines(db, cart)
+    return await offers.suggest_combo(db, customer_session, units_by_category(lines))
 
 
 async def load_priced_lines(db: AsyncSession, cart: Cart) -> list[PricedLine]:
@@ -272,17 +286,39 @@ async def build_snapshot(
     db: AsyncSession, customer_session: CustomerSession, cart: Cart, tax_rate: Decimal
 ) -> CartSnapshot:
     lines = await load_priced_lines(db, cart)
-    return snapshot_from_lines(customer_session, cart, lines, tax_rate)
+    discounts = await price_discounts(db, lines)
+    return snapshot_from_lines(customer_session, cart, lines, discounts, tax_rate)
+
+
+async def price_discounts(
+    db: AsyncSession, lines: list[PricedLine]
+) -> tuple[Discount, ...]:
+    """Everything these lines earn off, read from the rules as they are now."""
+    rules = await offers.load_combo_rules(db)
+    return apply_combos(units_by_category(lines), rules).discounts
+
+
+def units_by_category(lines: list[PricedLine]) -> dict[str, int]:
+    """How many units the cart holds in each menu category."""
+    units: dict[str, int] = defaultdict(int)
+    for line in lines:
+        units[line.item.category_code] += line.quantity
+    return dict(units)
 
 
 def snapshot_from_lines(
     customer_session: CustomerSession,
     cart: Cart,
     lines: list[PricedLine],
+    discounts: tuple[Discount, ...],
     tax_rate: Decimal,
 ) -> CartSnapshot:
     language = customer_session.language or DEFAULT_LANGUAGE
-    totals = pricing.cart_totals((line.line_total_cents for line in lines), tax_rate)
+    totals = pricing.cart_totals(
+        (line.line_total_cents for line in lines),
+        tax_rate,
+        sum(discount.amount_cents for discount in discounts),
+    )
     return CartSnapshot(
         session_id=customer_session.id,
         state=customer_session.state,
@@ -291,6 +327,17 @@ def snapshot_from_lines(
         lines=[line.to_view(language) for line in lines],
         item_count=sum(line.quantity for line in lines),
         subtotal_cents=totals.subtotal_cents,
+        discounts=[
+            DiscountView(
+                kind=discount.kind,
+                code=discount.code,
+                name=localize(discount.name, language),
+                times=discount.times,
+                amount_cents=discount.amount_cents,
+            )
+            for discount in discounts
+        ],
+        discount_cents=totals.discount_cents,
         tax_cents=totals.tax_cents,
         total_cents=totals.total_cents,
     )

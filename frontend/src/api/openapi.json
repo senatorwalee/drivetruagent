@@ -55,6 +55,16 @@
               }
             ],
             "title": "Rule"
+          },
+          "suggestion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SuggestionView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -188,6 +198,17 @@
       },
       "CartSnapshot": {
         "properties": {
+          "discount_cents": {
+            "title": "Discount Cents",
+            "type": "integer"
+          },
+          "discounts": {
+            "items": {
+              "$ref": "#/components/schemas/DiscountView"
+            },
+            "title": "Discounts",
+            "type": "array"
+          },
           "item_count": {
             "title": "Item Count",
             "type": "integer"
@@ -235,10 +256,30 @@
           "lines",
           "item_count",
           "subtotal_cents",
+          "discounts",
+          "discount_cents",
           "tax_cents",
           "total_cents"
         ],
         "title": "CartSnapshot",
+        "type": "object"
+      },
+      "CategoryRef": {
+        "properties": {
+          "category_code": {
+            "title": "Category Code",
+            "type": "string"
+          },
+          "category_name": {
+            "title": "Category Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category_code",
+          "category_name"
+        ],
+        "title": "CategoryRef",
         "type": "object"
       },
       "CategoryView": {
@@ -343,6 +384,37 @@
         "title": "ChoiceOptionView",
         "type": "object"
       },
+      "ComboView": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "saves_cents": {
+            "title": "Saves Cents",
+            "type": "integer"
+          },
+          "slots": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryRef"
+            },
+            "title": "Slots",
+            "type": "array"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "slots",
+          "saves_cents"
+        ],
+        "title": "ComboView",
+        "type": "object"
+      },
       "Decision": {
         "enum": [
           "allow",
@@ -352,6 +424,48 @@
         ],
         "title": "Decision",
         "type": "string"
+      },
+      "DiscountKind": {
+        "description": "Why an amount came off an order.",
+        "enum": [
+          "combo",
+          "special"
+        ],
+        "title": "DiscountKind",
+        "type": "string"
+      },
+      "DiscountView": {
+        "description": "An amount taken off, and why. Worked out by the backend, never asked for.",
+        "properties": {
+          "amount_cents": {
+            "title": "Amount Cents",
+            "type": "integer"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/DiscountKind"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "times": {
+            "title": "Times",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "code",
+          "name",
+          "times",
+          "amount_cents"
+        ],
+        "title": "DiscountView",
+        "type": "object"
       },
       "ErrorBody": {
         "properties": {
@@ -729,6 +843,17 @@
       },
       "OrderView": {
         "properties": {
+          "discount_cents": {
+            "title": "Discount Cents",
+            "type": "integer"
+          },
+          "discounts": {
+            "items": {
+              "$ref": "#/components/schemas/DiscountView"
+            },
+            "title": "Discounts",
+            "type": "array"
+          },
           "item_count": {
             "title": "Item Count",
             "type": "integer"
@@ -783,6 +908,8 @@
           "lines",
           "item_count",
           "subtotal_cents",
+          "discounts",
+          "discount_cents",
           "tax_cents",
           "total_cents",
           "submitted_at"
@@ -1016,6 +1143,42 @@
         "title": "SubmitOrder",
         "type": "object"
       },
+      "SuggestionView": {
+        "description": "Something the agent may offer the customer, once.\n\nThe backend decides whether there is anything to suggest. The agent only\nchooses the words.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/DiscountKind"
+          },
+          "missing": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryRef"
+            },
+            "title": "Missing",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "saves_cents": {
+            "title": "Saves Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "code",
+          "name",
+          "missing",
+          "saves_cents"
+        ],
+        "title": "SuggestionView",
+        "type": "object"
+      },
       "UpdateLine": {
         "additionalProperties": false,
         "properties": {
@@ -1178,6 +1341,55 @@
         "summary": "Which model the agent uses",
         "tags": [
           "conversation"
+        ]
+      }
+    },
+    "/combos": {
+      "get": {
+        "description": "The active combos, highest priority first.\n\nA cart earns a combo by holding one item from each of its slots. The\nsaving then shows up in the cart's `discounts` without anything being\nasked for.",
+        "operationId": "read_combos_combos_get",
+        "parameters": [
+          {
+            "description": "The language names are returned in.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Language",
+              "default": "en",
+              "description": "The language names are returned in."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ComboView"
+                  },
+                  "title": "Response Read Combos Combos Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "The combo deals",
+        "tags": [
+          "offers"
         ]
       }
     },

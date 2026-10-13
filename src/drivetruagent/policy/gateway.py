@@ -53,6 +53,10 @@ PENDING_ACTION_RESOLVED = "pending_action_resolved"
 PENDING_ACTION_STALE = "pending_action_stale"
 PENDING_ACTION_CANCELLED = "pending_action_cancelled"
 HUMAN_REQUESTED = "human_requested"
+SUGGESTION_INSTRUCTION = (
+    "Then offer the suggestion once, in a few words, saying what to add and "
+    "what it saves."
+)
 
 
 async def execute(
@@ -267,11 +271,22 @@ async def _run(
 
     # Something happened, so a question still waiting for an answer is stale.
     await _supersede_pending(db, session_id)
+    # Only an addition prompts a suggestion. Offering a combo to someone who
+    # has just taken the drink off their order would be the wrong moment.
+    suggestion = (
+        await cart_rules.suggestion_for(db, session_id)
+        if isinstance(action, AddItem)
+        else None
+    )
+    message = _done_message(action)
+    if suggestion is not None:
+        message = f"{message} {SUGGESTION_INSTRUCTION}"
     return ActionOutcome(
         decision=Decision.ALLOW,
-        message=_done_message(action),
+        message=message,
         cart=snapshot,
         order=order,
+        suggestion=suggestion,
     )
 
 

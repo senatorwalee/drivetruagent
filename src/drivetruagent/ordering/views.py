@@ -11,7 +11,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from drivetruagent.enums import Language, SessionState
+from drivetruagent.enums import DiscountKind, Language, SessionState
 
 # Used when a session's language has not been detected yet, and as the
 # fallback when a name has no entry in the session's language.
@@ -42,6 +42,18 @@ class LineView(BaseModel):
     line_total_cents: int
 
 
+class DiscountView(BaseModel):
+    """An amount taken off, and why. Worked out by the backend, never asked for."""
+
+    kind: DiscountKind
+    code: str
+    name: str
+    # How many times it applied: two combos, or three units of a special.
+    times: int
+    # The whole amount for this entry, as a positive number of cents.
+    amount_cents: int
+
+
 class CartSnapshot(BaseModel):
     session_id: uuid.UUID
     state: SessionState
@@ -51,8 +63,13 @@ class CartSnapshot(BaseModel):
     lines: list[LineView]
     # Total number of items, counting quantities: two fries and a cola is 3.
     item_count: int
+    # The sum of the lines, before discounts.
     subtotal_cents: int
+    discounts: list[DiscountView]
+    discount_cents: int
+    # Charged on the subtotal less the discount.
     tax_cents: int
+    # subtotal - discount + tax.
     total_cents: int
 
 
@@ -65,6 +82,8 @@ class OrderView(BaseModel):
     lines: list[LineView]
     item_count: int
     subtotal_cents: int
+    discounts: list[DiscountView]
+    discount_cents: int
     tax_cents: int
     total_cents: int
     submitted_at: datetime
@@ -138,3 +157,34 @@ class CategoryView(BaseModel):
 
 class MenuView(BaseModel):
     categories: list[CategoryView]
+
+
+# --- Offers -----------------------------------------------------------------
+
+
+class CategoryRef(BaseModel):
+    category_code: str
+    category_name: str
+
+
+class ComboView(BaseModel):
+    code: str
+    name: str
+    # One item from each of these, bought together, makes the combo.
+    slots: list[CategoryRef]
+    saves_cents: int
+
+
+class SuggestionView(BaseModel):
+    """Something the agent may offer the customer, once.
+
+    The backend decides whether there is anything to suggest. The agent only
+    chooses the words.
+    """
+
+    kind: DiscountKind
+    code: str
+    name: str
+    # What the customer would still have to add.
+    missing: list[CategoryRef]
+    saves_cents: int

@@ -21,6 +21,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/combos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The combo deals
+         * @description The active combos, highest priority first.
+         *
+         *     A cart earns a combo by holding one item from each of its slots. The
+         *     saving then shows up in the cart's `discounts` without anything being
+         *     asked for.
+         */
+        get: operations["read_combos_combos_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/live": {
         parameters: {
             query?: never;
@@ -434,6 +458,7 @@ export interface components {
             pending_action_id?: string | null;
             /** Rule */
             rule?: string | null;
+            suggestion?: components["schemas"]["SuggestionView"] | null;
         };
         /** AddItem */
         AddItem: {
@@ -489,6 +514,10 @@ export interface components {
         };
         /** CartSnapshot */
         CartSnapshot: {
+            /** Discount Cents */
+            discount_cents: number;
+            /** Discounts */
+            discounts: components["schemas"]["DiscountView"][];
             /** Item Count */
             item_count: number;
             language: components["schemas"]["Language"];
@@ -508,6 +537,13 @@ export interface components {
             total_cents: number;
             /** Version */
             version: number;
+        };
+        /** CategoryRef */
+        CategoryRef: {
+            /** Category Code */
+            category_code: string;
+            /** Category Name */
+            category_name: string;
         };
         /** CategoryView */
         CategoryView: {
@@ -544,11 +580,43 @@ export interface components {
             /** Price Delta Cents */
             price_delta_cents: number;
         };
+        /** ComboView */
+        ComboView: {
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Saves Cents */
+            saves_cents: number;
+            /** Slots */
+            slots: components["schemas"]["CategoryRef"][];
+        };
         /**
          * Decision
          * @enum {string}
          */
         Decision: "allow" | "reject" | "confirm" | "escalate";
+        /**
+         * DiscountKind
+         * @description Why an amount came off an order.
+         * @enum {string}
+         */
+        DiscountKind: "combo" | "special";
+        /**
+         * DiscountView
+         * @description An amount taken off, and why. Worked out by the backend, never asked for.
+         */
+        DiscountView: {
+            /** Amount Cents */
+            amount_cents: number;
+            /** Code */
+            code: string;
+            kind: components["schemas"]["DiscountKind"];
+            /** Name */
+            name: string;
+            /** Times */
+            times: number;
+        };
         /** ErrorBody */
         ErrorBody: {
             /** Code */
@@ -707,6 +775,10 @@ export interface components {
         };
         /** OrderView */
         OrderView: {
+            /** Discount Cents */
+            discount_cents: number;
+            /** Discounts */
+            discounts: components["schemas"]["DiscountView"][];
             /** Item Count */
             item_count: number;
             language: components["schemas"]["Language"];
@@ -832,6 +904,24 @@ export interface components {
              */
             type: "submit_order";
         };
+        /**
+         * SuggestionView
+         * @description Something the agent may offer the customer, once.
+         *
+         *     The backend decides whether there is anything to suggest. The agent only
+         *     chooses the words.
+         */
+        SuggestionView: {
+            /** Code */
+            code: string;
+            kind: components["schemas"]["DiscountKind"];
+            /** Missing */
+            missing: components["schemas"]["CategoryRef"][];
+            /** Name */
+            name: string;
+            /** Saves Cents */
+            saves_cents: number;
+        };
         /** UpdateLine */
         UpdateLine: {
             /** Line No */
@@ -899,6 +989,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentInfoResponse"];
+                };
+            };
+        };
+    };
+    read_combos_combos_get: {
+        parameters: {
+            query?: {
+                /** @description The language names are returned in. */
+                language?: components["schemas"]["Language"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComboView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

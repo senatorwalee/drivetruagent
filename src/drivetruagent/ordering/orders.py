@@ -8,18 +8,24 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from drivetruagent.db.models import Order, OrderLine, OrderLineOption
+from drivetruagent.db.models import Order, OrderDiscount, OrderLine, OrderLineOption
 from drivetruagent.enums import SessionState
 from drivetruagent.ordering.cart import (
     PricedLine,
     load_cart,
     load_priced_lines,
+    price_discounts,
     snapshot_from_lines,
 )
 from drivetruagent.ordering.errors import EmptyCart, OrderNotFound
 from drivetruagent.ordering.inventory import StockNeed, commit_reservations
 from drivetruagent.ordering.sessions import lock_active_session
-from drivetruagent.ordering.views import LineView, OrderView, SelectedOptionView
+from drivetruagent.ordering.views import (
+    DiscountView,
+    LineView,
+    OrderView,
+    SelectedOptionView,
+)
 
 ORDER_SUBMITTED = "order_submitted"
 
@@ -29,8 +35,9 @@ async def submit_order(
 ) -> OrderView:
     """Freeze the cart into an order and end the session as submitted.
 
-    Names and prices are copied into the order rows. From here on the order is
-    history: nothing that later happens to the menu can change it.
+    Names, prices and discounts are copied into the order rows. From here on
+    the order is history: nothing that later happens to the menu or to the
+    combo rules can change it.
 
     Does not commit. The order and the session's new state become permanent
     together, when the caller commits.
@@ -40,7 +47,8 @@ async def submit_order(
     lines = await load_priced_lines(db, cart)
     if not lines:
         raise EmptyCart()
-    snapshot = snapshot_from_lines(customer_session, cart, lines, tax_rate)
+    discounts = await price_discounts(db, lines)
+    snapshot = snapshot_from_lines(customer_session, cart, lines, discounts, tax_rate)
 
     # Stock is checked again and taken before any order row is written, so a
     # refusal here leaves no trace.
@@ -50,11 +58,24 @@ async def submit_order(
         session_id=session_id,
         language=snapshot.language,
         subtotal_cents=snapshot.subtotal_cents,
+        discount_cents=snapshot.discount_cents,
         tax_cents=snapshot.tax_cents,
         total_cents=snapshot.total_cents,
     )
     db.add(order)
     await db.flush()
+    db.add_all(
+        OrderDiscount(
+            order_id=order.id,
+            position=position,
+            kind=discount.kind,
+            code=discount.code,
+            name=discount.name,
+            times=discount.times,
+            amount_cents=discount.amount_cents,
+        )
+        for position, discount in enumerate(snapshot.discounts)
+    )
 
     for line, view in zip(lines, snapshot.lines, strict=True):
         order_line = OrderLine(
@@ -95,6 +116,8 @@ async def submit_order(
         lines=snapshot.lines,
         item_count=snapshot.item_count,
         subtotal_cents=snapshot.subtotal_cents,
+        discounts=snapshot.discounts,
+        discount_cents=snapshot.discount_cents,
         tax_cents=snapshot.tax_cents,
         total_cents=snapshot.total_cents,
         submitted_at=order.submitted_at,
@@ -120,7 +143,10 @@ async def get_order(db: AsyncSession, order_id: uuid.UUID) -> OrderView:
     statement = (
         select(Order)
         .where(Order.id == order_id)
-        .options(selectinload(Order.lines).selectinload(OrderLine.options))
+        .options(
+            selectinload(Order.lines).selectinload(OrderLine.options),
+            selectinload(Order.discounts),
+        )
         .execution_options(populate_existing=True)
     )
     order = (await db.execute(statement)).scalar_one_or_none()
@@ -156,6 +182,17 @@ async def get_order(db: AsyncSession, order_id: uuid.UUID) -> OrderView:
         lines=lines,
         item_count=sum(line.quantity for line in lines),
         subtotal_cents=order.subtotal_cents,
+        discounts=[
+            DiscountView(
+                kind=discount.kind,
+                code=discount.code,
+                name=discount.name,
+                times=discount.times,
+                amount_cents=discount.amount_cents,
+            )
+            for discount in order.discounts
+        ],
+        discount_cents=order.discount_cents,
         tax_cents=order.tax_cents,
         total_cents=order.total_cents,
         submitted_at=order.submitted_at,

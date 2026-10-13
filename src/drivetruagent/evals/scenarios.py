@@ -98,4 +98,38 @@ SCENARIOS: tuple[Scenario, ...] = (
         language=Language.FR,
         must_use=ORDERING_TOOLS | {"set_language"},
     ),
+    Scenario(
+        name="combo_taken_up",
+        # The agent offers the combo it is told about; the saving is the
+        # backend's doing, whatever the agent says.
+        customer=(
+            "A classic burger and small fries, please.",
+            "Sure, a bottled water.",
+            "That's all.",
+            "Yes.",
+        ),
+        final_state=SessionState.SUBMITTED,
+        lines=(
+            ExpectedLine("classic_burger", 1),
+            ExpectedLine("fries", 1, {"size": "small"}),
+            ExpectedLine("bottled_water", 1),
+        ),
+        discount_cents=200,
+        total_cents=844,  # (549 + 249 + 149 - 200) + 13%
+        must_use=ORDERING_TOOLS,
+    ),
+    Scenario(
+        name="combo_declined",
+        # Declining costs nothing and adds nothing.
+        customer=(
+            "Just a classic burger.",
+            "No thanks, that's everything.",
+            "Yes.",
+        ),
+        final_state=SessionState.SUBMITTED,
+        lines=(ExpectedLine("classic_burger", 1),),
+        discount_cents=0,
+        total_cents=620,  # 549 + 13%
+        must_use=ORDERING_TOOLS,
+    ),
 )

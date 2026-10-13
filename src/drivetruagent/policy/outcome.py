@@ -9,7 +9,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from drivetruagent.ordering.views import CartSnapshot, OrderView
+from drivetruagent.ordering.views import CartSnapshot, OrderView, SuggestionView
 from drivetruagent.policy.decisions import Decision
 
 
@@ -33,3 +33,5 @@ class ActionOutcome(BaseModel):
     pending_action_id: uuid.UUID | None = None
     # Present on `reject`: why, in a form code can act on.
     error: OutcomeError | None = None
+    # Present when there is something worth offering the customer, once.
+    suggestion: SuggestionView | None = None

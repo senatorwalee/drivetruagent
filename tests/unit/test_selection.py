@@ -52,6 +52,7 @@ def item(code: str, *groups: GroupSpec) -> ItemSpec:
         id=uuid.uuid4(),
         code=code,
         name={"en": code.title(), "fr": code.title()},
+        category_code="sides",
         base_price_cents=249,
         is_active=True,
         groups=groups,

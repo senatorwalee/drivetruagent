@@ -1,6 +1,7 @@
 """How a finished conversation is judged. No database and no model."""
 
 import uuid
+from collections import Counter
 from datetime import UTC, datetime
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
@@ -17,6 +18,7 @@ from drivetruagent.evals.scenario import (
     check,
 )
 from drivetruagent.evals.scenarios import SCENARIOS
+from drivetruagent.ordering.discounts import ComboRule, ComboSlot, apply_combos
 from drivetruagent.ordering.views import (
     CartSnapshot,
     LineView,
@@ -57,6 +59,7 @@ def result(
     tools: tuple[str, ...] = ("add_item", "request_confirmation", "submit_order"),
     agent_said: str = "Anything else?",
     total_cents: int = 113,
+    discount_cents: int = 0,
     with_order: bool = True,
 ) -> ScenarioResult:
     cart = CartSnapshot(
@@ -67,6 +70,8 @@ def result(
         lines=list(lines),
         item_count=sum(each.quantity for each in lines),
         subtotal_cents=100,
+        discounts=[],
+        discount_cents=discount_cents,
         tax_cents=13,
         total_cents=total_cents,
     )
@@ -79,6 +84,8 @@ def result(
             lines=list(lines),
             item_count=cart.item_count,
             subtotal_cents=100,
+            discounts=[],
+            discount_cents=0,
             tax_cents=13,
             total_cents=total_cents,
             submitted_at=datetime.now(UTC),
@@ -290,6 +297,46 @@ def test_scenario_total_matches_the_menu_prices(each: Scenario) -> None:
         base, deltas = prices[expected.item_code]
         unit = base + sum(deltas[choice] for choice in expected.options.items())
         subtotal += unit * expected.quantity
-    tax = int((Decimal(subtotal) * Decimal("0.13")).quantize(Decimal(1), ROUND_HALF_UP))
+    discount = combo_discount(each)
+    taxable = Decimal(subtotal - discount)
+    tax = int((taxable * Decimal("0.13")).quantize(Decimal(1), ROUND_HALF_UP))
 
-    assert each.total_cents == subtotal + tax
+    assert (each.discount_cents or 0) == discount
+    assert each.total_cents == subtotal - discount + tax
+
+
+def combo_discount(each: Scenario) -> int:
+    """What the menu file's combos take off the scenario's expected lines."""
+    menu = load_menu(MENU_PATH)
+    category_of = {
+        item.code: category.code
+        for category in menu.categories
+        for item in category.items
+    }
+    units: Counter[str] = Counter()
+    for expected in each.lines or ():
+        units[category_of[expected.item_code]] += expected.quantity
+    rules = [
+        ComboRule(
+            code=combo.code,
+            name=combo.name.model_dump(),
+            discount_cents=combo.discount_cents,
+            slots=tuple(ComboSlot(slot, {"en": slot}) for slot in combo.slots),
+        )
+        for combo in menu.combos
+    ]
+    return sum(d.amount_cents for d in apply_combos(units, rules).discounts)
+
+
+def test_wrong_discount() -> None:
+    expected = scenario(discount_cents=200)
+    actual = result(line("fries", size="large"), discount_cents=0)
+
+    assert check(expected, actual) == ["discount is 0 cents, expected 200"]
+
+
+def test_the_discount_is_not_checked_when_the_scenario_gives_none() -> None:
+    actual = result(line("fries", size="large"), discount_cents=200)
+
+    assert check(scenario(), actual) == []
+    assert check(scenario(discount_cents=200), actual) == []

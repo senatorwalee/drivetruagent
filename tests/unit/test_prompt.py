@@ -95,3 +95,12 @@ def test_the_instructions_are_the_same_every_time() -> None:
     )
 
     assert again == INSTRUCTIONS
+
+
+def test_the_model_is_told_it_cannot_grant_a_saving() -> None:
+    """Wording only: the backend has no way to apply a discount on request."""
+    combos = INSTRUCTIONS[INSTRUCTIONS.index("# Combos and savings") :]
+
+    assert "You never add, apply or promise one yourself." in combos
+    assert "offer it once" in combos
+    assert "never offer one again" in combos

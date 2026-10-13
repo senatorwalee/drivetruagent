@@ -584,6 +584,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Printed in the receipt's one accent colour, like a till's red ribbon. */
+.totals .saving {
+  color: var(--accent);
+}
+
 .totals .totalLabel,
 .totals .totalValue {
   padding-top: 10px;

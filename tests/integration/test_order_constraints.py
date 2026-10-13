@@ -100,8 +100,63 @@ async def test_total_that_is_not_subtotal_plus_tax_is_rejected(
 
 
 async def test_negative_subtotal_is_rejected(db_session: AsyncSession) -> None:
-    with pytest.raises(IntegrityError, match="ck_orders_subtotal_cents_non_negative"):
+    # Two rules refuse this row: the subtotal is negative, and the discount
+    # (zero) is larger than it. Postgres reports whichever it checks first.
+    refused_by = "ck_orders_(subtotal_cents_non_negative|discount_within_subtotal)"
+    with pytest.raises(IntegrityError, match=refused_by):
         await make_order(db_session, subtotal_cents=-100, tax_cents=100, total_cents=0)
+
+
+async def test_an_order_with_a_discount_must_still_add_up(
+    db_session: AsyncSession,
+) -> None:
+    order = await make_order(
+        db_session,
+        subtotal_cents=1000,
+        discount_cents=200,
+        tax_cents=104,
+        total_cents=904,
+    )
+
+    assert order.discount_cents == 200
+    with pytest.raises(IntegrityError, match="ck_orders_total_matches"):
+        await make_order(
+            db_session,
+            subtotal_cents=1000,
+            discount_cents=200,
+            tax_cents=104,
+            total_cents=1104,
+        )
+
+
+async def test_an_order_has_no_discount_unless_one_is_given(
+    db_session: AsyncSession,
+) -> None:
+    assert (await make_order(db_session)).discount_cents == 0
+
+
+async def test_negative_discount_is_rejected(db_session: AsyncSession) -> None:
+    with pytest.raises(IntegrityError, match="ck_orders_discount_cents_non_negative"):
+        await make_order(
+            db_session,
+            subtotal_cents=1000,
+            discount_cents=-100,
+            tax_cents=0,
+            total_cents=1100,
+        )
+
+
+async def test_a_discount_larger_than_the_subtotal_is_rejected(
+    db_session: AsyncSession,
+) -> None:
+    with pytest.raises(IntegrityError, match="ck_orders_discount_within_subtotal"):
+        await make_order(
+            db_session,
+            subtotal_cents=100,
+            discount_cents=200,
+            tax_cents=100,
+            total_cents=0,
+        )
 
 
 async def test_negative_tax_is_rejected(db_session: AsyncSession) -> None:

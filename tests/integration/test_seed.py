@@ -7,13 +7,16 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from drivetruagent.db.models import (
+    ComboRule,
+    ComboRuleSlot,
     MenuCategory,
     MenuItem,
     MenuItemAlias,
     Option,
     OptionGroup,
 )
-from drivetruagent.seed import MenuSeed, load_menu, seed_menu
+from drivetruagent.ordering.offers import load_combo_rules
+from drivetruagent.seed import ComboSeed, MenuSeed, load_menu, seed_menu
 
 MENU_PATH = Path(__file__).resolve().parents[2] / "data" / "menu.json"
 TABLES = [MenuCategory, MenuItem, OptionGroup, Option, MenuItemAlias]
@@ -214,3 +217,110 @@ async def test_seed_sets_display_order_from_file_order(
 
     assert (await item_by_code(db_session, "fries")).sort_order == 0
     assert (await item_by_code(db_session, "cookie")).sort_order == 1
+
+
+# --- Combos -----------------------------------------------------------------
+
+
+def a_combo(code: str, *slots: str, discount_cents: int = 50) -> ComboSeed:
+    return ComboSeed.model_validate(
+        {
+            "code": code,
+            "name": name(code.title(), code.title()),
+            "discount_cents": discount_cents,
+            "slots": list(slots),
+        }
+    )
+
+
+async def combo_slots(session: AsyncSession) -> dict[str, list[str]]:
+    """Each active combo's slot categories, in priority order."""
+    return {
+        rule.code: [slot.category_code for slot in rule.slots]
+        for rule in await load_combo_rules(session)
+    }
+
+
+async def test_the_real_menus_combo_is_loaded(db_session: AsyncSession) -> None:
+    summary = await seed_menu(db_session, load_menu(MENU_PATH))
+
+    assert summary.combos == 1
+    assert await combo_slots(db_session) == {
+        "burger_combo": ["burgers", "sides", "drinks"]
+    }
+
+
+async def test_seeding_twice_keeps_the_same_combo(db_session: AsyncSession) -> None:
+    menu = load_menu(MENU_PATH)
+    await seed_menu(db_session, menu)
+    combo_id = (await db_session.execute(select(ComboRule.id))).scalar_one()
+
+    await seed_menu(db_session, menu)
+
+    assert (await db_session.execute(select(ComboRule.id))).scalar_one() == combo_id
+    slots = await db_session.execute(select(func.count()).select_from(ComboRuleSlot))
+    assert slots.scalar_one() == 3
+
+
+async def test_a_combo_removed_from_the_file_is_retired_not_deleted(
+    db_session: AsyncSession,
+) -> None:
+    menu = load_menu(MENU_PATH)
+    await seed_menu(db_session, menu)
+
+    await seed_menu(db_session, menu.model_copy(update={"combos": []}))
+    db_session.expire_all()
+
+    rule = (await db_session.execute(select(ComboRule))).scalar_one()
+    assert rule.is_active is False
+    assert await combo_slots(db_session) == {}
+
+
+async def test_a_combo_added_back_to_the_file_applies_again(
+    db_session: AsyncSession,
+) -> None:
+    menu = load_menu(MENU_PATH)
+    await seed_menu(db_session, menu)
+    await seed_menu(db_session, menu.model_copy(update={"combos": []}))
+
+    await seed_menu(db_session, menu)
+
+    assert list(await combo_slots(db_session)) == ["burger_combo"]
+
+
+async def test_a_combos_slots_and_saving_follow_the_file(
+    db_session: AsyncSession,
+) -> None:
+    menu = load_menu(MENU_PATH)
+    await seed_menu(db_session, menu)
+    changed = menu.model_copy(
+        update={
+            "combos": [
+                a_combo("burger_combo", "burgers", "desserts", discount_cents=75)
+            ]
+        }
+    )
+
+    await seed_menu(db_session, changed)
+
+    (rule,) = await load_combo_rules(db_session)
+    assert [slot.category_code for slot in rule.slots] == ["burgers", "desserts"]
+    assert rule.discount_cents == 75
+
+
+async def test_combo_priority_is_the_order_in_the_file(
+    db_session: AsyncSession,
+) -> None:
+    menu = load_menu(MENU_PATH)
+    sweet_deal = a_combo("sweet_deal", "drinks", "desserts")
+    burger_combo = menu.combos[0]
+
+    await seed_menu(
+        db_session, menu.model_copy(update={"combos": [sweet_deal, burger_combo]})
+    )
+    assert list(await combo_slots(db_session)) == ["sweet_deal", "burger_combo"]
+
+    await seed_menu(
+        db_session, menu.model_copy(update={"combos": [burger_combo, sweet_deal]})
+    )
+    assert list(await combo_slots(db_session)) == ["burger_combo", "sweet_deal"]

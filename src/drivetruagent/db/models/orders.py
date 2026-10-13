@@ -14,6 +14,7 @@ from sqlalchemy import (
     Identity,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,7 +25,7 @@ from drivetruagent.db.base import (
     enum_check,
     text_enum,
 )
-from drivetruagent.enums import Language
+from drivetruagent.enums import DiscountKind, Language
 
 
 class Order(UuidPrimaryKey, Timestamps, Base):
@@ -33,8 +34,14 @@ class Order(UuidPrimaryKey, Timestamps, Base):
         enum_check("language", Language),
         CheckConstraint("subtotal_cents >= 0", name="subtotal_cents_non_negative"),
         CheckConstraint("tax_cents >= 0", name="tax_cents_non_negative"),
+        CheckConstraint("discount_cents >= 0", name="discount_cents_non_negative"),
+        # A discount can make an order cheaper, never free with change owed.
         CheckConstraint(
-            "total_cents = subtotal_cents + tax_cents", name="total_matches"
+            "discount_cents <= subtotal_cents", name="discount_within_subtotal"
+        ),
+        CheckConstraint(
+            "total_cents = subtotal_cents - discount_cents + tax_cents",
+            name="total_matches",
         ),
     )
 
@@ -47,7 +54,10 @@ class Order(UuidPrimaryKey, Timestamps, Base):
     )
     # The language the names below were frozen in.
     language: Mapped[Language] = mapped_column(text_enum(Language))
+    # The sum of the lines, before anything is taken off.
     subtotal_cents: Mapped[int]
+    # Everything taken off by combos and specials. Tax is charged on the rest.
+    discount_cents: Mapped[int] = mapped_column(server_default=text("0"))
     tax_cents: Mapped[int]
     total_cents: Mapped[int]
     submitted_at: Mapped[datetime] = mapped_column(
@@ -58,6 +68,13 @@ class Order(UuidPrimaryKey, Timestamps, Base):
         back_populates="order",
         lazy="raise",
         order_by="OrderLine.line_no",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    discounts: Mapped[list["OrderDiscount"]] = relationship(
+        back_populates="order",
+        lazy="raise",
+        order_by="OrderDiscount.position",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
@@ -132,3 +149,35 @@ class OrderLineOption(UuidPrimaryKey, Timestamps, Base):
     price_delta_cents: Mapped[int]
 
     line: Mapped[OrderLine] = relationship(back_populates="options", lazy="raise")
+
+
+class OrderDiscount(UuidPrimaryKey, Timestamps, Base):
+    """An amount taken off an order, frozen.
+
+    Like a frozen option, there is no foreign key to the rule that produced
+    it: the order must read the same after the rule is changed or retired.
+    """
+
+    __tablename__ = "order_discounts"
+    __table_args__ = (
+        # Also serves lookups by order_id.
+        UniqueConstraint("order_id", "position"),
+        enum_check("kind", DiscountKind),
+        CheckConstraint("position >= 0", name="position_non_negative"),
+        CheckConstraint("times >= 1", name="times_positive"),
+        CheckConstraint("amount_cents >= 0", name="amount_cents_non_negative"),
+    )
+
+    order_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("orders.id", ondelete="CASCADE")
+    )
+    position: Mapped[int]
+    kind: Mapped[DiscountKind] = mapped_column(text_enum(DiscountKind))
+    code: Mapped[str]
+    name: Mapped[str]
+    # How many times it applied: two combos, or three units of a special.
+    times: Mapped[int]
+    # The whole amount for this entry, across every time it applied.
+    amount_cents: Mapped[int]
+
+    order: Mapped[Order] = relationship(back_populates="discounts", lazy="raise")

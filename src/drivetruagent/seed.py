@@ -6,8 +6,9 @@ The file is checked in full before anything is written, and the load runs in
 one transaction, so a mistake in the file never leaves a half-loaded menu.
 Running it again is safe: rows are matched by their codes and updated.
 
-The database is made to match the file. Items and options that are no longer
-in the file are deactivated, not deleted, because past orders refer to them.
+The database is made to match the file. Items, options and combos that are no
+longer in the file are deactivated, not deleted, because past orders refer to
+them.
 """
 
 import asyncio
@@ -25,6 +26,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from drivetruagent.config import get_settings
 from drivetruagent.db.base import Base
 from drivetruagent.db.models import (
+    ComboRule,
+    ComboRuleSlot,
     MenuCategory,
     MenuItem,
     MenuItemAlias,
@@ -122,8 +125,21 @@ class MenuCategorySeed(SeedModel):
     items: list[MenuItemSeed] = Field(default_factory=list)
 
 
+class ComboSeed(SeedModel):
+    """One item from each slot's category, bought together, costs less."""
+
+    code: Code
+    name: LocalizedTextSeed
+    discount_cents: int = Field(gt=0)
+    # Category codes. The first is the main item the combo is built around.
+    slots: list[Code] = Field(min_length=2)
+
+
 class MenuSeed(SeedModel):
     categories: list[MenuCategorySeed] = Field(min_length=1)
+    # In priority order: when units could count toward two combos, the
+    # earlier one gets them.
+    combos: list[ComboSeed] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def check_codes_are_unique(self) -> Self:
@@ -132,6 +148,30 @@ class MenuSeed(SeedModel):
             [item.code for category in self.categories for item in category.items],
             "item code",
         )
+        _require_unique([combo.code for combo in self.combos], "combo code")
+        return self
+
+    @model_validator(mode="after")
+    def check_combos_can_be_made(self) -> Self:
+        cheapest = {
+            category.code: min(item.base_price_cents for item in category.items)
+            for category in self.categories
+            if category.items
+        }
+        for combo in self.combos:
+            unknown = sorted(set(combo.slots) - set(cheapest))
+            if unknown:
+                raise ValueError(
+                    f"combo {combo.code}: no items in category {', '.join(unknown)}"
+                )
+            # The cheapest set a customer could build. A discount as large as
+            # that would make food free.
+            cheapest_set = sum(cheapest[slot] for slot in combo.slots)
+            if combo.discount_cents >= cheapest_set:
+                raise ValueError(
+                    f"combo {combo.code}: a discount of {combo.discount_cents} "
+                    f"is not less than its cheapest set ({cheapest_set})"
+                )
         return self
 
 
@@ -141,6 +181,7 @@ class SeedSummary(BaseModel):
     option_groups: int
     options: int
     aliases: int
+    combos: int
 
 
 def _require_unique(values: list[str], what: str) -> None:
@@ -179,10 +220,11 @@ async def _upsert(
 async def seed_menu(session: AsyncSession, menu: MenuSeed) -> SeedSummary:
     """Make the catalog tables match `menu`. The caller owns the transaction."""
     item_ids: list[uuid.UUID] = []
+    category_ids: dict[str, uuid.UUID] = {}
     group_count = option_count = alias_count = 0
 
     for category_position, category in enumerate(menu.categories):
-        category_id = await _upsert(
+        category_id = category_ids[category.code] = await _upsert(
             session,
             MenuCategory,
             ["code"],
@@ -235,6 +277,7 @@ async def seed_menu(session: AsyncSession, menu: MenuSeed) -> SeedSummary:
         .where(MenuItem.id.not_in(item_ids), MenuItem.is_active)
         .values(is_active=False, updated_at=func.now())
     )
+    await _seed_combos(session, menu.combos, category_ids)
 
     return SeedSummary(
         categories=len(menu.categories),
@@ -242,6 +285,48 @@ async def seed_menu(session: AsyncSession, menu: MenuSeed) -> SeedSummary:
         option_groups=group_count,
         options=option_count,
         aliases=alias_count,
+        combos=len(menu.combos),
+    )
+
+
+async def _seed_combos(
+    session: AsyncSession, combos: list[ComboSeed], category_ids: dict[str, uuid.UUID]
+) -> None:
+    combo_ids: list[uuid.UUID] = []
+    for position, combo in enumerate(combos):
+        combo_id = await _upsert(
+            session,
+            ComboRule,
+            ["code"],
+            {
+                "code": combo.code,
+                "name_i18n": combo.name.model_dump(),
+                "discount_cents": combo.discount_cents,
+                "is_active": True,
+                "sort_order": position,
+            },
+        )
+        combo_ids.append(combo_id)
+        # Slots carry no history of their own, so they are simply replaced.
+        await session.execute(
+            delete(ComboRuleSlot).where(ComboRuleSlot.combo_rule_id == combo_id)
+        )
+        await session.execute(
+            insert(ComboRuleSlot),
+            [
+                {
+                    "combo_rule_id": combo_id,
+                    "position": slot_position,
+                    "category_id": category_ids[slot],
+                }
+                for slot_position, slot in enumerate(combo.slots)
+            ],
+        )
+
+    await session.execute(
+        update(ComboRule)
+        .where(ComboRule.id.not_in(combo_ids), ComboRule.is_active)
+        .values(is_active=False, updated_at=func.now())
     )
 
 

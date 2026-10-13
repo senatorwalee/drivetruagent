@@ -9,6 +9,7 @@ from drivetruagent.api import (
     health,
     inventory,
     menu,
+    offers,
     sessions,
 )
 from drivetruagent.api.errors import register_error_handlers
@@ -36,6 +37,7 @@ def create_app() -> FastAPI:
     app.include_router(conversation.router)
     app.include_router(menu.router)
     app.include_router(inventory.router)
+    app.include_router(offers.router)
     register_error_handlers(app)
     return app
 

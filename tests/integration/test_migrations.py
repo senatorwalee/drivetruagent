@@ -70,6 +70,10 @@ def test_upgrade_creates_the_tables(scratch_database_url: str) -> None:
         "inventory",
         "reservations",
         "idempotency_records",
+        "combo_rules",
+        "combo_rule_slots",
+        "order_discounts",
+        "session_suggestions",
     }
 
 

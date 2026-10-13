@@ -26,6 +26,8 @@ export interface Decision {
   kind: DecisionKind
   /** The rule or error code behind the decision, if there was one. */
   reason: string | null
+  /** The name of something the backend told the agent it may offer, if anything. */
+  suggestion: string | null
   /** The cart version after the call, when the call returned a cart. */
   cartVersion: number | null
 }

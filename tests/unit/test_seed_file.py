@@ -203,3 +203,99 @@ def test_alias_in_an_unsupported_language_is_rejected() -> None:
 def test_blank_alias_is_rejected() -> None:
     with pytest.raises(ValidationError, match="cannot be empty"):
         MenuSeed.model_validate(menu(item(aliases={"en": ["  "]})))
+
+
+# --- Combos -----------------------------------------------------------------
+
+
+def combo(**overrides: Any) -> dict[str, Any]:
+    values: dict[str, Any] = {
+        "code": "burger_combo",
+        "name": name("Burger combo", "Trio burger"),
+        "discount_cents": 200,
+        "slots": ["burgers", "sides"],
+    }
+    return values | overrides
+
+
+def menu_with_combos(*combos: dict[str, Any]) -> dict[str, Any]:
+    """A burger at 549 and fries at 249, so the cheapest set costs 798."""
+    return {
+        "categories": [
+            {
+                "code": "burgers",
+                "name": name("Burgers", "Hamburgers"),
+                "items": [item(code="burger", base_price_cents=549)],
+            },
+            {
+                "code": "sides",
+                "name": name("Sides", "Accompagnements"),
+                "items": [item(), item(code="rings", base_price_cents=329)],
+            },
+            {"code": "drinks", "name": name("Drinks", "Boissons"), "items": []},
+        ],
+        "combos": list(combos),
+    }
+
+
+def test_the_real_menu_has_the_burger_combo() -> None:
+    (burger_combo,) = load_menu(MENU_PATH).combos
+
+    assert burger_combo.code == "burger_combo"
+    assert burger_combo.slots == ["burgers", "sides", "drinks"]
+    assert burger_combo.discount_cents == 200
+
+
+def test_a_menu_needs_no_combos() -> None:
+    assert MenuSeed.model_validate(menu(item())).combos == []
+
+
+def test_a_valid_combo_is_accepted() -> None:
+    loaded = MenuSeed.model_validate(menu_with_combos(combo()))
+
+    assert [each.code for each in loaded.combos] == ["burger_combo"]
+
+
+def test_a_combo_on_an_unknown_category_is_rejected() -> None:
+    with pytest.raises(ValidationError, match="no items in category pizzas"):
+        MenuSeed.model_validate(menu_with_combos(combo(slots=["burgers", "pizzas"])))
+
+
+def test_a_combo_on_a_category_with_no_items_is_rejected() -> None:
+    """Nobody could ever complete it."""
+    with pytest.raises(ValidationError, match="no items in category drinks"):
+        MenuSeed.model_validate(menu_with_combos(combo(slots=["burgers", "drinks"])))
+
+
+def test_a_combo_of_one_thing_is_rejected() -> None:
+    with pytest.raises(ValidationError, match="slots"):
+        MenuSeed.model_validate(menu_with_combos(combo(slots=["burgers"])))
+
+
+@pytest.mark.parametrize("discount_cents", [0, -100])
+def test_a_combo_must_take_something_off(discount_cents: int) -> None:
+    with pytest.raises(ValidationError, match="discount_cents"):
+        MenuSeed.model_validate(menu_with_combos(combo(discount_cents=discount_cents)))
+
+
+def test_a_combo_cannot_make_its_cheapest_set_free() -> None:
+    with pytest.raises(ValidationError, match="not less than its cheapest set"):
+        MenuSeed.model_validate(menu_with_combos(combo(discount_cents=798)))
+
+    MenuSeed.model_validate(menu_with_combos(combo(discount_cents=797)))
+
+
+def test_a_slot_used_twice_is_priced_twice() -> None:
+    """Two burgers: the cheapest set is 2 x 549."""
+    twice = ["burgers", "burgers"]
+
+    MenuSeed.model_validate(menu_with_combos(combo(slots=twice, discount_cents=1097)))
+    with pytest.raises(ValidationError, match="not less than its cheapest set"):
+        MenuSeed.model_validate(
+            menu_with_combos(combo(slots=twice, discount_cents=1098))
+        )
+
+
+def test_two_combos_with_one_code_are_rejected() -> None:
+    with pytest.raises(ValidationError, match="duplicate combo code"):
+        MenuSeed.model_validate(menu_with_combos(combo(), combo()))

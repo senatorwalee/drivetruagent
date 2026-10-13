@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
-import { clock, deriveAgentState, isFinal, itemsLabel, money, progressSteps, speakingMilliseconds } from './presentation'
+import {
+  clock,
+  deriveAgentState,
+  discountLabel,
+  isFinal,
+  itemsLabel,
+  money,
+  plainAmount,
+  progressSteps,
+  speakingMilliseconds,
+} from './presentation'
 
 const quiet = { paused: false, ended: false, waitingForReply: false, speaking: false, customerActive: false }
 
@@ -13,6 +23,22 @@ describe('money', () => {
     [120000, '$1200.00'],
   ])('%i cents is %s', (cents, expected) => {
     expect(money(cents)).toBe(expected)
+  })
+})
+
+describe('plainAmount', () => {
+  it('prints cents as a till does, with no currency sign', () => {
+    expect([0, 5, 200, 1035].map(plainAmount)).toEqual(['0.00', '0.05', '2.00', '10.35'])
+  })
+})
+
+describe('discountLabel', () => {
+  it('is the name alone when the saving applied once', () => {
+    expect(discountLabel({ name: 'Burger combo', times: 1 })).toBe('Burger combo')
+  })
+
+  it('says how many times when it applied more than once', () => {
+    expect(discountLabel({ name: 'Burger combo', times: 3 })).toBe('Burger combo × 3')
   })
 })
 

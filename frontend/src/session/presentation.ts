@@ -2,7 +2,7 @@
  * Small pure helpers every view uses to turn state into words and numbers:
  * money, elapsed time, the agent indicator's state, and the progress steps.
  */
-import type { SessionState } from '../api/client'
+import type { Discount, SessionState } from '../api/client'
 import type { AgentState } from './types'
 
 export function money(cents: number): string {
@@ -13,6 +13,16 @@ export function money(cents: number): string {
 export function clock(seconds: number): string {
   const whole = Math.max(0, Math.floor(seconds))
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`
+}
+
+/** An amount without the currency sign, the way a till prints a column of them. */
+export function plainAmount(cents: number): string {
+  return (cents / 100).toFixed(2)
+}
+
+/** A saving's name, with how many times it applied when that is more than once. */
+export function discountLabel(discount: Pick<Discount, 'name' | 'times'>): string {
+  return discount.times > 1 ? `${discount.name} × ${discount.times}` : discount.name
 }
 
 export function itemsLabel(count: number): string {

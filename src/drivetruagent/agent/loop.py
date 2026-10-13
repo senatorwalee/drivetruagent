@@ -30,6 +30,7 @@ from drivetruagent.agent.tools import TOOL_DEFINITIONS, ToolContext, run_tool
 from drivetruagent.enums import AgentEventKind
 from drivetruagent.ordering.cart import get_cart
 from drivetruagent.ordering.inventory import DEFAULT_RESERVATION_TTL
+from drivetruagent.ordering.offers import close_suggestions
 from drivetruagent.ordering.sessions import get_session
 from drivetruagent.ordering.views import CartSnapshot
 from drivetruagent.policy.decisions import PolicyLimits
@@ -71,6 +72,9 @@ async def run_turn(
     await get_session(db, session_id)  # raises SessionNotFound
     turn_id = uuid.uuid4()
     await events.record_message(db, session_id, turn_id, UserMessage(user_text))
+    # The customer has answered, one way or another, anything they were
+    # offered last turn. It is not offered again.
+    await close_suggestions(db, session_id)
     await db.commit()
 
     instructions = await build_instructions(db, config.restaurant_name)

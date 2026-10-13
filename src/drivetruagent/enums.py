@@ -53,6 +53,24 @@ class ReservationStatus(StrEnum):
     RELEASED = "released"
 
 
+class DiscountKind(StrEnum):
+    """Why an amount came off an order."""
+
+    # Items bought together, such as a burger, a side and a drink.
+    COMBO = "combo"
+    # An item that is cheaper today.
+    SPECIAL = "special"
+
+
+class SuggestionStatus(StrEnum):
+    """Whether a suggestion made to a session can still be made again."""
+
+    # Being offered in the customer turn that is running now.
+    OPEN = "open"
+    # The customer has spoken since. It is never offered to them again.
+    CLOSED = "closed"
+
+
 class AgentEventKind(StrEnum):
     """What one row of the agent's event log records."""
 

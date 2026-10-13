@@ -85,3 +85,49 @@ def test_total_is_always_subtotal_plus_tax() -> None:
         totals = cart_totals([subtotal], ONTARIO)
 
         assert totals.total_cents == totals.subtotal_cents + totals.tax_cents
+
+
+# --- Discounts --------------------------------------------------------------
+
+
+def test_tax_is_charged_on_what_is_left_after_the_discount() -> None:
+    # A burger, small fries and a water (549 + 249 + 149), less a 200 combo.
+    totals = cart_totals([549, 249, 149], ONTARIO, discount_cents=200)
+
+    assert totals == CartTotals(
+        subtotal_cents=947, discount_cents=200, tax_cents=97, total_cents=844
+    )
+
+
+def test_the_subtotal_is_the_sum_of_the_lines_whatever_the_discount() -> None:
+    assert cart_totals([500, 500], ONTARIO, discount_cents=300).subtotal_cents == 1000
+
+
+def test_no_discount_is_the_same_as_a_discount_of_zero() -> None:
+    assert cart_totals([997], ONTARIO) == cart_totals([997], ONTARIO, 0)
+
+
+def test_a_discount_never_takes_a_cart_below_zero() -> None:
+    totals = cart_totals([300], ONTARIO, discount_cents=500)
+
+    assert totals == CartTotals(
+        subtotal_cents=300, discount_cents=300, tax_cents=0, total_cents=0
+    )
+
+
+def test_a_negative_discount_is_ignored() -> None:
+    """A discount can only take money off. It can never add a charge."""
+    assert cart_totals([300], ONTARIO, discount_cents=-50) == cart_totals(
+        [300], ONTARIO
+    )
+
+
+def test_total_is_always_subtotal_less_discount_plus_tax() -> None:
+    for subtotal in range(0, 5000, 7):
+        for discount in (0, 1, 199, 200, 5000):
+            totals = cart_totals([subtotal], ONTARIO, discount)
+
+            assert totals.total_cents == (
+                totals.subtotal_cents - totals.discount_cents + totals.tax_cents
+            )
+            assert 0 <= totals.discount_cents <= totals.subtotal_cents
