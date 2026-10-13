@@ -10,9 +10,9 @@ migrated, seeded database (make up, make migrate, make seed).
 import asyncio
 import uuid
 
+from drivetruagent.agent.factory import agent_config, model_from_settings
 from drivetruagent.agent.loop import run_turn
 from drivetruagent.agent.model import ModelUnavailable
-from drivetruagent.api.conversation import agent_config, get_model_client
 from drivetruagent.config import get_settings
 from drivetruagent.db.session import create_engine, create_session_factory
 from drivetruagent.enums import FINAL_SESSION_STATES
@@ -41,7 +41,7 @@ def describe(cart: CartSnapshot) -> str:
 
 async def chat() -> None:
     settings = get_settings()
-    model = get_model_client(settings)
+    model = model_from_settings(settings)
     config = agent_config(settings)
     engine = create_engine(settings.database_url)
     session_factory = create_session_factory(engine)

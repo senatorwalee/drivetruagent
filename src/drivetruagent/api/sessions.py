@@ -10,7 +10,7 @@ import uuid
 
 from fastapi import APIRouter, status
 
-from drivetruagent.api.deps import SettingsDep
+from drivetruagent.api.deps import SessionDep, SettingsDep
 from drivetruagent.api.errors import CONFLICT, NOT_FOUND, REFUSED
 from drivetruagent.api.schemas import (
     AddLineRequest,
@@ -18,7 +18,6 @@ from drivetruagent.api.schemas import (
     UpdateLineRequest,
     UpdateSessionRequest,
 )
-from drivetruagent.db.session import SessionDep
 from drivetruagent.ordering import cart, orders, sessions
 from drivetruagent.ordering.views import CartSnapshot, OrderView, SessionView
 

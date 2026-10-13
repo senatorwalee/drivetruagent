@@ -9,9 +9,8 @@ import uuid
 
 from fastapi import APIRouter
 
-from drivetruagent.api.deps import SettingsDep
+from drivetruagent.api.deps import SessionDep, SettingsDep
 from drivetruagent.api.errors import NOT_FOUND
-from drivetruagent.db.session import SessionDep
 from drivetruagent.policy import gateway
 from drivetruagent.policy.actions import Action
 from drivetruagent.policy.outcome import ActionOutcome

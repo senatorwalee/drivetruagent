@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from drivetruagent.db.session import SessionDep
+from drivetruagent.api.deps import SessionDep
 
 router = APIRouter(prefix="/health", tags=["health"])
 

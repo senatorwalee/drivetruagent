@@ -176,13 +176,6 @@ class OrderNotFound(OrderingError):
         super().__init__(f"No order with id {order_id}.")
 
 
-class PendingActionNotFound(OrderingError):
-    code = "pending_action_not_found"
-
-    def __init__(self, pending_action_id: object) -> None:
-        super().__init__(f"This session has no pending action {pending_action_id}.")
-
-
 class EmptyCart(OrderingError):
     code = "empty_cart"
 

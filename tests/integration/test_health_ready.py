@@ -5,8 +5,8 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
+from drivetruagent.api.deps import get_session
 from drivetruagent.config import get_settings
-from drivetruagent.db.session import get_session
 from drivetruagent.main import create_app
 
 # Nothing listens on port 1, so connections are refused immediately.

@@ -23,9 +23,9 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.pool import NullPool
 from testcontainers.community.postgres import PostgresContainer
 
+from drivetruagent.api.deps import get_session
 from drivetruagent.config import Settings, get_settings
 from drivetruagent.db.base import Base
-from drivetruagent.db.session import get_session
 from drivetruagent.main import create_app
 from drivetruagent.seed import load_menu, seed_menu
 
