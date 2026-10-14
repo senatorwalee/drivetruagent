@@ -9,11 +9,13 @@ from dataclasses import dataclass
 from drivetruagent.agent import demo_model
 from drivetruagent.agent.demo_model import DemoModel
 from drivetruagent.agent.gemini_model import GeminiModel
+from drivetruagent.agent.guard import Guard, ModelClassifier
 from drivetruagent.agent.loop import AgentConfig
 from drivetruagent.agent.model import ModelClient, ModelUnavailable
 from drivetruagent.agent.openai_model import OpenAIModel
 from drivetruagent.config import Settings
 from drivetruagent.ordering.offers import SpecialsCache
+from drivetruagent.policy.guardrails import StrikeLimits
 
 
 @dataclass(frozen=True)
@@ -77,4 +79,23 @@ def agent_config(
         reservation_ttl=settings.reservation_ttl,
         specials_cache=specials_cache,
         timers=settings.session_timers,
+        guard=guard_from_settings(settings),
     )
+
+
+def guard_from_settings(settings: Settings) -> Guard:
+    """The rules always; a classifier call too when a real model is set up.
+
+    The scripted demo has no model to ask, so it gets the rules alone. So
+    does a session whose model is unavailable: the agent will say so anyway.
+    """
+    limits = StrikeLimits(
+        abuse=settings.guardrail_abuse_strikes,
+        confusion=settings.guardrail_confusion_strikes,
+    )
+    if not settings.guardrail_classifier or settings.agent_model == "demo":
+        return Guard(limits)
+    try:
+        return Guard(limits, ModelClassifier(model_from_settings(settings)))
+    except ModelUnavailable:
+        return Guard(limits)

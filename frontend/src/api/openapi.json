@@ -3434,7 +3434,7 @@
     },
     "/sessions/{session_id}/messages": {
       "post": {
-        "description": "Send what the customer said and get the agent's reply.\n\nThe agent may use several tools before it answers. Each tool's effect is\nsaved as it happens, and the reply comes with the cart as it now stands.",
+        "description": "Send what the customer said and get the agent's reply.\n\nThe agent may use several tools before it answers. Each tool's effect is\nsaved as it happens, and the reply comes with the cart as it now stands.\nA session ended for abuse takes no more messages (409).",
         "operationId": "send_message_sessions__session_id__messages_post",
         "parameters": [
           {
@@ -3478,6 +3478,16 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "422": {
             "content": {

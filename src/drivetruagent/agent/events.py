@@ -51,18 +51,40 @@ async def record_message(
     await record(db, session_id, turn_id, kind, payload)
 
 
+# What the model sees in place of a message the guardrail blocked.
+WITHHELD = "[The customer said something the guardrail withheld.]"
+
+
 async def load_messages(db: AsyncSession, session_id: uuid.UUID) -> list[Message]:
-    """The whole conversation so far, oldest first."""
+    """The whole conversation so far, oldest first, as the model may see it.
+
+    A customer message the guardrail blocked stays in the log for staff and
+    review, but is replaced here by a note: whatever it was built to do to
+    the model, it never gets the chance, in this turn or any later one.
+    """
     statement = (
         select(AgentEvent)
         .where(
             AgentEvent.session_id == session_id,
-            AgentEvent.kind.in_(_CONVERSATION_KINDS),
+            AgentEvent.kind.in_((*_CONVERSATION_KINDS, AgentEventKind.GUARDRAIL)),
         )
         .order_by(AgentEvent.seq)
     )
-    events = (await db.execute(statement)).scalars()
-    return [_to_message(event) for event in events]
+    rows = list((await db.execute(statement)).scalars())
+    withheld_turns = {
+        row.turn_id
+        for row in rows
+        if row.kind is AgentEventKind.GUARDRAIL and row.payload.get("withheld")
+    }
+    messages: list[Message] = []
+    for row in rows:
+        if row.kind is AgentEventKind.GUARDRAIL:
+            continue
+        if row.kind is AgentEventKind.USER_MESSAGE and row.turn_id in withheld_turns:
+            messages.append(UserMessage(WITHHELD))
+        else:
+            messages.append(_to_message(row))
+    return messages
 
 
 async def load_events(

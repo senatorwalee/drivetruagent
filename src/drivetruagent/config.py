@@ -53,6 +53,13 @@ class Settings(BaseSettings):
     agent_model: Literal["openai", "gemini", "demo"] = "openai"
     openai_api_key: SecretStr | None = None
     openai_text_model: str = "gpt-6-luna"
+    # Guardrails: how many strikes before the session ends (abuse, attempts
+    # to get round the rules) or goes to a person (off topic, getting
+    # nowhere). The classifier call can be switched off; the rules cannot.
+    guardrail_abuse_strikes: int = Field(default=3, ge=1)
+    guardrail_confusion_strikes: int = Field(default=3, ge=1)
+    guardrail_classifier: bool = True
+
     # Voice, through OpenAI Realtime. Needs OPENAI_API_KEY whichever text
     # model is chosen. See agent/voice.py.
     voice_model: str = "gpt-realtime-2.1-mini"

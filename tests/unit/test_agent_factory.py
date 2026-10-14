@@ -5,11 +5,16 @@ from typing import Any
 import pytest
 
 from drivetruagent.agent.demo_model import DemoModel
-from drivetruagent.agent.factory import agent_info, model_from_settings
+from drivetruagent.agent.factory import (
+    agent_info,
+    guard_from_settings,
+    model_from_settings,
+)
 from drivetruagent.agent.gemini_model import GeminiModel
 from drivetruagent.agent.model import ModelUnavailable
 from drivetruagent.agent.openai_model import OpenAIModel
 from drivetruagent.config import Settings
+from drivetruagent.policy.guardrails import StrikeLimits
 
 
 def settings(**values: Any) -> Settings:
@@ -98,3 +103,37 @@ def test_keys_are_not_shown_when_settings_are_printed() -> None:
 
     assert "test-gemini-key" not in shown
     assert "test-openai-key" not in shown
+
+
+# --- The guardrail ----------------------------------------------------------
+
+
+def test_with_a_real_model_the_guard_has_a_classifier() -> None:
+    guard = guard_from_settings(settings(**WITH_OPENAI))
+
+    assert guard.classifier is not None
+    assert guard.limits == StrikeLimits(abuse=3, confusion=3)
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        {"agent_model": "demo"},
+        {**WITH_OPENAI, "guardrail_classifier": False},
+        {"agent_model": "gemini"},  # no key: the model is unavailable
+    ],
+)
+def test_otherwise_only_the_rules_apply(values: dict[str, Any]) -> None:
+    assert guard_from_settings(settings(**values)).classifier is None
+
+
+def test_the_strike_limits_come_from_the_settings() -> None:
+    guard = guard_from_settings(
+        settings(
+            agent_model="demo",
+            guardrail_abuse_strikes=2,
+            guardrail_confusion_strikes=5,
+        )
+    )
+
+    assert guard.limits == StrikeLimits(abuse=2, confusion=5)

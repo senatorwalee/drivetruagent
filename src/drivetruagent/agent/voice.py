@@ -38,6 +38,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from drivetruagent.agent import events
+from drivetruagent.agent.guard import check_message
 from drivetruagent.agent.loop import AgentConfig
 from drivetruagent.agent.messages import (
     AssistantMessage,
@@ -52,6 +53,7 @@ from drivetruagent.enums import FINAL_SESSION_STATES, AgentEventKind
 from drivetruagent.ordering.errors import OrderingError
 from drivetruagent.ordering.offers import close_suggestions
 from drivetruagent.ordering.sessions import begin_turn, end_turn, get_session
+from drivetruagent.policy.guardrails import GuardAction
 
 logger = logging.getLogger(__name__)
 
@@ -203,6 +205,32 @@ class VoiceBridge:
             # As in text mode: anything offered last turn has had its chance.
             await close_suggestions(db, self.session_id)
             await db.commit()
+        await self._check(text)
+
+    async def _check(self, text: str) -> None:
+        """The guardrail, on a call. The model heard the audio and has likely
+        answered already, so a blocked message cannot be kept from it here.
+        Strikes still count, the fixed sentence is said, and at three the
+        call ends."""
+        guard = self._config.guard
+        if guard is None:
+            return
+        async with self._scope() as db:
+            outcome = await check_message(
+                db,
+                self.session_id,
+                self._turn_id,
+                text,
+                guard=guard,
+                tax_rate=self._config.tax_rate,
+            )
+            await db.commit()
+        if outcome.reply is None:
+            return
+        await self._call.say(outcome.reply)
+        if outcome.action in (GuardAction.TERMINATE, GuardAction.HAND_OFF):
+            await self._sleep(speaking_seconds(outcome.reply))
+            await self._end_call()
 
     async def _model_called(
         self, response_id: str, call_id: str, name: str, raw_arguments: str
