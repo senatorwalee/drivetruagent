@@ -31,6 +31,7 @@ built piece by piece.
 | 10b | Staff screen: the handoff queue and the package, in the web app | Done |
 | 11 | A second model provider: Gemini, which has a free tier | Done; not yet run against Google's API |
 | 12 | Voice: talk to the agent through OpenAI Realtime | Done; tested with a recorded voice |
+| 13 | The week's specials and live stock on the live screen | Done |
 | Later | Knowledge search, tracing | Planned |
 
 ## Stack
@@ -213,6 +214,21 @@ make chat
 
 Without a key everything else still works; only the conversation endpoint
 answers 503.
+
+### The board under the session
+
+The live screen shows the restaurant's side of things, so nobody has to open
+the database during a demo:
+
+- **This week's specials**, Monday to Sunday, with today marked. Ask the agent
+  "what's today's special?" and the answer can be checked against the board.
+- **Stock for every item**, counting down live. Adding something to a cart
+  holds it ("2 held") and lowers what another customer could have; placing
+  the order lowers what is on hand. Today's special is highlighted, and an
+  item running low turns red.
+
+It reads `GET /specials/week` and `GET /inventory`, refreshed every few
+seconds and faster during a turn or a call.
 
 ### Talking to it
 
@@ -450,8 +466,10 @@ removed, two tests fail.
 
 ## Today's special
 
-An item is cheaper on certain days of the week (`specials` in
-`data/menu.json`). Like a combo, the saving is worked out by the backend for
+There is one special for each day of the week (`specials` in
+`data/menu.json`): Monday chicken burgers, Tuesday double cheeseburgers,
+Wednesday onion rings, Thursday nuggets, Friday milkshakes, Saturday sundaes,
+Sunday veggie burgers. Like a combo, the saving is worked out by the backend for
 every one in the cart, and it stacks with a combo.
 
 **Which day is "today"?** The date where the restaurant is
@@ -649,6 +667,7 @@ Run `make dev` and open <http://127.0.0.1:8000/docs> to try these.
 | `POST /handoffs/{id}/resolve` | Place the order as it stands, or cancel it |
 | `GET /combos` | The combo deals |
 | `GET /specials` | Today's specials, with live stock |
+| `GET /specials/week` | This week's specials, Monday to Sunday, with today marked |
 | `PUT /specials/{code}` | End a special early, or bring it back |
 
 The three action endpoints are the agent's path and go through the policy
