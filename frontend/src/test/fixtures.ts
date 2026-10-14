@@ -24,6 +24,18 @@ function event(kind: AgentEvent['kind'], payload: Record<string, unknown>): Agen
 
 /** The backend acting on a clock: 'nudge', 'abandon' or 'hand_off'. */
 export const timer = (action: string, rule: string, after_seconds: number) => event('timer', { action, rule, after_seconds })
+/** The guardrail flagging a message: what it was, and what was done about it. */
+export const guardrail = (verdict: string, action: string, strikes: number, source = 'rules', reason = 'insult') =>
+  event('guardrail', {
+    verdict,
+    reason,
+    source,
+    action,
+    abuse_strikes: verdict === 'off_topic' ? 0 : strikes,
+    confusion_strikes: verdict === 'off_topic' ? strikes : 0,
+    strike_limit: 3,
+    withheld: action === 'block' || action === 'terminate',
+  })
 export const said = (text: string) => event('user_message', { text })
 export const replied = (text: string) => event('assistant_message', { text })
 export const modelCall = () => event('model_call', { model: 'demo-script', latency_ms: 3, tool_calls: 1 })
