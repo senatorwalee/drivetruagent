@@ -447,6 +447,43 @@
         "title": "ComboView",
         "type": "object"
       },
+      "DaySpecialsView": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "day_name": {
+            "title": "Day Name",
+            "type": "string"
+          },
+          "is_today": {
+            "title": "Is Today",
+            "type": "boolean"
+          },
+          "specials": {
+            "items": {
+              "$ref": "#/components/schemas/SpecialView"
+            },
+            "title": "Specials",
+            "type": "array"
+          },
+          "weekday": {
+            "title": "Weekday",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date",
+          "weekday",
+          "day_name",
+          "is_today",
+          "specials"
+        ],
+        "title": "DaySpecialsView",
+        "type": "object"
+      },
       "Decision": {
         "enum": [
           "allow",
@@ -1979,6 +2016,29 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "WeekOfSpecialsView": {
+        "description": "The specials for each day of this week, Monday to Sunday.",
+        "properties": {
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/DaySpecialsView"
+            },
+            "title": "Days",
+            "type": "array"
+          },
+          "today": {
+            "format": "date",
+            "title": "Today",
+            "type": "string"
+          }
+        },
+        "required": [
+          "today",
+          "days"
+        ],
+        "title": "WeekOfSpecialsView",
         "type": "object"
       }
     }
@@ -3969,6 +4029,51 @@
           }
         },
         "summary": "Today's specials",
+        "tags": [
+          "offers"
+        ]
+      }
+    },
+    "/specials/week": {
+      "get": {
+        "description": "Monday to Sunday of the current week, with today marked. Each day's\n`in_stock` is read live.",
+        "operationId": "read_week_of_specials_specials_week_get",
+        "parameters": [
+          {
+            "description": "The language names are returned in.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Language",
+              "default": "en",
+              "description": "The language names are returned in."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeekOfSpecialsView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "This week's specials, day by day",
         "tags": [
           "offers"
         ]

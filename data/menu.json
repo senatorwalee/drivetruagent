@@ -1182,26 +1182,116 @@
   ],
   "specials": [
     {
-      "code": "chicken_burger_days",
+      "code": "chicken_burger_monday",
       "item": "chicken_burger",
-      "name": { "en": "Chicken burger special", "fr": "Spécial burger au poulet" },
+      "name": {
+        "en": "Chicken burger Monday",
+        "fr": "Lundi burger au poulet"
+      },
       "description": {
-        "en": "A dollar fifty off every crispy chicken burger, Monday to Thursday.",
-        "fr": "Un dollar cinquante de rabais sur chaque burger au poulet croustillant, du lundi au jeudi."
+        "en": "A dollar fifty off every crispy chicken burger, every Monday.",
+        "fr": "Un dollar cinquante de rabais sur chaque burger au poulet croustillant, tous les lundis."
       },
       "discount_cents": 150,
-      "weekdays": [1, 2, 3, 4]
+      "weekdays": [
+        1
+      ]
     },
     {
-      "code": "weekend_milkshake",
-      "item": "milkshake",
-      "name": { "en": "Weekend milkshake", "fr": "Lait frappé de fin de semaine" },
+      "code": "double_cheese_tuesday",
+      "item": "double_cheeseburger",
+      "name": {
+        "en": "Double cheese Tuesday",
+        "fr": "Mardi double fromage"
+      },
       "description": {
-        "en": "A dollar off every milkshake, Friday to Sunday.",
-        "fr": "Un dollar de rabais sur chaque lait frappé, du vendredi au dimanche."
+        "en": "A dollar fifty off every double cheeseburger, every Tuesday.",
+        "fr": "Un dollar cinquante de rabais sur chaque double hamburger au fromage, tous les mardis."
+      },
+      "discount_cents": 150,
+      "weekdays": [
+        2
+      ]
+    },
+    {
+      "code": "onion_ring_wednesday",
+      "item": "onion_rings",
+      "name": {
+        "en": "Onion ring Wednesday",
+        "fr": "Mercredi rondelles d'oignon"
+      },
+      "description": {
+        "en": "A dollar off every order of onion rings, every Wednesday.",
+        "fr": "Un dollar de rabais sur chaque portion de rondelles d'oignon, tous les mercredis."
       },
       "discount_cents": 100,
-      "weekdays": [5, 6, 7]
+      "weekdays": [
+        3
+      ]
+    },
+    {
+      "code": "nugget_thursday",
+      "item": "chicken_nuggets",
+      "name": {
+        "en": "Nugget Thursday",
+        "fr": "Jeudi croquettes"
+      },
+      "description": {
+        "en": "A dollar fifty off every box of chicken nuggets, every Thursday.",
+        "fr": "Un dollar cinquante de rabais sur chaque boîte de croquettes de poulet, tous les jeudis."
+      },
+      "discount_cents": 150,
+      "weekdays": [
+        4
+      ]
+    },
+    {
+      "code": "milkshake_friday",
+      "item": "milkshake",
+      "name": {
+        "en": "Milkshake Friday",
+        "fr": "Vendredi lait frappé"
+      },
+      "description": {
+        "en": "A dollar off every milkshake, every Friday.",
+        "fr": "Un dollar de rabais sur chaque lait frappé, tous les vendredis."
+      },
+      "discount_cents": 100,
+      "weekdays": [
+        5
+      ]
+    },
+    {
+      "code": "sundae_saturday",
+      "item": "sundae",
+      "name": {
+        "en": "Sundae Saturday",
+        "fr": "Samedi sundae"
+      },
+      "description": {
+        "en": "A dollar off every sundae, every Saturday.",
+        "fr": "Un dollar de rabais sur chaque sundae, tous les samedis."
+      },
+      "discount_cents": 100,
+      "weekdays": [
+        6
+      ]
+    },
+    {
+      "code": "veggie_sunday",
+      "item": "veggie_burger",
+      "name": {
+        "en": "Veggie Sunday",
+        "fr": "Dimanche végé"
+      },
+      "description": {
+        "en": "A dollar fifty off every veggie burger, every Sunday.",
+        "fr": "Un dollar cinquante de rabais sur chaque burger végétarien, tous les dimanches."
+      },
+      "discount_cents": 150,
+      "weekdays": [
+        7
+      ]
     }
   ]
 }

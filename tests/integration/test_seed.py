@@ -341,12 +341,12 @@ async def special_codes(session: AsyncSession, day: date) -> list[str]:
 async def test_the_real_menus_specials_are_loaded(db_session: AsyncSession) -> None:
     summary = await seed_menu(db_session, load_menu(MENU_PATH))
 
-    assert summary.specials == 2
-    assert await special_codes(db_session, MONDAY) == ["chicken_burger_days"]
-    assert await special_codes(db_session, FRIDAY) == ["weekend_milkshake"]
+    assert summary.specials == 7
+    assert await special_codes(db_session, MONDAY) == ["chicken_burger_monday"]
+    assert await special_codes(db_session, FRIDAY) == ["milkshake_friday"]
     (monday,) = await load_specials(db_session, MONDAY)
     assert (monday.item_code, monday.discount_cents) == ("chicken_burger", 150)
-    assert monday.weekdays == frozenset({1, 2, 3, 4})
+    assert monday.weekdays == frozenset({1})
 
 
 async def test_seeding_twice_keeps_the_same_specials(db_session: AsyncSession) -> None:
@@ -368,9 +368,9 @@ async def test_a_special_removed_from_the_file_is_retired_not_deleted(
     await seed_menu(db_session, menu.model_copy(update={"specials": menu.specials[1:]}))
 
     assert await special_codes(db_session, MONDAY) == []
-    assert await special_codes(db_session, FRIDAY) == ["weekend_milkshake"]
+    assert await special_codes(db_session, FRIDAY) == ["milkshake_friday"]
     rows = await db_session.execute(select(func.count()).select_from(Special))
-    assert rows.scalar_one() == 2
+    assert rows.scalar_one() == 7
 
 
 async def test_a_special_added_back_to_the_file_runs_again(
@@ -382,7 +382,7 @@ async def test_a_special_added_back_to_the_file_runs_again(
 
     await seed_menu(db_session, menu)
 
-    assert await special_codes(db_session, MONDAY) == ["chicken_burger_days"]
+    assert await special_codes(db_session, MONDAY) == ["chicken_burger_monday"]
 
 
 async def test_a_specials_days_and_saving_follow_the_file(
@@ -394,13 +394,12 @@ async def test_a_specials_days_and_saving_follow_the_file(
         update={"weekdays": [5], "discount_cents": 75, "item": "cookie"}
     )
 
-    await seed_menu(
-        db_session, menu.model_copy(update={"specials": [changed, menu.specials[1]]})
-    )
+    friday = menu.specials[4]
+    await seed_menu(db_session, menu.model_copy(update={"specials": [changed, friday]}))
 
     assert await special_codes(db_session, MONDAY) == []
     friday = await load_specials(db_session, FRIDAY)
     assert [(s.code, s.item_code, s.discount_cents) for s in friday] == [
-        ("chicken_burger_days", "cookie", 75),
-        ("weekend_milkshake", "milkshake", 100),
+        ("chicken_burger_monday", "cookie", 75),
+        ("milkshake_friday", "milkshake", 100),
     ]

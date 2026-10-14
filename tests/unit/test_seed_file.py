@@ -326,7 +326,17 @@ def test_the_real_menu_has_a_special_for_every_day_of_the_week() -> None:
 
     covered = {day for each in specials for day in each.weekdays}
     assert covered == {1, 2, 3, 4, 5, 6, 7}
-    assert {each.item for each in specials} == {"chicken_burger", "milkshake"}
+    # One a day, each on a different item, so a week of specials reads as seven.
+    assert sorted(day for each in specials for day in each.weekdays) == [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+    ]
+    assert len({each.item for each in specials}) == 7
 
 
 def test_the_real_menus_specials_are_described_in_both_languages() -> None:

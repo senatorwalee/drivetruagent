@@ -7,6 +7,7 @@ import { PageLink } from '../../app/PageLink'
 import { clock, progressSteps } from '../../session/presentation'
 import type { LiveSession } from '../../session/useLiveSession'
 import { MicButton } from '../shared/MicButton'
+import { ShopBoard } from '../shared/ShopBoard'
 import { useComposer } from '../shared/useComposer'
 import { ViewSwitcher } from '../shared/ViewSwitcher'
 import type { LiveSessionViewProps } from '../shared/viewTypes'
@@ -58,6 +59,7 @@ export function Receipt({ live, view, onViewChange }: LiveSessionViewProps) {
         </section>
         <ReceiptTape live={live} />
         <Ledger decisions={live.timeline.decisions} />
+        <ShopBoard week={live.board.week} stock={live.board.stock} className={styles.board} />
       </main>
     </div>
   )

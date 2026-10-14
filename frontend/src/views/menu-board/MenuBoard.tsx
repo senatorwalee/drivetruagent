@@ -8,6 +8,7 @@ import { clock, progressSteps } from '../../session/presentation'
 import type { LiveSession } from '../../session/useLiveSession'
 import { CheckIcon, PauseIcon, PlayIcon } from '../shared/icons'
 import { MicButton } from '../shared/MicButton'
+import { ShopBoard } from '../shared/ShopBoard'
 import { useComposer } from '../shared/useComposer'
 import { ViewSwitcher } from '../shared/ViewSwitcher'
 import type { LiveSessionViewProps } from '../shared/viewTypes'
@@ -62,6 +63,7 @@ export function MenuBoard({ live, view, onViewChange }: LiveSessionViewProps) {
         </section>
         <OrderPanel live={live} />
         <DecisionStrip decisions={live.timeline.decisions} />
+        <ShopBoard week={live.board.week} stock={live.board.stock} className={styles.board} />
       </main>
     </div>
   )

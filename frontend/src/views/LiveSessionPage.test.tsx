@@ -130,6 +130,15 @@ describe('the live session page', () => {
     expect(screen.queryByText(/hand-off in/)).not.toBeInTheDocument()
   })
 
+  it("shows this week's specials and the stock from the backend", async () => {
+    render(<App />)
+
+    const board = await screen.findByRole('region', { name: 'Specials and stock' })
+    expect(await within(board).findByText('Onion rings', { selector: 'span' })).toBeInTheDocument()
+    expect(backend.requests.some((request) => request.path === '/specials/week')).toBe(true)
+    expect(backend.requests.some((request) => request.path === '/inventory')).toBe(true)
+  })
+
   it('links to the staff screen', async () => {
     render(<App />)
 

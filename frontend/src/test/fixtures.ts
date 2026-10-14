@@ -2,7 +2,8 @@
  * Realistic data for tests: the shapes the backend really returns, taken from
  * the scripted demo conversation.
  */
-import type { AgentEvent, AgentInfo, Cart, Session } from '../api/client'
+import type { AgentEvent, AgentInfo, Cart, Session, StockLevel, WeekOfSpecials } from '../api/client'
+import type { StockGroup } from '../session/board'
 import type { LiveSession } from '../session/useLiveSession'
 import { buildTimeline } from '../session/timeline'
 import type { Voice } from '../voice/useVoiceCall'
@@ -148,6 +149,60 @@ export function eventsUpToHeldCookies(): AgentEvent[] {
   ]
 }
 
+const DAYS: [string, string, string, number, number][] = [
+  ['Monday', 'chicken_burger', 'Crispy chicken burger', 649, 150],
+  ['Tuesday', 'double_cheeseburger', 'Double cheeseburger', 799, 150],
+  ['Wednesday', 'onion_rings', 'Onion rings', 329, 100],
+  ['Thursday', 'chicken_nuggets', 'Chicken nuggets', 449, 150],
+  ['Friday', 'milkshake', 'Milkshake', 399, 100],
+  ['Saturday', 'sundae', 'Sundae', 299, 100],
+  ['Sunday', 'veggie_burger', 'Veggie burger', 629, 150],
+]
+
+/** The week of 12 October 2026, seen on the Wednesday. */
+export const week: WeekOfSpecials = {
+  today: '2026-10-14',
+  days: DAYS.map(([day_name, item_code, item_name, regular, saves], index) => ({
+    date: `2026-10-${12 + index}`,
+    weekday: index + 1,
+    day_name,
+    is_today: index === 2,
+    specials: [
+      {
+        code: `${item_code}_special`,
+        name: `${day_name} special`,
+        description: null,
+        item_code,
+        item_name,
+        regular_price_cents: regular,
+        special_price_cents: regular - saves,
+        saves_cents: saves,
+        in_stock: true,
+      },
+    ],
+  })),
+}
+
+/** Stock levels as the backend reports them: fries and cola are in a cart. */
+export const stockLevels: StockLevel[] = [
+  { item_code: 'fries', on_hand: 100, reserved: 1, available: 99 },
+  { item_code: 'cola', on_hand: 100, reserved: 1, available: 99 },
+  { item_code: 'onion_rings', on_hand: 40, reserved: 0, available: 40 },
+  { item_code: 'cookie', on_hand: 4, reserved: 0, available: 4 },
+]
+
+export const stock: StockGroup[] = [
+  {
+    categoryName: 'Sides',
+    rows: [
+      { itemCode: 'fries', itemName: 'Fries', onHand: 100, held: 1, available: 99, special: false },
+      { itemCode: 'onion_rings', itemName: 'Onion rings', onHand: 40, held: 0, available: 40, special: true },
+    ],
+  },
+  { categoryName: 'Drinks', rows: [{ itemCode: 'cola', itemName: 'Cola', onHand: 100, held: 1, available: 99, special: false }] },
+  { categoryName: 'Desserts', rows: [{ itemCode: 'cookie', itemName: 'Chocolate chip cookie', onHand: 4, held: 0, available: 4, special: false }] },
+]
+
 /** Voice as it is with no key for it: the button shows, and is disabled. */
 export const noVoice: Voice = {
   ...IDLE,
@@ -175,6 +230,7 @@ export function liveSession(overrides: Partial<LiveSession> = {}): LiveSession {
     itemName: (code) => ITEM_NAMES[code] ?? code,
     paused: false,
     voice: noVoice,
+    board: { week, stock },
     canSend: true,
     send: () => {},
     startNewSession: () => {},

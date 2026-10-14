@@ -187,7 +187,9 @@ def _deals_message(has_specials: bool, has_combos: bool) -> str:
     if not has_specials and not has_combos:
         return "There are no specials or combos today. Say so, and offer the menu."
     opening = (
-        "Tell the customer today's special in a sentence."
+        "Tell the customer today's special in a sentence. Mention the combo "
+        "only if they asked about deals or combos: one offer at a time keeps "
+        '"one of those" clear.'
         if has_specials
         else "There is no special today. Say so, and mention the combo."
     )

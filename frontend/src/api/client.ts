@@ -20,6 +20,8 @@ export type AgentEvent = Schemas['EventView']
 export type MessageReply = Schemas['MessageResponse']
 export type Menu = Schemas['MenuView']
 export type HandoffSummary = Schemas['HandoffSummary']
+export type StockLevel = Schemas['StockLevelView']
+export type WeekOfSpecials = Schemas['WeekOfSpecialsView']
 export type HandoffPackage = Schemas['HandoffPackage']
 export type HandoffStep = Schemas['Step']
 export type HeldStock = Schemas['HeldStock']
@@ -78,6 +80,10 @@ export const api = {
   session: (sessionId: string) => request<Session>(`/sessions/${sessionId}`),
   cart: (sessionId: string) => request<Cart>(`/sessions/${sessionId}/cart`),
   events: (sessionId: string) => request<AgentEvent[]>(`/sessions/${sessionId}/events`),
+  /** Stock for every tracked item: on hand, held in carts, available. */
+  inventory: () => request<StockLevel[]>('/inventory'),
+  /** Monday to Sunday of this week, with today marked. */
+  weekOfSpecials: (language: Language) => request<WeekOfSpecials>(`/specials/week?language=${language}`),
   sendMessage: (sessionId: string, text: string) =>
     post<MessageReply>(`/sessions/${sessionId}/messages`, { text }),
   /** Stop the session's timers, for a presenter who wants to talk. */

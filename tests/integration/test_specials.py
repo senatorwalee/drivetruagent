@@ -1,8 +1,8 @@
 """Today's specials against a real database and the real menu.
 
-From data/menu.json:
-  Monday to Thursday   150 off every chicken burger (649)
-  Friday to Sunday     100 off every milkshake (399 small)
+From data/menu.json, one special a day. The two used most here:
+  Monday   150 off every chicken burger (649)
+  Friday   100 off every milkshake (399 small)
 
 The day is never read from a clock here. Each session is given its business
 date, which is how the app itself decides which specials a session gets.
@@ -33,6 +33,7 @@ from drivetruagent.ordering.offers import (
     load_specials,
     set_special_active,
     todays_specials,
+    week_of_specials,
 )
 from drivetruagent.ordering.orders import get_order, submit_order
 from drivetruagent.ordering.sessions import open_session, set_language
@@ -55,14 +56,12 @@ MILKSHAKE = ("milkshake", {"size": ["small"], "flavour": ["vanilla"]})
 SMALL_FRIES = ("fries", {"size": ["small"]})
 WATER = ("bottled_water", {})
 
-MONDAY_DESCRIPTION = (
-    "A dollar fifty off every crispy chicken burger, Monday to Thursday."
-)
+MONDAY_DESCRIPTION = "A dollar fifty off every crispy chicken burger, every Monday."
 
 CHICKEN_SPECIAL = DiscountView(
     kind=DiscountKind.SPECIAL,
-    code="chicken_burger_days",
-    name="Chicken burger special",
+    code="chicken_burger_monday",
+    name="Chicken burger Monday",
     times=1,
     amount_cents=150,
 )
@@ -110,10 +109,10 @@ async def retire(db: AsyncSession, code: str) -> None:
 @pytest.mark.parametrize(
     ("day", "expected"),
     [
-        (MONDAY, ["chicken_burger_days"]),
-        (THURSDAY, ["chicken_burger_days"]),
-        (FRIDAY, ["weekend_milkshake"]),
-        (SUNDAY, ["weekend_milkshake"]),
+        (MONDAY, ["chicken_burger_monday"]),
+        (THURSDAY, ["nugget_thursday"]),
+        (FRIDAY, ["milkshake_friday"]),
+        (SUNDAY, ["veggie_sunday"]),
     ],
 )
 async def test_each_day_has_its_special(
@@ -134,12 +133,12 @@ async def test_a_special_with_no_weekdays_runs_every_day(
     db_session: AsyncSession,
 ) -> None:
     await db_session.execute(
-        update(Special).where(Special.code == "weekend_milkshake").values(weekdays=[])
+        update(Special).where(Special.code == "milkshake_friday").values(weekdays=[])
     )
 
     assert [special.code for special in await load_specials(db_session, MONDAY)] == [
-        "chicken_burger_days",
-        "weekend_milkshake",
+        "chicken_burger_monday",
+        "milkshake_friday",
     ]
 
 
@@ -196,7 +195,7 @@ async def test_the_weekend_special_comes_off_at_the_weekend(
     at_the_weekend = await add(db_session, friday, MILKSHAKE)
     in_the_week = await add(db_session, monday, MILKSHAKE)
 
-    assert [d.code for d in at_the_weekend.discounts] == ["weekend_milkshake"]
+    assert [d.code for d in at_the_weekend.discounts] == ["milkshake_friday"]
     assert at_the_weekend.discount_cents == 100
     assert in_the_week.discounts == []
 
@@ -204,13 +203,13 @@ async def test_the_weekend_special_comes_off_at_the_weekend(
 async def test_a_session_keeps_the_specials_of_the_day_it_opened(
     db_session: AsyncSession,
 ) -> None:
-    """Two cars at the speaker at the same moment, one that arrived before
-    midnight on Thursday and one after. Each is priced by its own day."""
-    thursday = await car_on(db_session, THURSDAY, "lane-1")
-    friday = await car_on(db_session, FRIDAY, "lane-2")
+    """Two cars at the speaker at the same moment, one that arrived just
+    before midnight on Monday and one just after. Each is priced by its own day."""
+    monday = await car_on(db_session, MONDAY, "lane-1")
+    tuesday = await car_on(db_session, MONDAY + timedelta(days=1), "lane-2")
 
-    before_midnight = await add(db_session, thursday, CHICKEN_BURGER)
-    after_midnight = await add(db_session, friday, CHICKEN_BURGER)
+    before_midnight = await add(db_session, monday, CHICKEN_BURGER)
+    after_midnight = await add(db_session, tuesday, CHICKEN_BURGER)
 
     assert before_midnight.discount_cents == 150
     assert after_midnight.discount_cents == 0
@@ -255,7 +254,7 @@ async def test_a_special_and_a_combo_both_apply(db_session: AsyncSession) -> Non
 
     assert [(d.kind, d.code, d.amount_cents) for d in cart.discounts] == [
         (DiscountKind.COMBO, "burger_combo", 200),
-        (DiscountKind.SPECIAL, "chicken_burger_days", 150),
+        (DiscountKind.SPECIAL, "chicken_burger_monday", 150),
     ]
     assert (cart.subtotal_cents, cart.discount_cents) == (1047, 350)
     # Tax on 697.
@@ -271,14 +270,14 @@ async def test_the_special_is_named_in_the_customers_language(
 
     cart = await get_cart(db_session, session_id, tax_rate=TAX)
 
-    assert [d.name for d in cart.discounts] == ["Spécial burger au poulet"]
+    assert [d.name for d in cart.discounts] == ["Lundi burger au poulet"]
 
 
 async def test_a_retired_special_stops_coming_off(db_session: AsyncSession) -> None:
     session_id = await car_on(db_session, MONDAY)
     await add(db_session, session_id, CHICKEN_BURGER)
 
-    await set_special_active(db_session, "chicken_burger_days", False)
+    await set_special_active(db_session, "chicken_burger_monday", False)
 
     assert (await get_cart(db_session, session_id, tax_rate=TAX)).discounts == []
 
@@ -286,9 +285,9 @@ async def test_a_retired_special_stops_coming_off(db_session: AsyncSession) -> N
 async def test_a_special_brought_back_comes_off_again(db_session: AsyncSession) -> None:
     session_id = await car_on(db_session, MONDAY)
     await add(db_session, session_id, CHICKEN_BURGER)
-    await set_special_active(db_session, "chicken_burger_days", False)
+    await set_special_active(db_session, "chicken_burger_monday", False)
 
-    await set_special_active(db_session, "chicken_burger_days", True)
+    await set_special_active(db_session, "chicken_burger_monday", True)
 
     cart = await get_cart(db_session, session_id, tax_rate=TAX)
     assert cart.discounts == [CHICKEN_SPECIAL]
@@ -363,7 +362,7 @@ async def test_an_order_freezes_its_special(db_session: AsyncSession) -> None:
     row = (await db_session.execute(select(OrderDiscount))).scalar_one()
     assert (row.kind, row.code, row.times) == (
         DiscountKind.SPECIAL,
-        "chicken_burger_days",
+        "chicken_burger_monday",
         1,
     )
 
@@ -375,8 +374,8 @@ async def test_mondays_special_as_a_customer_hears_it(db_session: AsyncSession) 
     (special,) = await todays_specials(db_session, MONDAY, Language.EN)
 
     assert special.model_dump() == {
-        "code": "chicken_burger_days",
-        "name": "Chicken burger special",
+        "code": "chicken_burger_monday",
+        "name": "Chicken burger Monday",
         "description": MONDAY_DESCRIPTION,
         "item_code": "chicken_burger",
         "item_name": "Crispy chicken burger",
@@ -390,10 +389,10 @@ async def test_mondays_special_as_a_customer_hears_it(db_session: AsyncSession) 
 async def test_fridays_special_in_french(db_session: AsyncSession) -> None:
     (special,) = await todays_specials(db_session, FRIDAY, Language.FR)
 
-    assert special.name == "Lait frappé de fin de semaine"
+    assert special.name == "Vendredi lait frappé"
     assert special.item_name == "Lait frappé"
     assert special.description is not None
-    assert "du vendredi au dimanche" in special.description
+    assert "tous les vendredis" in special.description
     assert (special.regular_price_cents, special.special_price_cents) == (399, 299)
 
 
@@ -409,6 +408,108 @@ async def test_a_sold_out_special_says_so(db_session: AsyncSession) -> None:
     (special,) = await todays_specials(db_session, MONDAY, Language.EN)
 
     assert special.in_stock is False
+
+
+# --- The week ---------------------------------------------------------------
+
+WEDNESDAY = date(2026, 10, 14)
+
+
+async def test_the_week_runs_monday_to_sunday_with_today_marked(
+    db_session: AsyncSession,
+) -> None:
+    week = await week_of_specials(db_session, WEDNESDAY, Language.EN)
+
+    assert week.today == WEDNESDAY
+    assert [day.date for day in week.days] == [
+        MONDAY + timedelta(days=n) for n in range(7)
+    ]
+    assert [day.weekday for day in week.days] == [1, 2, 3, 4, 5, 6, 7]
+    assert [day.day_name for day in week.days] == [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    ]
+    assert [day.is_today for day in week.days] == [
+        False,
+        False,
+        True,
+        False,
+        False,
+        False,
+        False,
+    ]
+
+
+async def test_each_day_of_the_week_shows_its_own_special(
+    db_session: AsyncSession,
+) -> None:
+    """So someone watching can check the special the agent names against the
+    day it is."""
+    week = await week_of_specials(db_session, WEDNESDAY, Language.EN)
+
+    assert [[s.item_code for s in day.specials] for day in week.days] == [
+        ["chicken_burger"],
+        ["double_cheeseburger"],
+        ["onion_rings"],
+        ["chicken_nuggets"],
+        ["milkshake"],
+        ["sundae"],
+        ["veggie_burger"],
+    ]
+    wednesday = week.days[2].specials[0]
+    assert (
+        wednesday.name,
+        wednesday.regular_price_cents,
+        wednesday.special_price_cents,
+    ) == (
+        "Onion ring Wednesday",
+        329,
+        229,
+    )
+
+
+async def test_a_week_seen_from_sunday_is_the_week_ending_today(
+    db_session: AsyncSession,
+) -> None:
+    week = await week_of_specials(db_session, SUNDAY, Language.EN)
+
+    assert week.days[0].date == SUNDAY - timedelta(days=6)
+    assert week.days[-1].date == SUNDAY
+    assert week.days[-1].is_today
+
+
+async def test_the_week_in_french(db_session: AsyncSession) -> None:
+    week = await week_of_specials(db_session, WEDNESDAY, Language.FR)
+
+    assert [day.day_name for day in week.days][:3] == ["lundi", "mardi", "mercredi"]
+    assert week.days[2].specials[0].name == "Mercredi rondelles d'oignon"
+
+
+async def test_a_day_with_no_special_has_an_empty_list(
+    db_session: AsyncSession,
+) -> None:
+    await retire(db_session, "onion_ring_wednesday")
+
+    week = await week_of_specials(db_session, WEDNESDAY, Language.EN)
+
+    assert week.days[2].specials == []
+    assert week.days[2].is_today
+
+
+async def test_the_week_shows_a_special_that_has_sold_out(
+    db_session: AsyncSession,
+) -> None:
+    await set_on_hand(db_session, "onion_rings", 0)
+
+    week = await week_of_specials(db_session, WEDNESDAY, Language.EN)
+
+    assert week.days[2].specials[0].in_stock is False
+    assert week.days[3].specials[0].in_stock is True
 
 
 # --- The cache --------------------------------------------------------------
@@ -434,18 +535,18 @@ async def test_a_second_question_is_answered_from_the_cache(
     """Shown by changing the database behind the cache's back: the cached
     answer is still given, which it could not be if the database were read."""
     first = await codes(db_session, MONDAY, cache)
-    await retire(db_session, "chicken_burger_days")
+    await retire(db_session, "chicken_burger_monday")
 
     second = await codes(db_session, MONDAY, cache)
 
-    assert first == second == ["chicken_burger_days"]
+    assert first == second == ["chicken_burger_monday"]
 
 
 async def test_without_a_cache_every_question_reads_the_database(
     db_session: AsyncSession,
 ) -> None:
     await codes(db_session, MONDAY, None)
-    await retire(db_session, "chicken_burger_days")
+    await retire(db_session, "chicken_burger_monday")
 
     assert await codes(db_session, MONDAY, None) == []
 
@@ -454,14 +555,14 @@ async def test_the_cache_is_read_again_once_its_time_is_up(
     db_session: AsyncSession, cache: SpecialsCache, clock: Clock
 ) -> None:
     await codes(db_session, MONDAY, cache)
-    await retire(db_session, "chicken_burger_days")
+    await retire(db_session, "chicken_burger_monday")
 
     clock.now += 59
     still_cached = await codes(db_session, MONDAY, cache)
     clock.now += 1
     refreshed = await codes(db_session, MONDAY, cache)
 
-    assert still_cached == ["chicken_burger_days"]
+    assert still_cached == ["chicken_burger_monday"]
     assert refreshed == []
 
 
@@ -469,7 +570,7 @@ async def test_invalidating_makes_the_next_question_read_the_database(
     db_session: AsyncSession, cache: SpecialsCache
 ) -> None:
     await codes(db_session, MONDAY, cache)
-    await retire(db_session, "chicken_burger_days")
+    await retire(db_session, "chicken_burger_monday")
 
     cache.invalidate()
 
@@ -480,15 +581,15 @@ async def test_each_day_is_cached_on_its_own(
     db_session: AsyncSession, cache: SpecialsCache
 ) -> None:
     """Asking on Monday must never answer Friday's question."""
-    assert await codes(db_session, MONDAY, cache) == ["chicken_burger_days"]
-    assert await codes(db_session, FRIDAY, cache) == ["weekend_milkshake"]
-    assert await codes(db_session, MONDAY, cache) == ["chicken_burger_days"]
+    assert await codes(db_session, MONDAY, cache) == ["chicken_burger_monday"]
+    assert await codes(db_session, FRIDAY, cache) == ["milkshake_friday"]
+    assert await codes(db_session, MONDAY, cache) == ["chicken_burger_monday"]
 
 
 async def test_no_specials_today_is_cached_too(
     db_session: AsyncSession, cache: SpecialsCache
 ) -> None:
-    await retire(db_session, "chicken_burger_days")
+    await retire(db_session, "chicken_burger_monday")
     assert await codes(db_session, MONDAY, cache) == []
 
     await db_session.execute(update(Special).values(is_active=True))
@@ -518,13 +619,13 @@ async def test_one_cached_list_serves_every_language(
     db_session: AsyncSession, cache: SpecialsCache
 ) -> None:
     (english,) = await todays_specials(db_session, MONDAY, Language.EN, cache=cache)
-    await retire(db_session, "chicken_burger_days")
+    await retire(db_session, "chicken_burger_monday")
 
     (french,) = await todays_specials(db_session, MONDAY, Language.FR, cache=cache)
 
     assert (english.name, french.name) == (
-        "Chicken burger special",
-        "Spécial burger au poulet",
+        "Chicken burger Monday",
+        "Lundi burger au poulet",
     )
 
 
@@ -534,12 +635,12 @@ async def test_a_stale_cache_never_changes_what_a_cart_is_charged(
     """The cache can make the agent mention a special that has just ended.
     It cannot make a cart charge for one: pricing reads the database."""
     await codes(db_session, MONDAY, cache)
-    await retire(db_session, "chicken_burger_days")
+    await retire(db_session, "chicken_burger_monday")
     session_id = await car_on(db_session, MONDAY)
 
     cart = await add(db_session, session_id, CHICKEN_BURGER)
 
-    assert await codes(db_session, MONDAY, cache) == ["chicken_burger_days"]
+    assert await codes(db_session, MONDAY, cache) == ["chicken_burger_monday"]
     assert cart.discounts == []
     assert cart.total_cents == 649 + 84
 
@@ -570,6 +671,9 @@ async def test_the_tool_gives_the_special_and_the_combos(
     assert [combo["code"] for combo in result["combos"]] == ["burger_combo"]
     assert result["message"].startswith("Tell the customer today's special")
     assert "applied for you" in result["message"]
+    # Asked about the special, the agent answers about the special. Offering
+    # the combo too made "two of those" ambiguous on a real model.
+    assert "Mention the combo only if they asked" in result["message"]
 
 
 async def test_the_tool_answers_for_the_sessions_own_day(
@@ -584,8 +688,8 @@ async def test_the_tool_answers_for_the_sessions_own_day(
         )
         return result["specials"][0]["code"]
 
-    assert await special_for(monday) == "chicken_burger_days"
-    assert await special_for(friday) == "weekend_milkshake"
+    assert await special_for(monday) == "chicken_burger_monday"
+    assert await special_for(friday) == "milkshake_friday"
 
 
 async def test_the_tool_follows_the_session_language(db_session: AsyncSession) -> None:
@@ -595,7 +699,7 @@ async def test_the_tool_follows_the_session_language(db_session: AsyncSession) -
 
     result = await run_tool(context, "get_todays_specials", {})
 
-    assert result["specials"][0]["name"] == "Lait frappé de fin de semaine"
+    assert result["specials"][0]["name"] == "Vendredi lait frappé"
     assert result["combos"][0]["name"] == "Trio burger"
 
 
@@ -605,14 +709,14 @@ async def test_the_tool_uses_the_cache_it_is_given(
     session_id = await car_on(db_session, MONDAY)
     context = tool_context(db_session, session_id, cache)
     await run_tool(context, "get_todays_specials", {})
-    await retire(db_session, "chicken_burger_days")
+    await retire(db_session, "chicken_burger_monday")
 
     cached = await run_tool(context, "get_todays_specials", {})
     fresh = await run_tool(
         tool_context(db_session, session_id), "get_todays_specials", {}
     )
 
-    assert [s["code"] for s in cached["specials"]] == ["chicken_burger_days"]
+    assert [s["code"] for s in cached["specials"]] == ["chicken_burger_monday"]
     assert fresh["specials"] == []
     assert fresh["message"].startswith("There is no special today.")
 
@@ -663,8 +767,8 @@ async def test_todays_specials_are_listed(client: httpx.AsyncClient) -> None:
     (special,) = await read_specials(client)
 
     assert special == {
-        "code": "chicken_burger_days",
-        "name": "Chicken burger special",
+        "code": "chicken_burger_monday",
+        "name": "Chicken burger Monday",
         "description": MONDAY_DESCRIPTION,
         "item_code": "chicken_burger",
         "item_name": "Crispy chicken burger",
@@ -682,8 +786,8 @@ async def test_the_list_follows_the_day(
     today["today"] = FRIDAY
     friday = await read_specials(client, language="fr")
 
-    assert [s["code"] for s in monday] == ["chicken_burger_days"]
-    assert [s["name"] for s in friday] == ["Lait frappé de fin de semaine"]
+    assert [s["code"] for s in monday] == ["chicken_burger_monday"]
+    assert [s["name"] for s in friday] == ["Vendredi lait frappé"]
 
 
 @pytest_today
@@ -691,10 +795,10 @@ async def test_the_endpoint_answers_from_the_cache(
     client: httpx.AsyncClient, db_session: AsyncSession
 ) -> None:
     await read_specials(client)
-    await retire(db_session, "chicken_burger_days")
+    await retire(db_session, "chicken_burger_monday")
     await db_session.commit()
 
-    assert [s["code"] for s in await read_specials(client)] == ["chicken_burger_days"]
+    assert [s["code"] for s in await read_specials(client)] == ["chicken_burger_monday"]
 
 
 @pytest_today
@@ -706,22 +810,22 @@ async def test_ending_a_special_shows_on_the_very_next_read(
     await read_specials(client)
 
     response = await client.put(
-        "/specials/chicken_burger_days", json={"is_active": False}
+        "/specials/chicken_burger_monday", json={"is_active": False}
     )
 
     assert response.status_code == 200
-    assert response.json() == {"code": "chicken_burger_days", "is_active": False}
+    assert response.json() == {"code": "chicken_burger_monday", "is_active": False}
     assert await read_specials(client) == []
 
 
 @pytest_today
 async def test_a_special_can_be_brought_back(client: httpx.AsyncClient) -> None:
-    await client.put("/specials/chicken_burger_days", json={"is_active": False})
+    await client.put("/specials/chicken_burger_monday", json={"is_active": False})
     await read_specials(client)
 
-    await client.put("/specials/chicken_burger_days", json={"is_active": True})
+    await client.put("/specials/chicken_burger_monday", json={"is_active": True})
 
-    assert [s["code"] for s in await read_specials(client)] == ["chicken_burger_days"]
+    assert [s["code"] for s in await read_specials(client)] == ["chicken_burger_monday"]
 
 
 @pytest_today
@@ -742,7 +846,7 @@ async def test_a_bad_change_is_rejected(
     client: httpx.AsyncClient, body: dict[str, object]
 ) -> None:
     """In particular, the amount of a special cannot be set through the API."""
-    response = await client.put("/specials/chicken_burger_days", json=body)
+    response = await client.put("/specials/chicken_burger_monday", json=body)
 
     assert response.status_code == 422
     assert (await read_specials(client))[0]["saves_cents"] == 150
@@ -762,10 +866,10 @@ async def test_a_session_opened_over_http_keeps_the_days_date(
 async def test_a_cart_is_priced_by_the_day_its_session_opened(
     client: httpx.AsyncClient, today: dict[str, date]
 ) -> None:
-    """Opened on Thursday night; the order is finished after midnight."""
-    today["today"] = THURSDAY
+    """Opened on Monday night; the order is finished after midnight."""
+    today["today"] = MONDAY
     session_id = (await client.post("/sessions")).json()["session_id"]
-    today["today"] = FRIDAY
+    today["today"] = MONDAY + timedelta(days=1)
 
     cart = (
         await client.post(
@@ -776,3 +880,18 @@ async def test_a_cart_is_priced_by_the_day_its_session_opened(
 
     assert cart["discounts"] == [CHICKEN_SPECIAL.model_dump(mode="json")]
     assert cart["total_cents"] == 564
+
+
+async def test_the_week_endpoint(
+    client: httpx.AsyncClient, today: dict[str, date]
+) -> None:
+    today["today"] = WEDNESDAY
+
+    response = await client.get("/specials/week", params={"language": "fr"})
+
+    assert response.status_code == 200
+    week = response.json()
+    assert week["today"] == "2026-10-14"
+    assert [day["is_today"] for day in week["days"]].index(True) == 2
+    assert week["days"][2]["day_name"] == "mercredi"
+    assert week["days"][2]["specials"][0]["item_code"] == "onion_rings"
