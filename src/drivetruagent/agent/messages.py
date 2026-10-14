@@ -4,6 +4,7 @@ The event log stores these, the loop passes them around, and each model
 adapter converts them to its provider's own format at the last moment.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -26,6 +27,11 @@ class ToolCall:
     call_id: str
     name: str
     arguments: dict[str, Any]
+    # Anything the provider attached to this call and needs to be given back
+    # unchanged on the next request (Gemini's thought signature, for one). The
+    # adapter that made it is the only code that looks inside. It is stored
+    # with the call, because the event log is the only conversation store.
+    provider_data: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True)

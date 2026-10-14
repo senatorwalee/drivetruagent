@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from drivetruagent.agent.scripted import ScriptedModel, call, say
 from drivetruagent.api.conversation import get_model_client
+from drivetruagent.config import Settings, get_settings
 
 pytestmark = pytest.mark.usefixtures("menu")
 
@@ -97,6 +98,25 @@ async def test_without_a_model_the_agent_is_unavailable_but_ordering_still_works
     assert conversation.json()["error"]["code"] == "agent_unavailable"
     assert "OPENAI_API_KEY" in conversation.json()["error"]["message"]
     assert ordering.status_code == 201
+
+
+async def test_choosing_gemini_without_its_key_says_which_key_is_missing(
+    app: FastAPI, client: httpx.AsyncClient, session_id: str
+) -> None:
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        database_url="postgresql+psycopg://unused",
+        agent_model="gemini",
+        _env_file=None,  # pyright: ignore[reportCallIssue]
+    )
+
+    conversation = await client.post(
+        f"/sessions/{session_id}/messages", json={"text": "Hi"}
+    )
+    info = (await client.get("/agent")).json()
+
+    assert conversation.status_code == 503
+    assert "GEMINI_API_KEY" in conversation.json()["error"]["message"]
+    assert (info["available"], info["model"]) == (False, None)
 
 
 async def test_unknown_session_is_not_found(

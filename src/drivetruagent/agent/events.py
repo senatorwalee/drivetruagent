@@ -89,11 +89,14 @@ def _to_event(message: Message) -> tuple[AgentEventKind, dict[str, Any]]:
     if isinstance(message, AssistantMessage):
         return AgentEventKind.ASSISTANT_MESSAGE, {"text": message.text}
     if isinstance(message, ToolCall):
-        return AgentEventKind.TOOL_CALL, {
+        payload: dict[str, Any] = {
             "call_id": message.call_id,
             "name": message.name,
             "arguments": message.arguments,
         }
+        if message.provider_data is not None:
+            payload["provider_data"] = dict(message.provider_data)
+        return AgentEventKind.TOOL_CALL, payload
     return AgentEventKind.TOOL_RESULT, {
         "call_id": message.call_id,
         "name": message.name,
@@ -112,6 +115,7 @@ def _to_message(event: AgentEvent) -> Message:
             call_id=payload["call_id"],
             name=payload["name"],
             arguments=payload["arguments"],
+            provider_data=payload.get("provider_data"),
         )
     return ToolResult(
         call_id=payload["call_id"], name=payload["name"], result=payload["result"]

@@ -104,3 +104,13 @@ def test_only_the_adapter_imports_the_model_providers_library() -> None:
     }
 
     assert users == {"agent/openai_model.py"}
+
+
+def test_only_the_gemini_adapter_imports_googles_library() -> None:
+    users = {
+        str(path.relative_to(SOURCE))
+        for path in SOURCE.rglob("*.py")
+        if imports_from(path, "google")
+    }
+
+    assert users == {"agent/gemini_model.py"}

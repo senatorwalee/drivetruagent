@@ -46,11 +46,15 @@ class Settings(BaseSettings):
 
     # The agent. Without a key the ordering API still works; only the
     # conversation endpoint is unavailable.
-    # "openai" talks to a real model. "demo" plays one fixed conversation with
-    # no key and no cost; its tool calls still run through the real backend.
-    agent_model: Literal["openai", "demo"] = "openai"
+    # "openai" and "gemini" talk to a real model. "demo" plays one fixed
+    # conversation with no key and no cost; its tool calls still run through
+    # the real backend.
+    agent_model: Literal["openai", "gemini", "demo"] = "openai"
     openai_api_key: SecretStr | None = None
     openai_text_model: str = "gpt-6-luna"
+    # Google's Gemini API has a free tier. See agent/gemini_model.py.
+    gemini_api_key: SecretStr | None = None
+    gemini_text_model: str = "gemini-2.5-flash-lite"
     restaurant_name: str = "Maple Lane Burgers"
     # How many times the model may ask for tools within one customer turn.
     agent_max_tool_rounds: int = Field(default=8, ge=1)

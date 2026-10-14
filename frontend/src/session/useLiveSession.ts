@@ -24,6 +24,8 @@ const FOLLOW_INTERVAL_MS = 400
  */
 const IDLE_INTERVAL_MS = 1000
 
+const NO_MODEL = 'No model is configured. In .env, set AGENT_MODEL=demo, or add an OpenAI or Gemini key.'
+
 const EMPTY_TIMELINE: Timeline = { transcript: [], decisions: [], pending: null, order: null }
 
 export interface LiveSession {
@@ -207,11 +209,11 @@ export function useLiveSession(): LiveSession {
 function describeProblem(openError: unknown, sendError: unknown, agent: AgentInfo | null): string | null {
   if (openError) return 'Cannot reach the backend. Start it with `make dev`, then reload.'
   if (sendError instanceof ApiError && sendError.code === 'agent_unavailable') {
-    return 'No model is configured. Set AGENT_MODEL=demo in .env, or add an OpenAI key.'
+    return NO_MODEL
   }
   if (sendError) return 'That message did not go through. Try again.'
   if (agent && !agent.available) {
-    return 'No model is configured. Set AGENT_MODEL=demo in .env, or add an OpenAI key.'
+    return NO_MODEL
   }
   return null
 }
