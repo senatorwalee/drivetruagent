@@ -134,6 +134,24 @@ class AllergenLevel(StrEnum):
     MAY_CONTAIN = "may_contain"
 
 
+class KnowledgeAudience(StrEnum):
+    """Who a knowledge document may be shown to."""
+
+    # The customer-facing agent may search it.
+    CUSTOMER = "customer"
+    # Staff only: procedures, contacts. The agent can never return it.
+    STAFF = "staff"
+
+
+class KnowledgeType(StrEnum):
+    INGREDIENTS = "ingredients"
+    PREPARATION = "preparation"
+    NUTRITION = "nutrition"
+    # Vegetarian, vegan, halal and the like.
+    DIETS = "diets"
+    PROCEDURE = "procedure"
+
+
 # A session in one of these states is still in progress. Every other state is
 # final: the session has ended and can never change again.
 ACTIVE_SESSION_STATES = frozenset(
