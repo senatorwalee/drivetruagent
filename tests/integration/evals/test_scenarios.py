@@ -32,7 +32,10 @@ def settings() -> Settings:
     return Settings(**values)  # pyright: ignore[reportArgumentType]
 
 
-@pytest.fixture(scope="module")
+# Per test, not per module: each test runs in its own event loop, and a client
+# kept from an earlier test holds pooled connections tied to a closed loop
+# ("Event loop is closed" on the next request).
+@pytest.fixture
 def model(settings: Settings) -> ModelClient:
     if settings.agent_model == "demo":
         pytest.skip("AGENT_MODEL=demo plays a script; the evals need a real model")
