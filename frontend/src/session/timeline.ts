@@ -213,6 +213,7 @@ export function summarise(args: Json): string {
   }
   parts.push(...selectionParts(args['selections']))
   if (typeof args['query'] === 'string') parts.push(`"${args['query']}"`)
+  if (Array.isArray(args['allergens']) && args['allergens'].length > 0) parts.push(args['allergens'].join('+'))
   if (typeof args['language'] === 'string') parts.push(args['language'])
   if (typeof args['reason'] === 'string') parts.push(args['reason'])
 

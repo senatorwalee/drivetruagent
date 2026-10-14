@@ -224,7 +224,7 @@ def test_each_reason_has_a_heading_a_person_can_read() -> None:
 
 
 def test_an_unknown_reason_still_reads_as_words() -> None:
-    assert reason_title("allergen_unverified") == "Allergen unverified"
+    assert reason_title("complaint_unresolved") == "Complaint unresolved"
 
 
 def test_a_very_large_order_says_what_was_asked_for() -> None:
@@ -307,10 +307,46 @@ def test_repeated_confusion_says_to_ask_what_the_customer_wants() -> None:
 
 def test_a_reason_added_later_still_gets_a_usable_sentence() -> None:
     sentence = outstanding(
-        "allergen_unverified", {}, None, item_name=None, cart_item_count=0
+        "complaint_unresolved", {}, None, item_name=None, cart_item_count=0
     )
 
     assert sentence == (
-        "Handed off by the rule 'allergen_unverified'. Read the conversation "
+        "Handed off by the rule 'complaint_unresolved'. Read the conversation "
         "and carry on from there. The cart is empty."
     )
+
+
+def test_an_allergen_question_names_the_items_and_the_allergens() -> None:
+    sentence = outstanding(
+        "allergen_unverified",
+        {
+            "item_codes": ["cookie", "apple_pie"],
+            "items": ["Chocolate chip cookie", "Apple pie"],
+            "allergens": ["tree_nut"],
+        },
+        None,
+        item_name=None,
+        cart_item_count=2,
+    )
+
+    assert sentence == (
+        "The customer asked about allergens (tree nut) in Chocolate chip cookie "
+        "and Apple pie, which has no checked allergen information. Answer from "
+        "the allergen binder or ask the manager before they order. The cart "
+        "holds 2 items and can be placed as it stands."
+    )
+    assert reason_title("allergen_unverified") == (
+        "Allergen question with no checked answer"
+    )
+
+
+def test_an_allergen_question_about_any_allergen_does_not_list_them() -> None:
+    sentence = outstanding(
+        "allergen_unverified",
+        {"items": ["Apple pie"], "allergens": []},
+        None,
+        item_name=None,
+        cart_item_count=0,
+    )
+
+    assert sentence.startswith("The customer asked about allergens in Apple pie,")

@@ -24,7 +24,8 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from drivetruagent.agent.model import ToolDefinition
-from drivetruagent.enums import Language
+from drivetruagent.enums import Allergen, Language
+from drivetruagent.ordering import allergen_matrix
 from drivetruagent.ordering import cart as cart_rules
 from drivetruagent.ordering import menu as menu_rules
 from drivetruagent.ordering import offers as offer_rules
@@ -117,6 +118,12 @@ class LanguageArgs(Args):
 
 class HumanArgs(Args):
     reason: str
+
+
+class AllergenArgs(Args):
+    item_code: str | None
+    selections: list[Selection] | None
+    allergens: list[Allergen] | None
 
 
 def _as_mapping(selections: list[Selection]) -> dict[str, list[str]]:
@@ -272,6 +279,53 @@ async def _set_language(context: ToolContext, args: LanguageArgs) -> ToolOutput:
     }
 
 
+ALLERGEN_INSTRUCTIONS = (
+    "Tell the customer what is listed, naming allergens in plain words, and "
+    "mention anything it may contain and why. Never say something is safe, "
+    "allergen-free or fine for them: say it is not listed as containing it. "
+    "If they mention a serious allergy, offer to get a team member."
+)
+
+
+async def _check_allergens(context: ToolContext, args: AllergenArgs) -> ToolOutput:
+    language = await _session_language(context)
+    if args.item_code is not None:
+        selections = _as_mapping(args.selections or [])
+        reports = [
+            await allergen_matrix.item_allergens(
+                context.db, args.item_code, selections, args.allergens, language
+            )
+        ]
+    else:
+        reports = await allergen_matrix.cart_allergens(
+            context.db,
+            context.session_id,
+            args.allergens,
+            language,
+            tax_rate=context.tax_rate,
+        )
+        if not reports:
+            return {
+                "items": [],
+                "message": "The order is empty. Ask which item they mean.",
+            }
+
+    unverified = {r.item_code: r.item_name for r in reports if not r.verified}
+    if unverified:
+        outcome = await gateway.allergen_unverified(
+            context.db,
+            context.session_id,
+            unverified,
+            [allergen.value for allergen in args.allergens or []],
+            tax_rate=context.tax_rate,
+        )
+        return outcome.model_dump(mode="json", exclude_none=True)
+    return {
+        "items": [report.model_dump(mode="json") for report in reports],
+        "message": ALLERGEN_INSTRUCTIONS,
+    }
+
+
 async def _request_human(context: ToolContext, args: HumanArgs) -> ToolOutput:
     outcome = await gateway.hand_to_human(
         context.db, context.session_id, args.reason, tax_rate=context.tax_rate
@@ -379,6 +433,44 @@ TOOLS: tuple[Tool[Any], ...] = (
         _NO_ARGUMENTS,
         NoArgs,
         _get_todays_specials,
+    ),
+    _tool(
+        "check_allergens",
+        "Look up allergens in the restaurant's allergen information. Use it "
+        "for every allergen or dietary question; never answer one from memory "
+        "or from a description. Give an item to check it with the customer's "
+        "choices (unchosen choices count as their defaults), or null to check "
+        "every line in the order with the choices on each line.",
+        _object(
+            {
+                "item_code": {
+                    "type": ["string", "null"],
+                    "description": "The item's code, or null for the whole order.",
+                },
+                "selections": {
+                    "anyOf": [_SELECTIONS, {"type": "null"}],
+                    "description": "Choices to take into account, or null.",
+                },
+                "allergens": {
+                    "anyOf": [
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "enum": [allergen.value for allergen in Allergen],
+                            },
+                        },
+                        {"type": "null"},
+                    ],
+                    "description": (
+                        "The allergens asked about, or null for all. Dairy is "
+                        "'milk'; nuts are 'peanut' and 'tree_nut'."
+                    ),
+                },
+            }
+        ),
+        AllergenArgs,
+        _check_allergens,
     ),
     _tool(
         "add_item",

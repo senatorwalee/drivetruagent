@@ -206,6 +206,8 @@ describe('summarise', () => {
     [{ line_no: 1, quantity: null, selections: [{ group: 'dip', options: [] }] }, 'L1 · dip=none'],
     [{ line_no: 4 }, 'L4'],
     [{ item_code: 'chicken_nuggets', quantity: 1, selections: [{ group: 'dip', options: ['ketchup', 'barbecue'] }] }, 'chicken_nuggets · dip=ketchup+barbecue'],
+    [{ item_code: 'cheeseburger', selections: null, allergens: ['milk', 'tree_nut'] }, 'cheeseburger · milk+tree_nut'],
+    [{ item_code: null, selections: null, allergens: null }, ''],
     [{ language: 'fr' }, 'fr'],
     [{ reason: 'customer asked' }, 'customer asked'],
     [{}, ''],

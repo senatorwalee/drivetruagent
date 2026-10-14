@@ -5,6 +5,7 @@ which tables exist, so a model that is not imported here is invisible to it.
 """
 
 from drivetruagent.db.models.catalog import (
+    AllergenDeclaration,
     MenuCategory,
     MenuItem,
     MenuItemAlias,
@@ -40,6 +41,7 @@ from drivetruagent.db.models.policy import PendingAction
 
 __all__ = [
     "AgentEvent",
+    "AllergenDeclaration",
     "Cart",
     "CartLine",
     "CartLineOption",

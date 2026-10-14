@@ -5,6 +5,7 @@ choices an item needs by reading these tables through tools.
 """
 
 import uuid
+from datetime import date
 
 from sqlalchemy import CheckConstraint, ForeignKey, Index, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB
@@ -18,7 +19,7 @@ from drivetruagent.db.base import (
     has_english,
     text_enum,
 )
-from drivetruagent.enums import Language
+from drivetruagent.enums import Allergen, AllergenLevel, Language
 
 # Translated text, one entry per language: {"en": "Fries", "fr": "Frites"}.
 type LocalizedText = dict[str, str]
@@ -61,6 +62,9 @@ class MenuItem(UuidPrimaryKey, Timestamps, Base):
     # Items are never deleted, because orders point at them. Deactivate instead.
     is_active: Mapped[bool] = mapped_column(server_default=text("true"))
     sort_order: Mapped[int] = mapped_column(server_default=text("0"))
+    # When the item's allergen declarations were last reviewed. NULL: they
+    # never were, and nothing may be said about its allergens.
+    allergens_reviewed_on: Mapped[date | None]
 
     category: Mapped[MenuCategory] = relationship(back_populates="items", lazy="raise")
     option_groups: Mapped[list["OptionGroup"]] = relationship(
@@ -170,3 +174,34 @@ class MenuItemAlias(UuidPrimaryKey, Timestamps, Base):
     alias: Mapped[str]
 
     item: Mapped[MenuItem] = relationship(back_populates="aliases", lazy="raise")
+
+
+class AllergenDeclaration(UuidPrimaryKey, Timestamps, Base):
+    """One allergen an item contains or may contain, from the allergen matrix.
+
+    `option_id` NULL means the item itself, whatever is chosen; otherwise the
+    allergen comes with that option (cheese adds milk). Only what is declared
+    is stored: an allergen with no row is "not listed", never "free of".
+    """
+
+    __tablename__ = "allergen_declarations"
+    __table_args__ = (
+        # NULLS NOT DISTINCT: the item itself (option NULL) is declared once.
+        UniqueConstraint(
+            "item_id", "option_id", "allergen", postgresql_nulls_not_distinct=True
+        ),
+        enum_check("allergen", Allergen),
+        enum_check("level", AllergenLevel),
+        has_english("note_i18n"),
+    )
+
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("menu_items.id", ondelete="CASCADE"), index=True
+    )
+    option_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("options.id", ondelete="CASCADE")
+    )
+    allergen: Mapped[Allergen] = mapped_column(text_enum(Allergen))
+    level: Mapped[AllergenLevel] = mapped_column(text_enum(AllergenLevel))
+    # Why it may be present: "Fried in the same oil as the onion rings."
+    note_i18n: Mapped[LocalizedText | None] = mapped_column(LOCALIZED_TEXT)

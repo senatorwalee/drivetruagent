@@ -42,6 +42,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from drivetruagent.agent import events, timekeeper
 from drivetruagent.agent.guard import BLOCKED, ENDED, Guard
 from drivetruagent.agent.loop import AgentConfig
+from drivetruagent.agent.tools import TOOL_DEFINITIONS
 from drivetruagent.agent.voice import (
     TIMER_RESPONSE,
     LiveCalls,
@@ -822,7 +823,7 @@ async def test_the_call_is_set_up_like_the_text_agent(
     assert session["type"] == "realtime"
     assert session["model"] == "gpt-realtime-2.1-mini"
     assert session["instructions"].startswith("You take orders at the drive-through")
-    assert len(session["tools"]) == 13
+    assert len(session["tools"]) == len(TOOL_DEFINITIONS)
     assert {"type", "name", "description", "parameters"} == set(session["tools"][0])
     assert session["audio"]["input"]["transcription"] == {
         "model": "gpt-4o-mini-transcribe"

@@ -250,6 +250,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/menu/items/{item_code}/allergens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One item's allergens
+         * @description What the item contains and may contain with its default choices, and
+         *     which other choices would add an allergen. From the allergen matrix.
+         *
+         *     `verified` false means the item's allergens were never reviewed, and the
+         *     lists say nothing.
+         */
+        get: operations["read_item_allergens_menu_items__item_code__allergens_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/menu/search": {
         parameters: {
             query?: never;
@@ -751,6 +775,36 @@ export interface components {
             /** Voice Model */
             voice_model: string | null;
         };
+        /**
+         * Allergen
+         * @description Health Canada's priority food allergens, with gluten listed apart from
+         *     wheat because a customer avoiding gluten asks about it by that name.
+         * @enum {string}
+         */
+        Allergen: "peanut" | "tree_nut" | "sesame" | "milk" | "egg" | "fish" | "shellfish" | "soy" | "wheat" | "gluten" | "mustard" | "sulphite";
+        /** AllergenReport */
+        AllergenReport: {
+            /** Contains */
+            contains: components["schemas"]["ContainsView"][];
+            /** Item Code */
+            item_code: string;
+            /** Item Name */
+            item_name: string;
+            /** Line No */
+            line_no?: number | null;
+            /** May Contain */
+            may_contain: components["schemas"]["MayContainView"][];
+            /** Not Listed */
+            not_listed: components["schemas"]["Allergen"][];
+            /** Options */
+            options: string[];
+            /** Options That Add */
+            options_that_add: components["schemas"]["OptionAddsView"][];
+            /** Reviewed On */
+            reviewed_on: string | null;
+            /** Verified */
+            verified: boolean;
+        };
         /** CartSnapshot */
         CartSnapshot: {
             /** Discount Cents */
@@ -829,6 +883,12 @@ export interface components {
             saves_cents: number;
             /** Slots */
             slots: components["schemas"]["CategoryRef"][];
+        };
+        /** ContainsView */
+        ContainsView: {
+            allergen: components["schemas"]["Allergen"];
+            /** Sources */
+            sources: string[];
         };
         /** DaySpecialsView */
         DaySpecialsView: {
@@ -1099,6 +1159,12 @@ export interface components {
             /** Unit Price Cents */
             unit_price_cents: number;
         };
+        /** MayContainView */
+        MayContainView: {
+            allergen: components["schemas"]["Allergen"];
+            /** Because */
+            because: string[];
+        };
         /** MenuItemSummary */
         MenuItemSummary: {
             /** Base Price Cents */
@@ -1160,6 +1226,19 @@ export interface components {
              * @default lane-1
              */
             lane: string;
+        };
+        /** OptionAddsView */
+        OptionAddsView: {
+            /** Contains */
+            contains: components["schemas"]["Allergen"][];
+            /** Group Code */
+            group_code: string;
+            /** May Contain */
+            may_contain: components["schemas"]["Allergen"][];
+            /** Option Code */
+            option_code: string;
+            /** Option Name */
+            option_name: string;
         };
         /** OrderView */
         OrderView: {
@@ -1887,6 +1966,49 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ItemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_item_allergens_menu_items__item_code__allergens_get: {
+        parameters: {
+            query?: {
+                /** @description The language names are returned in. */
+                language?: components["schemas"]["Language"];
+            };
+            header?: never;
+            path: {
+                item_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AllergenReport"];
                 };
             };
             /** @description Not Found */

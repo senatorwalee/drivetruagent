@@ -48,7 +48,10 @@
                     "en": "Cheese",
                     "fr": "Fromage"
                   },
-                  "price_delta_cents": 75
+                  "price_delta_cents": 75,
+                  "allergens": {
+                    "contains": ["milk"]
+                  }
                 },
                 {
                   "code": "bacon",
@@ -68,7 +71,20 @@
                 }
               ]
             }
-          ]
+          ],
+          "allergens": {
+            "reviewed_on": "2026-10-01",
+            "contains": ["wheat", "gluten", "sesame", "soy", "egg", "mustard"],
+            "may_contain": [
+              {
+                "allergens": ["milk"],
+                "because": {
+                  "en": "Cooked on the same grill as cheese.",
+                  "fr": "Cuit sur le même gril que le fromage."
+                }
+              }
+            ]
+          }
         },
         {
           "code": "cheeseburger",
@@ -122,7 +138,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "allergens": {
+            "reviewed_on": "2026-10-01",
+            "contains": ["wheat", "gluten", "sesame", "soy", "milk", "mustard"]
+          }
         },
         {
           "code": "double_cheeseburger",
@@ -171,7 +191,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "allergens": {
+            "reviewed_on": "2026-10-01",
+            "contains": ["wheat", "gluten", "sesame", "soy", "milk", "mustard"]
+          }
         },
         {
           "code": "chicken_burger",
@@ -222,11 +246,27 @@
                   "name": {
                     "en": "Spicy",
                     "fr": "Épicé"
+                  },
+                  "allergens": {
+                    "contains": ["mustard"]
                   }
                 }
               ]
             }
-          ]
+          ],
+          "allergens": {
+            "reviewed_on": "2026-10-01",
+            "contains": ["wheat", "gluten", "sesame", "soy", "egg"],
+            "may_contain": [
+              {
+                "allergens": ["milk"],
+                "because": {
+                  "en": "Fried in the same oil as the onion rings and nuggets.",
+                  "fr": "Frit dans la même huile que les rondelles d'oignon et les croquettes."
+                }
+              }
+            ]
+          }
         },
         {
           "code": "veggie_burger",
@@ -270,11 +310,34 @@
                     "en": "Cheese",
                     "fr": "Fromage"
                   },
-                  "price_delta_cents": 75
+                  "price_delta_cents": 75,
+                  "allergens": {
+                    "contains": ["milk"]
+                  }
                 }
               ]
             }
-          ]
+          ],
+          "allergens": {
+            "reviewed_on": "2026-10-01",
+            "contains": ["wheat", "gluten", "sesame", "soy", "egg"],
+            "may_contain": [
+              {
+                "allergens": ["milk"],
+                "because": {
+                  "en": "Cooked on the same grill as cheese.",
+                  "fr": "Cuit sur le même gril que le fromage."
+                }
+              },
+              {
+                "allergens": ["peanut", "tree_nut"],
+                "because": {
+                  "en": "Made where nuts are handled.",
+                  "fr": "Préparé là où l'on manipule des noix."
+                }
+              }
+            ]
+          }
         }
       ]
     },
@@ -396,11 +459,26 @@
                   "name": {
                     "en": "Seasoned",
                     "fr": "Assaisonnées"
+                  },
+                  "allergens": {
+                    "contains": ["milk"]
                   }
                 }
               ]
             }
-          ]
+          ],
+          "allergens": {
+            "reviewed_on": "2026-10-01",
+            "may_contain": [
+              {
+                "allergens": ["wheat", "gluten", "milk", "egg"],
+                "because": {
+                  "en": "Fried in the same oil as the onion rings and nuggets.",
+                  "fr": "Frit dans la même huile que les rondelles d'oignon et les croquettes."
+                }
+              }
+            ]
+          }
         },
         {
           "code": "onion_rings",
@@ -447,7 +525,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "allergens": {
+            "reviewed_on": "2026-10-01",
+            "contains": ["wheat", "gluten", "milk", "egg"]
+          }
         },
         {
           "code": "chicken_nuggets",
@@ -525,6 +607,9 @@
                   "name": {
                     "en": "Barbecue",
                     "fr": "Barbecue"
+                  },
+                  "allergens": {
+                    "contains": ["mustard", "sulphite"]
                   }
                 },
                 {
@@ -532,6 +617,9 @@
                   "name": {
                     "en": "Honey mustard",
                     "fr": "Miel et moutarde"
+                  },
+                  "allergens": {
+                    "contains": ["mustard", "egg"]
                   }
                 },
                 {
@@ -543,7 +631,20 @@
                 }
               ]
             }
-          ]
+          ],
+          "allergens": {
+            "reviewed_on": "2026-10-01",
+            "contains": ["wheat", "gluten", "egg"],
+            "may_contain": [
+              {
+                "allergens": ["milk"],
+                "because": {
+                  "en": "Fried in the same oil as the onion rings and nuggets.",
+                  "fr": "Frit dans la même huile que les rondelles d'oignon et les croquettes."
+                }
+              }
+            ]
+          }
         },
         {
           "code": "side_salad",
@@ -579,13 +680,19 @@
                     "en": "Vinaigrette",
                     "fr": "Vinaigrette classique"
                   },
-                  "default": true
+                  "default": true,
+                  "allergens": {
+                    "contains": ["mustard", "sulphite"]
+                  }
                 },
                 {
                   "code": "ranch",
                   "name": {
                     "en": "Ranch",
                     "fr": "Ranch"
+                  },
+                  "allergens": {
+                    "contains": ["milk", "egg"]
                   }
                 },
                 {
@@ -597,7 +704,10 @@
                 }
               ]
             }
-          ]
+          ],
+          "allergens": {
+            "reviewed_on": "2026-10-01"
+          }
         }
       ]
     },
@@ -664,7 +774,10 @@
                 }
               ]
             }
-          ]
+          ],
+          "allergens": {
+            "reviewed_on": "2026-10-01"
+          }
         },
         {
           "code": "lemon_lime_soda",
@@ -724,7 +837,10 @@
                 }
               ]
             }
-          ]
+          ],
+          "allergens": {
+            "reviewed_on": "2026-10-01"
+          }
         },
         {
           "code": "iced_tea",
@@ -805,7 +921,10 @@
                 }
               ]
             }
-          ]
+          ],
+          "allergens": {
+            "reviewed_on": "2026-10-01"
+          }
         },
         {
           "code": "orange_juice",
@@ -851,7 +970,10 @@
                 }
               ]
             }
-          ]
+          ],
+          "allergens": {
+            "reviewed_on": "2026-10-01"
+          }
         },
         {
           "code": "coffee",
@@ -927,6 +1049,9 @@
                   "name": {
                     "en": "Milk",
                     "fr": "Lait"
+                  },
+                  "allergens": {
+                    "contains": ["milk"]
                   }
                 },
                 {
@@ -934,6 +1059,9 @@
                   "name": {
                     "en": "Cream",
                     "fr": "Crème"
+                  },
+                  "allergens": {
+                    "contains": ["milk"]
                   }
                 },
                 {
@@ -942,11 +1070,25 @@
                     "en": "Oat milk",
                     "fr": "Boisson d'avoine"
                   },
-                  "price_delta_cents": 50
+                  "price_delta_cents": 50,
+                  "allergens": {
+                    "may_contain": [
+                      {
+                        "allergens": ["gluten"],
+                        "because": {
+                          "en": "Oats may be processed alongside wheat.",
+                          "fr": "L'avoine peut être transformée avec du blé."
+                        }
+                      }
+                    ]
+                  }
                 }
               ]
             }
-          ]
+          ],
+          "allergens": {
+            "reviewed_on": "2026-10-01"
+          }
         },
         {
           "code": "bottled_water",
@@ -966,7 +1108,10 @@
               "eau en bouteille"
             ]
           },
-          "option_groups": []
+          "option_groups": [],
+          "allergens": {
+            "reviewed_on": "2026-10-01"
+          }
         },
         {
           "code": "milkshake",
@@ -1034,6 +1179,9 @@
                   "name": {
                     "en": "Chocolate",
                     "fr": "Chocolat"
+                  },
+                  "allergens": {
+                    "contains": ["soy"]
                   }
                 },
                 {
@@ -1045,7 +1193,11 @@
                 }
               ]
             }
-          ]
+          ],
+          "allergens": {
+            "reviewed_on": "2026-10-01",
+            "contains": ["milk"]
+          }
         }
       ]
     },
@@ -1073,7 +1225,20 @@
               "chausson aux pommes"
             ]
           },
-          "option_groups": []
+          "option_groups": [],
+          "allergens": {
+            "reviewed_on": "2026-10-01",
+            "contains": ["wheat", "gluten", "soy"],
+            "may_contain": [
+              {
+                "allergens": ["milk", "egg"],
+                "because": {
+                  "en": "Baked where dairy and eggs are used.",
+                  "fr": "Cuit là où l'on utilise des produits laitiers et des œufs."
+                }
+              }
+            ]
+          }
         },
         {
           "code": "sundae",
@@ -1106,6 +1271,9 @@
                   "name": {
                     "en": "Chocolate",
                     "fr": "Chocolat"
+                  },
+                  "allergens": {
+                    "contains": ["soy"]
                   }
                 },
                 {
@@ -1124,7 +1292,20 @@
                 }
               ]
             }
-          ]
+          ],
+          "allergens": {
+            "reviewed_on": "2026-10-01",
+            "contains": ["milk"],
+            "may_contain": [
+              {
+                "allergens": ["peanut", "tree_nut"],
+                "because": {
+                  "en": "Made where nuts are handled.",
+                  "fr": "Préparé là où l'on manipule des noix."
+                }
+              }
+            ]
+          }
         },
         {
           "code": "cookie",
@@ -1144,7 +1325,20 @@
               "biscuit au chocolat"
             ]
           },
-          "option_groups": []
+          "option_groups": [],
+          "allergens": {
+            "reviewed_on": "2026-10-01",
+            "contains": ["wheat", "gluten", "milk", "egg", "soy"],
+            "may_contain": [
+              {
+                "allergens": ["peanut", "tree_nut"],
+                "because": {
+                  "en": "Made where nuts are handled.",
+                  "fr": "Préparé là où l'on manipule des noix."
+                }
+              }
+            ]
+          }
         },
         {
           "code": "soft_serve_cone",
@@ -1167,7 +1361,11 @@
               "crème molle"
             ]
           },
-          "option_groups": []
+          "option_groups": [],
+          "allergens": {
+            "reviewed_on": "2026-10-01",
+            "contains": ["milk", "wheat", "gluten", "soy"]
+          }
         }
       ]
     }
