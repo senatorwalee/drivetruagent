@@ -84,6 +84,22 @@ export const api = {
   pause: (sessionId: string) => post<Session>(`/sessions/${sessionId}/pause`),
   resume: (sessionId: string) => post<Session>(`/sessions/${sessionId}/resume`),
 
+  /** Start a voice call: our WebRTC offer in, OpenAI's answer out (both SDP text). */
+  startVoice: async (sessionId: string, sdp: string): Promise<string> => {
+    const response = await fetch(`${BASE}/sessions/${sessionId}/voice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/sdp' },
+      body: sdp,
+    })
+    if (!response.ok) throw await toApiError(response)
+    return response.text()
+  },
+  endVoice: async (sessionId: string): Promise<void> => {
+    const response = await fetch(`${BASE}/sessions/${sessionId}/voice`, { method: 'DELETE' })
+    // No call to end is not a problem: the call is over either way.
+    if (!response.ok && response.status !== 404) throw await toApiError(response)
+  },
+
   /** Sessions handed to a person, the longest-waiting first. */
   handoffs: () => request<HandoffSummary[]>('/handoffs'),
   handoff: (handoffId: string) => request<HandoffPackage>(`/handoffs/${handoffId}`),

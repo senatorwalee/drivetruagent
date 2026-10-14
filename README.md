@@ -30,7 +30,8 @@ built piece by piece.
 | 10a | Handoff package: what a person taking over is shown, and closing a handoff | Done |
 | 10b | Staff screen: the handoff queue and the package, in the web app | Done |
 | 11 | A second model provider: Gemini, which has a free tier | Done; not yet run against Google's API |
-| Later | Voice, knowledge search, tracing | Planned |
+| 12 | Voice: talk to the agent through OpenAI Realtime | Done; tested with a recorded voice |
+| Later | Knowledge search, tracing | Planned |
 
 ## Stack
 
@@ -40,7 +41,7 @@ built piece by piece.
 | Database | PostgreSQL 17 with pgvector |
 | Database access | SQLAlchemy 2.0 (async), Alembic migrations |
 | Model | OpenAI (Responses API) or Google Gemini, behind one interface; chosen in `.env` |
-| Voice (planned) | OpenAI Realtime, relayed through the backend |
+| Voice | OpenAI Realtime over WebRTC; the backend holds the key and runs every tool call |
 | Tests | pytest, with a real Postgres started by testcontainers |
 | Web app | React, TypeScript and Vite; TanStack Query; types generated from the API |
 | Tooling | uv, ruff, pyright, oxlint, Vitest, pre-commit, GitHub Actions |
@@ -212,6 +213,33 @@ make chat
 
 Without a key everything else still works; only the conversation endpoint
 answers 503.
+
+### Talking to it
+
+Press the microphone button on the live screen and speak. The agent answers
+aloud. It needs `OPENAI_API_KEY` (voice is OpenAI Realtime,
+`gpt-realtime-2.1-mini` by default) and a browser that allows the microphone;
+`localhost` counts as secure, so Chrome asks once.
+
+    browser  --audio, WebRTC-->  OpenAI Realtime  <--events-->  backend
+
+- **Audio goes straight between the browser and OpenAI**, which keeps it quick
+  and lets the browser handle echo and noise.
+- **The browser sends its call offer to the backend, not to OpenAI.** The
+  backend forwards it with its own key and the call's settings. The browser
+  never holds a key.
+- **The backend joins the call** on a second connection and runs every tool
+  the model asks for through the same tools and policy gateway as typing. The
+  browser cannot answer a tool call.
+- **What is said, both ways, is written to the event log** from OpenAI's
+  transcripts, so the live screen, the staff handoff package and the timers
+  work unchanged. On a call, the timers' sentences ("Are you still there?")
+  are spoken.
+
+Typing is switched off during a call. Pause mutes the microphone as well as
+stopping the timers. Verified with a real call through the page, using a
+recorded voice as the customer. See `agent/voice.py`, `api/voice.py` and
+`frontend/src/voice/`.
 
 ### Running it on Gemini, for free
 
@@ -594,6 +622,8 @@ Run `make dev` and open <http://127.0.0.1:8000/docs> to try these.
 | `POST /sessions` | Open a session and its cart |
 | `GET /sessions/{id}` | Read a session |
 | `PATCH /sessions/{id}` | Set the session's language |
+| `POST /sessions/{id}/voice` | Start a voice call: the browser's WebRTC offer in, OpenAI's answer out |
+| `DELETE /sessions/{id}/voice` | Hang up |
 | `POST /sessions/{id}/pause` | Stop the session's timers |
 | `POST /sessions/{id}/resume` | Start them again |
 | `GET /sessions/{id}/cart` | Read the cart, priced |

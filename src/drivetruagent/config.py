@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from drivetruagent.agent.voice import VoiceSettings
 from drivetruagent.ordering.timers import TimerSettings
 from drivetruagent.policy.decisions import PolicyLimits
 
@@ -52,6 +53,11 @@ class Settings(BaseSettings):
     agent_model: Literal["openai", "gemini", "demo"] = "openai"
     openai_api_key: SecretStr | None = None
     openai_text_model: str = "gpt-6-luna"
+    # Voice, through OpenAI Realtime. Needs OPENAI_API_KEY whichever text
+    # model is chosen. See agent/voice.py.
+    voice_model: str = "gpt-realtime-2.1-mini"
+    voice_name: str = "marin"
+    voice_transcription_model: str = "gpt-4o-mini-transcribe"
     # Google's Gemini API has a free tier. See agent/gemini_model.py.
     gemini_api_key: SecretStr | None = None
     gemini_text_model: str = "gemini-2.5-flash-lite"
@@ -89,6 +95,14 @@ class Settings(BaseSettings):
         """The restaurant's calendar date at `now` (default: this moment)."""
         zone = ZoneInfo(self.restaurant_timezone)
         return (now.astimezone(zone) if now else datetime.now(zone)).date()
+
+    @property
+    def voice_settings(self) -> VoiceSettings:
+        return VoiceSettings(
+            model=self.voice_model,
+            voice=self.voice_name,
+            transcription_model=self.voice_transcription_model,
+        )
 
     @property
     def session_timers(self) -> TimerSettings:

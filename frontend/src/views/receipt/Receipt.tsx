@@ -6,7 +6,7 @@ import { STAFF_PATH } from '../../app/navigation'
 import { PageLink } from '../../app/PageLink'
 import { clock, progressSteps } from '../../session/presentation'
 import type { LiveSession } from '../../session/useLiveSession'
-import { MicrophoneIcon } from '../shared/icons'
+import { MicButton } from '../shared/MicButton'
 import { useComposer } from '../shared/useComposer'
 import { ViewSwitcher } from '../shared/ViewSwitcher'
 import type { LiveSessionViewProps } from '../shared/viewTypes'
@@ -106,9 +106,7 @@ function Composer({ live }: { live: LiveSession }) {
         </button>
       )}
       <form className={styles.composer} onSubmit={composer.submit}>
-        <button type="button" className={styles.mic} aria-label="Speak (voice is not connected yet)" disabled>
-          <MicrophoneIcon />
-        </button>
+        <MicButton voice={live.voice} className={styles.mic} />
         <label htmlFor="receipt-say" className={styles.visuallyHidden}>
           What the customer says
         </label>

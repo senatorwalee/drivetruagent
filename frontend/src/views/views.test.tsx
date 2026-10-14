@@ -8,7 +8,7 @@ import type { ComponentType } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { buildTimeline } from '../session/timeline'
-import { cart, comboCart, liveSession, replied, resetSeq, session, timer, toolRound } from '../test/fixtures'
+import { cart, comboCart, liveSession, noVoice, replied, resetSeq, session, timer, toolRound } from '../test/fixtures'
 import { ControlRoom } from './control-room/ControlRoom'
 import { MenuBoard } from './menu-board/MenuBoard'
 import { Receipt } from './receipt/Receipt'
@@ -181,6 +181,39 @@ describe.each(VIEWS)('%s view', (viewId, View) => {
     expect(screen.getAllByText('clock').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText(/asked after 20s of silence/)).toBeInTheDocument()
     expect(screen.getByText('Are you still there?')).toBeInTheDocument()
+  })
+
+  it('shows the mic, disabled, when voice is not available', () => {
+    show()
+
+    expect(screen.getByRole('button', { name: 'Voice is not available' })).toBeDisabled()
+  })
+
+  it('starts a call from the mic', async () => {
+    const start = vi.fn()
+    show({ voice: { ...noVoice, available: true, start } })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Talk to the agent' }))
+
+    expect(start).toHaveBeenCalledOnce()
+  })
+
+  it('hangs up from the same button during a call, and says to just speak', async () => {
+    const stop = vi.fn()
+    show({ voice: { ...noVoice, available: true, active: true, status: 'live', stop }, canSend: false })
+
+    const hangUp = screen.getByRole('button', { name: 'Hang up' })
+    expect(hangUp).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByPlaceholderText('On a call: just speak')).toBeDisabled()
+    await userEvent.click(hangUp)
+
+    expect(stop).toHaveBeenCalledOnce()
+  })
+
+  it('says the call is connecting while it is set up', () => {
+    show({ voice: { ...noVoice, available: true, active: true, status: 'connecting' }, canSend: false })
+
+    expect(screen.getByPlaceholderText('Connecting the call…')).toBeInTheDocument()
   })
 
   it('pauses and resumes', async () => {

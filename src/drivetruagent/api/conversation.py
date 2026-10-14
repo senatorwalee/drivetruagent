@@ -42,6 +42,9 @@ class AgentInfoResponse(BaseModel):
     scripted: bool
     # For the demo script: what to type at each turn.
     suggested_lines: list[str]
+    # Whether voice calls can be made. They need an OpenAI key.
+    voice_available: bool
+    voice_model: str | None
 
 
 class EventView(BaseModel):
@@ -125,4 +128,6 @@ async def read_agent_info(settings: SettingsDep) -> AgentInfoResponse:
         model=info.model,
         scripted=info.scripted,
         suggested_lines=list(info.suggested_lines),
+        voice_available=settings.openai_api_key is not None,
+        voice_model=settings.voice_model if settings.openai_api_key else None,
     )

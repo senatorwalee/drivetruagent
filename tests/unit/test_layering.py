@@ -95,15 +95,16 @@ def test_pure_logic_touches_no_database_web_or_model_library(module: str) -> Non
     assert not found, f"{module} imports {sorted(found)}"
 
 
-def test_only_the_adapter_imports_the_model_providers_library() -> None:
-    """Everything else talks to a model through the ModelClient interface."""
+def test_only_the_adapters_import_the_model_providers_library() -> None:
+    """Everything else talks to a model through the ModelClient interface, or
+    for voice through agent/voice.py."""
     users = {
         str(path.relative_to(SOURCE))
         for path in SOURCE.rglob("*.py")
         if imports_from(path, "openai")
     }
 
-    assert users == {"agent/openai_model.py"}
+    assert users == {"agent/openai_model.py", "agent/voice.py"}
 
 
 def test_only_the_gemini_adapter_imports_googles_library() -> None:

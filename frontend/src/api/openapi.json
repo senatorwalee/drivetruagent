@@ -199,6 +199,21 @@
             },
             "title": "Suggested Lines",
             "type": "array"
+          },
+          "voice_available": {
+            "title": "Voice Available",
+            "type": "boolean"
+          },
+          "voice_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voice Model"
           }
         },
         "required": [
@@ -206,7 +221,9 @@
           "available",
           "model",
           "scripted",
-          "suggested_lines"
+          "suggested_lines",
+          "voice_available",
+          "voice_model"
         ],
         "title": "AgentInfoResponse",
         "type": "object"
@@ -3784,6 +3801,127 @@
         "summary": "Start the session's clocks again",
         "tags": [
           "ordering"
+        ]
+      }
+    },
+    "/sessions/{session_id}/voice": {
+      "delete": {
+        "operationId": "hang_up_sessions__session_id__voice_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Hang up",
+        "tags": [
+          "voice"
+        ]
+      },
+      "post": {
+        "description": "Send the browser's SDP offer; get OpenAI's SDP answer back.\n\nThe call is set up with the same instructions and tools as text mode,\nand the backend joins it to run every tool call through the policy\ngateway.",
+        "operationId": "start_call_sessions__session_id__voice_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Start a voice call",
+        "tags": [
+          "voice"
         ]
       }
     },
