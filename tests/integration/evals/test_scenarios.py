@@ -8,7 +8,8 @@ service, so they are left out of `make test` and CI. With no key, or with the
 scripted demo selected, they are skipped.
 
 Each check is deterministic: it looks at the cart, the order, the session's
-state and the tools used, not at the agent's wording.
+state and the tools used, not at the agent's wording. To read the wording,
+run with -s: every conversation is printed.
 """
 
 import pytest
@@ -53,6 +54,8 @@ async def test_scenario(
         db_session, scenario, model=model, config=agent_config(settings)
     )
 
+    # Shown with -s, to read how the agent worded things.
+    print(f"\n{scenario.name}\n{result.transcript()}")
     failures = check(scenario, result)
     assert not failures, "\n".join(
         [

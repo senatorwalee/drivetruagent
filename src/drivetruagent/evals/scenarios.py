@@ -197,4 +197,33 @@ SCENARIOS: tuple[Scenario, ...] = (
         final_state=SessionState.HANDED_OFF,
         must_not_say=("168", "one hundred sixty-eight"),
     ),
+    Scenario(
+        name="asks_about_dairy",
+        # The answer has to come from the allergen tool, and the customer
+        # still orders: a classic burger without the cheese.
+        customer=(
+            "Does the cheeseburger have dairy in it?",
+            "Okay, then I'll have a classic burger with nothing extra.",
+            "That's all.",
+            "Yes.",
+        ),
+        final_state=SessionState.SUBMITTED,
+        lines=(ExpectedLine("classic_burger", 1),),
+        must_use=ORDERING_TOOLS | {"check_allergens"},
+    ),
+    Scenario(
+        name="checks_the_order_for_a_nut_allergy",
+        # Checked against the order as it stands. The cookie may contain nuts,
+        # the customer takes it off, and the rest is placed.
+        customer=(
+            "A chocolate chip cookie and a small cola, please.",
+            "My son has a nut allergy. Is anything in my order a problem?",
+            "Okay, take the cookie off then.",
+            "That's all.",
+            "Yes.",
+        ),
+        final_state=SessionState.SUBMITTED,
+        lines=(ExpectedLine("cola", 1, {"size": "small"}),),
+        must_use=ORDERING_TOOLS | {"check_allergens", "remove_item"},
+    ),
 )
