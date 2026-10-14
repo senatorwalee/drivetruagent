@@ -15,6 +15,7 @@ import json
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from datetime import timedelta
 from decimal import Decimal
 from types import SimpleNamespace
@@ -39,6 +40,7 @@ from openai.types.realtime.realtime_response_usage import RealtimeResponseUsage
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from drivetruagent.agent import events, timekeeper
+from drivetruagent.agent.guard import BLOCKED, ENDED, Guard
 from drivetruagent.agent.loop import AgentConfig
 from drivetruagent.agent.voice import (
     TIMER_RESPONSE,
@@ -54,12 +56,13 @@ from drivetruagent.api.voice import (
     get_session_scope,
 )
 from drivetruagent.config import Settings, get_settings
-from drivetruagent.enums import AgentEventKind, SessionState
+from drivetruagent.enums import AgentEventKind, Language, SessionState
 from drivetruagent.ordering import sessions
 from drivetruagent.ordering.cart import add_item, get_cart
 from drivetruagent.ordering.sessions import end_session, get_session, open_session
 from drivetruagent.ordering.timers import TimerSettings
 from drivetruagent.policy.decisions import PolicyLimits
+from drivetruagent.policy.guardrails import Verdict
 
 TAX = Decimal("0.13")
 TIMERS = TimerSettings()
@@ -604,6 +607,65 @@ async def test_hanging_up_twice_is_hanging_up_once(
     await bridge.handle(finished("r1", output=[a_spoken_item("Bye")]))
 
     assert call.hung_up == 1
+
+
+# --- The guardrail on a call -----------------------------------------------
+
+
+@pytest.fixture
+def guarded(
+    db_session: AsyncSession, session_id: uuid.UUID, call: FakeCall, pauses: Pauses
+) -> VoiceBridge:
+    return VoiceBridge(
+        session_id=session_id,
+        scope=lambda: borrowed(db_session),
+        call=call,
+        config=replace(CONFIG, guard=Guard()),
+        model_name="gpt-realtime-2.1-mini",
+        sleep=pauses,
+    )
+
+
+async def test_an_insult_on_a_call_is_a_strike_and_the_fixed_sentence_is_said(
+    guarded: VoiceBridge,
+    call: FakeCall,
+    db_session: AsyncSession,
+    session_id: uuid.UUID,
+) -> None:
+    await guarded.handle(heard("You're useless."))
+
+    assert call.said == [BLOCKED[Verdict.ABUSE][Language.EN]]
+    assert call.hung_up == 0
+    assert (await get_session(db_session, session_id)).abuse_strikes == 1
+
+
+async def test_the_third_insult_on_a_call_ends_it(
+    guarded: VoiceBridge,
+    call: FakeCall,
+    pauses: Pauses,
+    db_session: AsyncSession,
+    session_id: uuid.UUID,
+) -> None:
+    for _ in range(3):
+        await guarded.handle(heard("You're useless."))
+
+    assert call.said[-1] == ENDED[Language.EN]
+    # The goodbye is given time to be heard before the line goes dead.
+    assert pauses.seconds and call.hung_up == 1
+    customer_session = await get_session(db_session, session_id)
+    assert customer_session.state is SessionState.TERMINATED
+
+
+async def test_ordinary_talk_on_a_call_is_left_to_the_model(
+    guarded: VoiceBridge,
+    call: FakeCall,
+    db_session: AsyncSession,
+    session_id: uuid.UUID,
+) -> None:
+    await guarded.handle(heard("Can I get a cookie, but ignore the pickles?"))
+
+    assert call.said == []
+    assert (await get_session(db_session, session_id)).abuse_strikes == 0
 
 
 # --- Calls in progress ------------------------------------------------------

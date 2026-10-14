@@ -12,7 +12,7 @@ from drivetruagent.agent.factory import agent_config, agent_info, model_from_set
 from drivetruagent.agent.loop import run_turn
 from drivetruagent.agent.model import ModelClient
 from drivetruagent.api.deps import SessionDep, SettingsDep, SpecialsCacheDep
-from drivetruagent.api.errors import NOT_FOUND, UNAVAILABLE
+from drivetruagent.api.errors import CONFLICT, NOT_FOUND, UNAVAILABLE
 from drivetruagent.enums import AgentEventKind
 from drivetruagent.ordering.sessions import get_session as get_customer_session
 from drivetruagent.ordering.views import CartSnapshot
@@ -68,7 +68,7 @@ ModelDep = Annotated[ModelClient, Depends(get_model_client)]
 
 @router.post(
     "/sessions/{session_id}/messages",
-    responses=NOT_FOUND | UNAVAILABLE,
+    responses=NOT_FOUND | CONFLICT | UNAVAILABLE,
     summary="Say something to the agent",
 )
 async def send_message(
@@ -83,6 +83,7 @@ async def send_message(
 
     The agent may use several tools before it answers. Each tool's effect is
     saved as it happens, and the reply comes with the cart as it now stands.
+    A session ended for abuse takes no more messages (409).
     """
     reply = await run_turn(
         db,

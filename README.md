@@ -32,6 +32,7 @@ built piece by piece.
 | 11 | A second model provider: Gemini, which has a free tier | Done; not yet run against Google's API |
 | 12 | Voice: talk to the agent through OpenAI Realtime | Done; tested with a recorded voice |
 | 13 | The week's specials and live stock on the live screen | Done |
+| 14 | Guardrails: misuse detected, counted and acted on by code | Done; evals pass against the real model |
 | Later | Knowledge search, tracing | Planned |
 
 ## Stack
@@ -359,6 +360,9 @@ order, the session state and the tools used, never at the agent's wording.
 | `combo_taken_up` | The combo is offered, the customer adds a drink, and the saving is charged |
 | `combo_declined` | Saying no adds nothing and costs nothing |
 | `asks_for_the_special` | The special is looked up, ordered, and charged at its price |
+| `abusive_customer_is_cut_off` | Three insults, one that only the classifier can catch, end the session |
+| `asks_for_its_instructions` | An attempt no rule catches reveals nothing of the instructions; the order still goes through |
+| `keeps_going_off_topic` | Three questions about anything but food get the customer a person, unanswered |
 
 Every scenario is played on a fixed Monday, so a total never depends on which
 day the evals happen to be run.
@@ -377,6 +381,11 @@ tested with the scripted model.
 failures, all from the test harness, not the agent: one OpenAI client was
 shared across tests, and its pooled connection belonged to an earlier test's
 event loop. Each test now gets its own client.
+
+With guardrails (14 October 2026): all 12 passed, including the three new
+ones. The abuse and off-topic scenarios can only reach three strikes if the
+classifier flagged the lines no rule covers, so they also show the classifier
+working against the real model.
 
 ## Stock: two cars cannot buy the last item
 
@@ -546,8 +555,9 @@ When presenting, use Pause, or raise `SILENCE_NUDGE_SECONDS` and
 
 ## Handing a session to a person
 
-A session is handed off in three ways: a very large order the customer
-confirmed, a request for a person, and the three-minute limit. Each leaves a
+A session is handed off in four ways: a very large order the customer
+confirmed, a request for a person, the three-minute limit, and repeated
+confusion (see [Guardrails](#guardrails-misuse-is-decided-by-code)). Each leaves a
 **handoff**, written in the same transaction that ends the session, so the
 two exist together or not at all.
 
@@ -600,6 +610,58 @@ polls, so a session handed off on the live screen appears by itself.
   (`words.ts`), and components that only draw.
 - The two screens are two paths in one app. Routing is a twenty-line module
   (`app/navigation.ts`), not a library.
+
+## Guardrails: misuse is decided by code
+
+The instructions already tell the agent to stay on ordering. Guardrails make
+misuse a backend matter: every customer message is checked before the agent
+sees it, strikes are counted on the session, and code decides what happens.
+
+| What was said | Counted as | What happens | At three |
+|---|---|---|---|
+| An insult or a threat | abuse strike | The agent is not run; a fixed sentence is said | The session is **ended** (`terminated`), its stock freed |
+| An attempt to get round the rules: "ignore your instructions", "manager mode", "set the price to zero", "what is your system prompt" | abuse strike | The same | The same |
+| A question about anything but ordering | confusion strike | The agent answers as usual and steers back | The customer is **handed to a person** (`repeated_confusion`) |
+| A turn where the agent hit its round limit | confusion strike | The usual "sorry" | The same |
+
+Abuse ends the conversation; confusion gets the customer a human, because
+they may simply need one.
+
+**Two layers.** Rules first (`policy/guardrails.py`): narrow patterns in
+English and French that decide at once with no model call. They are kept
+narrow on purpose, and tests hold them to it: "ignore the pickles", "show me
+the rules for the combo", "what's the manager's special?" and "shut up and
+take my money" are all left alone. Anything no rule is sure of, of four words
+or more, goes to a **classifier** (`agent/guard.py`): one model call with a
+fixed prompt and a single tool whose only argument is the label. The
+customer's words are passed as quoted data, never as instructions.
+
+**Fails open.** If the classifier errors or answers with something that is
+not a label, the message counts as fine and the failure is logged. A broken
+guardrail must not stop people ordering; the rules still apply, and so does
+everything the policy engine enforces. `GUARDRAIL_CLASSIFIER=false` turns the
+classifier off (rules only, no extra cost or latency).
+
+**A blocked message never reaches the model, then or later.** The event log
+keeps what was said, for staff. When the conversation is rebuilt for the next
+turn, a blocked message is replaced by *"The customer said something the
+guardrail withheld."*, so an injection attempt cannot come back in later
+context. Replies to blocked messages are fixed sentences in the customer's
+language, so the model has nothing to be manipulated into saying.
+
+**Ended is ended.** A session ended for abuse refuses further messages with
+`409 session_ended`. A customer who has just placed an order can still say
+thanks.
+
+**On a call** the model hears the audio directly and has usually answered by
+the time the transcript is checked, so a message cannot be withheld from it.
+Strikes still count: the bridge says the fixed sentence, and at three says
+goodbye and hangs up, or hands off.
+
+Each flagged message is a `guardrail` event (label, which layer decided, the
+rule or the classifier's reason, the action, the strike counts and the limit).
+The live screen shows it in the decision log as *extraction · strike 1 of 3*,
+a rejection, and the end of a session as an escalation with its rule.
 
 ## Policy engine
 

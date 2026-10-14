@@ -28,6 +28,9 @@ EXTREME_QUANTITY = "extreme_quantity"
 HUMAN_REQUESTED = "human_requested"
 TIME_LIMIT = "time_limit"
 SILENCE_TIMEOUT = "silence_timeout"
+# The guardrail's two outcomes: three strikes for abuse, or for confusion.
+ABUSE = "abuse"
+REPEATED_CONFUSION = "repeated_confusion"
 
 
 def evaluate(

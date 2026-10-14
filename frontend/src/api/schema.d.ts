@@ -465,6 +465,7 @@ export interface paths {
          *
          *     The agent may use several tools before it answers. Each tool's effect is
          *     saved as it happens, and the reply comes with the cart as it now stands.
+         *     A session ended for abuse takes no more messages (409).
          */
         post: operations["send_message_sessions__session_id__messages_post"];
         delete?: never;
@@ -732,7 +733,7 @@ export interface components {
          * @description What one row of the agent's event log records.
          * @enum {string}
          */
-        AgentEventKind: "user_message" | "model_call" | "tool_call" | "tool_result" | "assistant_message" | "timer";
+        AgentEventKind: "user_message" | "model_call" | "tool_call" | "tool_result" | "assistant_message" | "timer" | "guardrail";
         /** AgentInfoResponse */
         AgentInfoResponse: {
             /** Available */
@@ -2430,6 +2431,15 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

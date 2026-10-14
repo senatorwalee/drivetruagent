@@ -23,12 +23,14 @@ from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from drivetruagent.agent import events, timekeeper
+from drivetruagent.agent.guard import Guard, check_message, turn_went_nowhere
 from drivetruagent.agent.messages import AssistantMessage, ToolResult, UserMessage
 from drivetruagent.agent.model import ModelClient, ModelTurn
 from drivetruagent.agent.prompt import build_instructions
 from drivetruagent.agent.tools import TOOL_DEFINITIONS, ToolContext, run_tool
-from drivetruagent.enums import AgentEventKind
+from drivetruagent.enums import AgentEventKind, SessionState
 from drivetruagent.ordering.cart import get_cart
+from drivetruagent.ordering.errors import SessionEnded
 from drivetruagent.ordering.inventory import DEFAULT_RESERVATION_TTL
 from drivetruagent.ordering.offers import SpecialsCache, close_suggestions
 from drivetruagent.ordering.sessions import begin_turn, end_turn, get_session
@@ -52,6 +54,8 @@ class AgentConfig:
     specials_cache: SpecialsCache | None = None
     # The session length limit, checked as each turn starts. None: no limit.
     timers: TimerSettings | None = None
+    # Checks each customer message for misuse. None: no checks.
+    guard: Guard | None = None
 
 
 @dataclass(frozen=True)
@@ -73,8 +77,15 @@ async def run_turn(
     model: ModelClient,
     config: AgentConfig,
 ) -> AgentReply:
-    """Handle one thing the customer said and return what to say back."""
-    await get_session(db, session_id)  # raises SessionNotFound
+    """Handle one thing the customer said and return what to say back.
+
+    Raises SessionNotFound, or SessionEnded if the session was ended for
+    abuse: that is not undone by talking to it. A customer who has just
+    ordered can still say thanks.
+    """
+    customer_session = await get_session(db, session_id)
+    if customer_session.state is SessionState.TERMINATED:
+        raise SessionEnded(customer_session.state)
     turn_id = uuid.uuid4()
     await events.record_message(db, session_id, turn_id, UserMessage(user_text))
     # The customer has answered, one way or another, anything they were
@@ -88,19 +99,55 @@ async def run_turn(
     try:
         handed_off = await _hand_off_if_over_time(db, session_id, config)
         if handed_off is not None:
-            return AgentReply(
-                text=handed_off,
-                cart=await get_cart(db, session_id, tax_rate=config.tax_rate),
-                turn_id=turn_id,
-                tools_used=(),
+            return await _fixed_reply(db, session_id, turn_id, handed_off, config)
+        if config.guard is not None:
+            checked = await check_message(
+                db,
+                session_id,
+                turn_id,
+                user_text,
+                guard=config.guard,
+                tax_rate=config.tax_rate,
             )
-        return await _converse(db, session_id, turn_id, model=model, config=config)
+            await db.commit()
+            if checked.reply is not None:
+                # Blocked, or the session ended: the model is not asked.
+                return await _fixed_reply(
+                    db, session_id, turn_id, checked.reply, config
+                )
+
+        reply = await _converse(db, session_id, turn_id, model=model, config=config)
+        if reply.gave_up and config.guard is not None:
+            # Getting nowhere counts toward a person taking over.
+            stuck = await turn_went_nowhere(
+                db, session_id, turn_id, guard=config.guard, tax_rate=config.tax_rate
+            )
+            await db.commit()
+            if stuck.reply is not None:
+                return await _fixed_reply(db, session_id, turn_id, stuck.reply, config)
+        return reply
     finally:
         # Whatever happened, the turn is over. Anything left unsaved by a
         # failure is dropped first, so this always has a usable transaction.
         await db.rollback()
         await end_turn(db, session_id, now=datetime.now(UTC))
         await db.commit()
+
+
+async def _fixed_reply(
+    db: AsyncSession,
+    session_id: uuid.UUID,
+    turn_id: uuid.UUID,
+    text: str,
+    config: AgentConfig,
+) -> AgentReply:
+    """A reply the backend chose, already in the log, with no model involved."""
+    return AgentReply(
+        text=text,
+        cart=await get_cart(db, session_id, tax_rate=config.tax_rate),
+        turn_id=turn_id,
+        tools_used=(),
+    )
 
 
 async def _hand_off_if_over_time(

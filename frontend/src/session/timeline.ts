@@ -73,6 +73,12 @@ export function buildTimeline(events: readonly AgentEvent[]): Timeline {
         if (event.payload['action'] !== 'nudge') pending = null
         break
       }
+      case 'guardrail': {
+        const decision = guardrailDecision(event)
+        decisions.push(decision)
+        if (decision.kind === 'escalate') pending = null
+        break
+      }
       default:
         // model_call events are bookkeeping; the screen does not show them.
         break
@@ -102,6 +108,37 @@ function timerDecision(event: AgentEvent): Decision {
     // shown the same way, with the rule that caused it.
     kind: handOff ? 'escalate' : 'timer',
     reason: handOff && typeof rule === 'string' ? rule : null,
+    suggestion: null,
+    cartVersion: null,
+  }
+}
+
+const VERDICT_WORDS: Record<string, string> = { off_topic: 'off topic', abuse: 'abuse', extraction: 'extraction' }
+/** What ended the session, as the rule code staff see elsewhere. */
+const ENDING_RULES: Record<string, string> = { terminate: 'abuse', hand_off: 'repeated_confusion' }
+
+/**
+ * A guardrail event as an entry in the decision log: a message the backend
+ * flagged before the agent saw it, or a turn the agent got nowhere with.
+ * A strike is shown as a rejection; ending the session or handing it to a
+ * person as an escalation, with the rule behind it.
+ */
+function guardrailDecision(event: AgentEvent): Decision {
+  const { verdict, reason, source, action } = event.payload
+  const offTopic = verdict === 'off_topic'
+  const strikes = event.payload[offTopic ? 'confusion_strikes' : 'abuse_strikes']
+  const limit = event.payload['strike_limit']
+  const what = source === 'round_limit' ? 'agent got nowhere' : (VERDICT_WORDS[String(verdict)] ?? String(verdict))
+  const strike = typeof strikes === 'number' && typeof limit === 'number' ? `strike ${strikes} of ${limit}` : 'strike'
+  const ending = ENDING_RULES[String(action)]
+  return {
+    id: event.seq,
+    tool: 'guardrail',
+    summary: `${what} · ${strike}`,
+    kind: ending ? 'escalate' : 'reject',
+    // A rule's name says what matched; a classifier's reason is a sentence
+    // from a model and is left to the event log.
+    reason: ending ?? (source === 'rules' && typeof reason === 'string' ? reason : null),
     suggestion: null,
     cartVersion: null,
   }

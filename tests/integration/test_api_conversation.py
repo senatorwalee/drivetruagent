@@ -132,6 +132,24 @@ async def test_unknown_session_is_not_found(
     assert response.json()["error"]["code"] == "session_not_found"
 
 
+async def test_a_session_ended_for_abuse_takes_no_more_messages(
+    app: FastAPI, client: httpx.AsyncClient, session_id: str
+) -> None:
+    model = ScriptedModel([])
+    use_model(app, model)
+    url = f"/sessions/{session_id}/messages"
+
+    replies = [
+        await client.post(url, json={"text": "You're useless."}) for _ in range(3)
+    ]
+    response = await client.post(url, json={"text": "Sorry. A cookie, please."})
+
+    assert replies[-1].json()["cart"]["state"] == "terminated"
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "session_ended"
+    assert model.requests == []
+
+
 @pytest.mark.parametrize(
     "body", [{}, {"text": ""}, {"text": "x" * 2001}, {"message": "Hi"}]
 )

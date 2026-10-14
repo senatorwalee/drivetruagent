@@ -48,6 +48,10 @@ class CustomerSession(UuidPrimaryKey, Timestamps, Base):
             name="ended_at_matches_state",
         ),
         CheckConstraint("paused_seconds >= 0", name="paused_seconds_non_negative"),
+        CheckConstraint("abuse_strikes >= 0", name="abuse_strikes_non_negative"),
+        CheckConstraint(
+            "confusion_strikes >= 0", name="confusion_strikes_non_negative"
+        ),
         # One car per lane at a time: uniqueness applies only to active sessions.
         Index(
             "uq_sessions_one_active_per_lane",
@@ -85,6 +89,12 @@ class CustomerSession(UuidPrimaryKey, Timestamps, Base):
     paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Total time spent paused. It does not count toward the length limit.
     paused_seconds: Mapped[int] = mapped_column(server_default=text("0"))
+
+    # Guardrail strikes. See policy/guardrails.py.
+    # Abuse, or attempts to get round the agent's rules. Enough ends the session.
+    abuse_strikes: Mapped[int] = mapped_column(server_default=text("0"))
+    # Off topic, or the agent getting nowhere. Enough hands off to a person.
+    confusion_strikes: Mapped[int] = mapped_column(server_default=text("0"))
 
     cart: Mapped["Cart | None"] = relationship(
         back_populates="session",
