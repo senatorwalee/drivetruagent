@@ -58,6 +58,7 @@ def test_upgrade_creates_the_tables(scratch_database_url: str) -> None:
         "option_groups",
         "options",
         "menu_item_aliases",
+        "allergen_declarations",
         "sessions",
         "carts",
         "cart_lines",

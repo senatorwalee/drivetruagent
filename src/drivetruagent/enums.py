@@ -108,6 +108,32 @@ class AgentEventKind(StrEnum):
     GUARDRAIL = "guardrail"
 
 
+class Allergen(StrEnum):
+    """Health Canada's priority food allergens, with gluten listed apart from
+    wheat because a customer avoiding gluten asks about it by that name."""
+
+    PEANUT = "peanut"
+    TREE_NUT = "tree_nut"
+    SESAME = "sesame"
+    MILK = "milk"
+    EGG = "egg"
+    FISH = "fish"
+    # Crustaceans and molluscs.
+    SHELLFISH = "shellfish"
+    SOY = "soy"
+    WHEAT = "wheat"
+    GLUTEN = "gluten"
+    MUSTARD = "mustard"
+    SULPHITE = "sulphite"
+
+
+class AllergenLevel(StrEnum):
+    # It is an ingredient.
+    CONTAINS = "contains"
+    # Not an ingredient, but cross-contact is possible: a shared fryer.
+    MAY_CONTAIN = "may_contain"
+
+
 # A session in one of these states is still in progress. Every other state is
 # final: the session has ended and can never change again.
 ACTIVE_SESSION_STATES = frozenset(

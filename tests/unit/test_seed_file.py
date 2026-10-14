@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from drivetruagent.enums import Language
+from drivetruagent.enums import Allergen, Language
 from drivetruagent.seed import MenuSeed, OptionGroupSeed, load_menu
 
 MENU_PATH = Path(__file__).resolve().parents[2] / "data" / "menu.json"
@@ -414,3 +414,110 @@ def test_two_specials_may_name_one_item() -> None:
     )
 
     assert len(loaded.specials) == 2
+
+
+# --- Allergens --------------------------------------------------------------
+
+
+def test_every_item_in_the_real_menu_has_reviewed_allergens() -> None:
+    loaded = load_menu(MENU_PATH)
+
+    unreviewed = [
+        item.code
+        for category in loaded.categories
+        for item in category.items
+        if item.allergens is None
+    ]
+    assert unreviewed == []
+
+
+def test_the_real_menus_cheese_option_adds_milk() -> None:
+    loaded = load_menu(MENU_PATH)
+    burger = next(
+        item
+        for category in loaded.categories
+        for item in category.items
+        if item.code == "classic_burger"
+    )
+    cheese = next(o for o in burger.option_groups[0].options if o.code == "cheese")
+
+    assert cheese.allergens is not None
+    assert cheese.allergens.contains == [Allergen.MILK]
+
+
+def reviewed(**allergens: Any) -> dict[str, Any]:
+    return {"reviewed_on": "2026-10-01", **allergens}
+
+
+def test_allergens_with_a_reason_for_may_contain_are_accepted() -> None:
+    loaded = MenuSeed.model_validate(
+        menu(
+            item(
+                allergens=reviewed(
+                    contains=["wheat"],
+                    may_contain=[
+                        {
+                            "allergens": ["milk", "egg"],
+                            "because": name("Fryer", "Friteuse"),
+                        }
+                    ],
+                )
+            )
+        )
+    )
+
+    allergens = loaded.categories[0].items[0].allergens
+    assert allergens is not None
+    assert [(a.value, level.value) for a, level, _ in allergens.declarations()] == [
+        ("wheat", "contains"),
+        ("milk", "may_contain"),
+        ("egg", "may_contain"),
+    ]
+
+
+def test_an_item_can_be_reviewed_with_nothing_declared() -> None:
+    loaded = MenuSeed.model_validate(menu(item(allergens=reviewed())))
+
+    allergens = loaded.categories[0].items[0].allergens
+    assert allergens is not None
+    assert allergens.declarations() == []
+
+
+def test_an_unknown_allergen_is_rejected() -> None:
+    with pytest.raises(ValidationError, match="contains"):
+        MenuSeed.model_validate(menu(item(allergens=reviewed(contains=["celery"]))))
+
+
+def test_an_allergen_listed_twice_is_rejected() -> None:
+    with pytest.raises(ValidationError, match="allergen"):
+        MenuSeed.model_validate(
+            menu(
+                item(
+                    allergens=reviewed(
+                        contains=["milk"],
+                        may_contain=[{"allergens": ["milk"], "because": name()}],
+                    )
+                )
+            )
+        )
+
+
+def test_may_contain_needs_a_reason() -> None:
+    with pytest.raises(ValidationError, match="because"):
+        MenuSeed.model_validate(
+            menu(item(allergens=reviewed(may_contain=[{"allergens": ["milk"]}])))
+        )
+
+
+def test_reviewed_allergens_need_a_review_date() -> None:
+    with pytest.raises(ValidationError, match="reviewed_on"):
+        MenuSeed.model_validate(menu(item(allergens={"contains": ["milk"]})))
+
+
+def test_option_allergens_on_an_unreviewed_item_are_rejected() -> None:
+    cheesy = group(
+        options=[option("small"), option("cheesy", allergens={"contains": ["milk"]})]
+    )
+
+    with pytest.raises(ValidationError, match="no reviewed allergens"):
+        MenuSeed.model_validate(menu(item(option_groups=[cheesy])))

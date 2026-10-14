@@ -15,6 +15,7 @@ import asyncio
 import json
 import sys
 import uuid
+from datetime import date
 from pathlib import Path
 from typing import Annotated, Any, Self, cast
 
@@ -26,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from drivetruagent.config import get_settings
 from drivetruagent.db.base import Base
 from drivetruagent.db.models import (
+    AllergenDeclaration,
     ComboRule,
     ComboRuleSlot,
     MenuCategory,
@@ -36,7 +38,7 @@ from drivetruagent.db.models import (
     Special,
 )
 from drivetruagent.db.session import create_engine, create_session_factory
-from drivetruagent.enums import Language
+from drivetruagent.enums import Allergen, AllergenLevel, Language
 from drivetruagent.ordering.inventory import set_on_hand
 
 DEFAULT_MENU_PATH = Path("data/menu.json")
@@ -57,11 +59,54 @@ class LocalizedTextSeed(SeedModel):
     fr: NonEmptyText
 
 
+class MayContainSeed(SeedModel):
+    """Allergens that are not ingredients but may be present, and why."""
+
+    allergens: list[Allergen] = Field(min_length=1)
+    because: LocalizedTextSeed
+
+
+class AllergensSeed(SeedModel):
+    """What an option adds to its item's allergens."""
+
+    contains: list[Allergen] = Field(default_factory=list)
+    may_contain: list[MayContainSeed] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def check_each_allergen_is_listed_once(self) -> Self:
+        listed = [*self.contains]
+        for group in self.may_contain:
+            listed.extend(group.allergens)
+        _require_unique([allergen.value for allergen in listed], "allergen")
+        return self
+
+    def declarations(
+        self,
+    ) -> list[tuple[Allergen, AllergenLevel, LocalizedTextSeed | None]]:
+        rows: list[tuple[Allergen, AllergenLevel, LocalizedTextSeed | None]] = [
+            (allergen, AllergenLevel.CONTAINS, None) for allergen in self.contains
+        ]
+        for group in self.may_contain:
+            rows.extend(
+                (allergen, AllergenLevel.MAY_CONTAIN, group.because)
+                for allergen in group.allergens
+            )
+        return rows
+
+
+class ItemAllergensSeed(AllergensSeed):
+    """An item's allergens, from the allergen matrix. Listing none is a
+    statement too: a reviewed item with nothing declared."""
+
+    reviewed_on: date
+
+
 class OptionSeed(SeedModel):
     code: Code
     name: LocalizedTextSeed
     price_delta_cents: int = Field(default=0, ge=0)
     default: bool = False
+    allergens: AllergensSeed | None = None
 
 
 class OptionGroupSeed(SeedModel):
@@ -99,6 +144,9 @@ class MenuItemSeed(SeedModel):
     stock: int | None = Field(default=None, ge=0)
     aliases: dict[Language, list[str]] = Field(default_factory=dict)
     option_groups: list[OptionGroupSeed] = Field(default_factory=list)
+    # Leave it out for an item whose allergens have not been reviewed: the
+    # agent then says nothing about them and hands the question to a person.
+    allergens: ItemAllergensSeed | None = None
 
     @field_validator("aliases")
     @classmethod
@@ -117,6 +165,19 @@ class MenuItemSeed(SeedModel):
     @model_validator(mode="after")
     def check_group_codes_are_unique(self) -> Self:
         _require_unique([group.code for group in self.option_groups], "group code")
+        return self
+
+    @model_validator(mode="after")
+    def check_option_allergens_belong_to_a_reviewed_item(self) -> Self:
+        has_option_allergens = any(
+            option.allergens is not None
+            for group in self.option_groups
+            for option in group.options
+        )
+        if has_option_allergens and self.allergens is None:
+            raise ValueError(
+                "options declare allergens but the item has no reviewed allergens"
+            )
         return self
 
 
@@ -229,6 +290,7 @@ class SeedSummary(BaseModel):
     aliases: int
     combos: int
     specials: int
+    allergen_declarations: int
 
 
 def _require_unique(values: list[str], what: str) -> None:
@@ -269,7 +331,7 @@ async def seed_menu(session: AsyncSession, menu: MenuSeed) -> SeedSummary:
     item_ids: list[uuid.UUID] = []
     item_ids_by_code: dict[str, uuid.UUID] = {}
     category_ids: dict[str, uuid.UUID] = {}
-    group_count = option_count = alias_count = 0
+    group_count = option_count = alias_count = allergen_count = 0
 
     for category_position, category in enumerate(menu.categories):
         category_id = category_ids[category.code] = await _upsert(
@@ -298,15 +360,19 @@ async def seed_menu(session: AsyncSession, menu: MenuSeed) -> SeedSummary:
                     "base_price_cents": item.base_price_cents,
                     "is_active": True,
                     "sort_order": item_position,
+                    "allergens_reviewed_on": (
+                        item.allergens.reviewed_on if item.allergens else None
+                    ),
                 },
             )
             item_ids.append(item_id)
             item_ids_by_code[item.code] = item_id
 
-            group_ids = [
+            seeded_groups = [
                 await _seed_group(session, item_id, group_position, group)
                 for group_position, group in enumerate(item.option_groups)
             ]
+            group_ids = [group_id for group_id, _ in seeded_groups]
             group_count += len(group_ids)
             option_count += sum(len(group.options) for group in item.option_groups)
 
@@ -317,6 +383,12 @@ async def seed_menu(session: AsyncSession, menu: MenuSeed) -> SeedSummary:
                 )
             )
             alias_count += await _replace_aliases(session, item_id, item.aliases)
+            allergen_count += await _replace_allergens(
+                session,
+                item_id,
+                item,
+                [option_ids for _, option_ids in seeded_groups],
+            )
             if item.stock is not None:
                 # Sets the count to the file's value, which also restocks.
                 await set_on_hand(session, item.code, item.stock)
@@ -337,6 +409,7 @@ async def seed_menu(session: AsyncSession, menu: MenuSeed) -> SeedSummary:
         aliases=alias_count,
         combos=len(menu.combos),
         specials=len(menu.specials),
+        allergen_declarations=allergen_count,
     )
 
 
@@ -413,7 +486,9 @@ async def _seed_combos(
 
 async def _seed_group(
     session: AsyncSession, item_id: uuid.UUID, position: int, group: OptionGroupSeed
-) -> uuid.UUID:
+) -> tuple[uuid.UUID, list[uuid.UUID]]:
+    """Upsert one group and its options. Returns the group's id and its
+    options' ids, in the file's order."""
     group_id = await _upsert(
         session,
         OptionGroup,
@@ -463,7 +538,43 @@ async def _seed_group(
         )
         .values(is_active=False, updated_at=func.now())
     )
-    return group_id
+    return group_id, option_ids
+
+
+async def _replace_allergens(
+    session: AsyncSession,
+    item_id: uuid.UUID,
+    item: MenuItemSeed,
+    option_ids: list[list[uuid.UUID]],
+) -> int:
+    """Make the item's allergen declarations match the file. `option_ids`
+    holds each group's option ids, in the file's order."""
+    sources: list[tuple[uuid.UUID | None, AllergensSeed | None]] = [
+        (None, item.allergens)
+    ]
+    for group, ids in zip(item.option_groups, option_ids, strict=True):
+        sources.extend(
+            (option_id, option.allergens)
+            for option, option_id in zip(group.options, ids, strict=True)
+        )
+    rows = [
+        {
+            "item_id": item_id,
+            "option_id": option_id,
+            "allergen": allergen,
+            "level": level,
+            "note_i18n": note.model_dump() if note else None,
+        }
+        for option_id, allergens in sources
+        if allergens is not None
+        for allergen, level, note in allergens.declarations()
+    ]
+    await session.execute(
+        delete(AllergenDeclaration).where(AllergenDeclaration.item_id == item_id)
+    )
+    if rows:
+        await session.execute(insert(AllergenDeclaration), rows)
+    return len(rows)
 
 
 async def _replace_aliases(
