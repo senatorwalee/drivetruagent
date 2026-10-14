@@ -21,7 +21,7 @@ built piece by piece.
 | 02 | Cart logic, pricing and order submission | Done |
 | 03 | Ordering API and menu search | Done |
 | 04 | Policy engine: allow, reject, confirm, escalate | Done |
-| 05 | Text-mode agent, event log and first evals | Done; evals not yet run against a real model |
+| 05 | Text-mode agent, event log and first evals | Done; evals pass against the real model |
 | 06 | Web app: the live session screen in three switchable views | Done |
 | 07 | Stock reservations and idempotency keys | Done |
 | 08a | Combos: discounts worked out from the cart, and suggested once | Done |
@@ -351,9 +351,16 @@ day the evals happen to be run.
 make eval
 ```
 
-Evals call the real model, so they need a key and cost money. They are left
-out of `make test` and CI, and are skipped if no key is set. The scenario
-checker and runner themselves are tested with the scripted model.
+Evals call the real model, so they need a key and cost money (a few cents
+for the set on `gpt-6-luna`). They are left out of `make test` and CI, and
+are skipped if no key is set. The scenario checker and runner themselves are
+tested with the scripted model.
+
+**Results.** First run against the real model (`gpt-6-luna`, 14 October
+2026): all 9 scenarios passed, twice in a row. The very first attempt showed 4
+failures, all from the test harness, not the agent: one OpenAI client was
+shared across tests, and its pooled connection belonged to an earlier test's
+event loop. Each test now gets its own client.
 
 ## Stock: two cars cannot buy the last item
 
