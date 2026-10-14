@@ -27,6 +27,7 @@ from drivetruagent.agent.model import (
     ModelUsage,
     ToolDefinition,
 )
+from drivetruagent.knowledge.embedding import DIMENSIONS, EmbeddingUnavailable
 
 # Kept under a key the argument checks will reject, so a tool call whose
 # arguments were not valid JSON comes back to the model as invalid_tool_call.
@@ -58,6 +59,36 @@ class OpenAIModel:
         except openai.OpenAIError as error:
             raise ModelUnavailable(str(error)) from error
         return from_response(response)
+
+
+class OpenAIEmbedder:
+    """Implements knowledge.embedding.Embedder with OpenAI's embeddings API,
+    asking for DIMENSIONS-long vectors (text-embedding-3 models can shorten
+    theirs)."""
+
+    # Measured with text-embedding-3-small at 384 dimensions on the labelled
+    # questions in evals/retrieval.py: the passage that answers scored 0.50
+    # to 0.78 in English and 0.38 for a French question; off-topic questions
+    # scored at most 0.20. The retrieval evals check this still holds.
+    min_score = 0.35
+
+    def __init__(
+        self, api_key: str, model: str, client: AsyncOpenAI | None = None
+    ) -> None:
+        self.model = model
+        self._client = client or AsyncOpenAI(api_key=api_key)
+
+    async def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        if not texts:
+            return []
+        try:
+            response = await self._client.embeddings.create(
+                model=self.model, input=list(texts), dimensions=DIMENSIONS
+            )
+        except openai.OpenAIError as error:
+            raise EmbeddingUnavailable(str(error)) from error
+        ordered = sorted(response.data, key=lambda item: item.index)
+        return [list(item.embedding) for item in ordered]
 
 
 def to_input_items(messages: Sequence[Message]) -> list[dict[str, Any]]:

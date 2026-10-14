@@ -1,4 +1,4 @@
-.PHONY: up down dev migrate seed chat ui gen-api lint format test test-unit eval check check-ui hooks
+.PHONY: up down dev migrate seed ingest chat ui gen-api lint format test test-unit eval check check-ui hooks
 
 # Start and stop the local Postgres.
 up:
@@ -18,6 +18,10 @@ migrate:
 # Load data/menu.json into the local Postgres. Safe to run repeatedly.
 seed:
 	uv run python -m drivetruagent.seed
+
+# Load the knowledge documents; with OPENAI_API_KEY, OpenAI embeds them too.
+ingest:
+	uv run python -m drivetruagent.ingest
 
 # Talk to the agent in the terminal. Needs a model key in .env (OpenAI or Gemini).
 chat:

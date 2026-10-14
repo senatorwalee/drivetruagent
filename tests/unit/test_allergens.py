@@ -3,8 +3,16 @@
 import uuid
 from collections.abc import Collection
 
+import pytest
+
 from drivetruagent.enums import Allergen, AllergenLevel
-from drivetruagent.ordering.allergens import Declaration, OptionAdds, assess
+from drivetruagent.ordering.allergens import (
+    Declaration,
+    OptionAdds,
+    allergens_named,
+    assess,
+    is_about_allergens,
+)
 
 CONTAINS = AllergenLevel.CONTAINS
 MAY = AllergenLevel.MAY_CONTAIN
@@ -136,3 +144,41 @@ def test_options_that_add_follow_what_was_asked() -> None:
     (ranch,) = assess(declarations, set(), [Allergen.EGG]).options_that_add
 
     assert ranch == OptionAdds(RANCH, (Declaration(Allergen.EGG, CONTAINS, RANCH),))
+
+
+# --- Recognising an allergen question ---------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("question", "named"),
+    [
+        ("Do you fry in peanut oil?", {Allergen.PEANUT}),
+        ("Any nuts in the cookie?", {Allergen.TREE_NUT}),
+        ("Is it dairy-free?", {Allergen.MILK}),
+        ("Gluten or wheat in the bun?", {Allergen.GLUTEN, Allergen.WHEAT}),
+        ("Est-ce qu'il y a des arachides?", {Allergen.PEANUT}),
+        ("Il y a des œufs dans la sauce?", {Allergen.EGG}),
+        ("Contient du blé?", {Allergen.WHEAT}),
+        ("Is there fish sauce in it?", {Allergen.FISH}),
+        ("What oil do you use?", set()),
+        ("Can I get a donut?", set()),
+        ("A cheeseburger please", set()),
+    ],
+)
+def test_allergens_are_recognised_by_name(question: str, named: set[Allergen]) -> None:
+    assert allergens_named(question) == named
+
+
+@pytest.mark.parametrize(
+    ("question", "about"),
+    [
+        ("My son has a nut allergy", True),
+        ("Je suis allergique", True),
+        ("I'm lactose intolerant", True),
+        ("Is the burger allergen friendly?", True),
+        ("What oil do you fry in?", False),
+        ("Is the veggie burger vegan?", False),
+    ],
+)
+def test_an_allergen_question_is_recognised(question: str, about: bool) -> None:
+    assert is_about_allergens(question) is about

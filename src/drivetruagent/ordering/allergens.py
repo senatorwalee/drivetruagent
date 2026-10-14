@@ -9,6 +9,8 @@ Only what is declared counts. An allergen nobody declared is "not listed",
 which is all the matrix can say: it is never turned into "free of" or "safe".
 """
 
+import re
+import unicodedata
 import uuid
 from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
@@ -127,3 +129,98 @@ def _options_that_add(
     return tuple(
         OptionAdds(option_id, tuple(found)) for option_id, found in adds.items()
     )
+
+
+# --- Recognising an allergen question ---------------------------------------
+
+# Words a customer might use for each allergen, English and French, without
+# accents. Kept to words that mean the allergen: "cheese" is left out, since
+# a question about cheese is usually about the menu, not an allergy.
+_NAMES: dict[Allergen, tuple[str, ...]] = {
+    Allergen.PEANUT: ("peanut", "peanuts", "arachide", "arachides", "cacahuete"),
+    Allergen.TREE_NUT: (
+        "nut",
+        "nuts",
+        "tree nut",
+        "tree nuts",
+        "almond",
+        "almonds",
+        "cashew",
+        "cashews",
+        "walnut",
+        "walnuts",
+        "pecan",
+        "pecans",
+        "hazelnut",
+        "hazelnuts",
+        "pistachio",
+        "pistachios",
+        "noix",
+        "amande",
+        "amandes",
+        "noisette",
+        "noisettes",
+    ),
+    Allergen.SESAME: ("sesame",),
+    Allergen.MILK: ("milk", "dairy", "lactose", "butter", "lait", "laitier", "beurre"),
+    Allergen.EGG: ("egg", "eggs", "oeuf", "oeufs"),
+    Allergen.FISH: ("fish", "anchovy", "anchovies", "poisson"),
+    Allergen.SHELLFISH: (
+        "shellfish",
+        "shrimp",
+        "crab",
+        "lobster",
+        "crustacean",
+        "crustaceans",
+        "mollusc",
+        "fruits de mer",
+        "crevette",
+        "crevettes",
+    ),
+    Allergen.SOY: ("soy", "soya", "soja"),
+    Allergen.WHEAT: ("wheat", "ble", "farine"),
+    Allergen.GLUTEN: ("gluten", "celiac", "coeliac", "celiaque"),
+    Allergen.MUSTARD: ("mustard", "moutarde"),
+    Allergen.SULPHITE: ("sulphite", "sulphites", "sulfite", "sulfites"),
+}
+# Words that make it an allergen question without naming one.
+_ALLERGY_WORDS = (
+    "allergy",
+    "allergies",
+    "allergic",
+    "allergen",
+    "allergens",
+    "allergie",
+    "allergies",
+    "allergique",
+    "allergene",
+    "allergenes",
+    "intolerance",
+    "intolerant",
+)
+_NAME_PATTERNS = {
+    allergen: re.compile(r"\b(" + "|".join(map(re.escape, names)) + r")\b")
+    for allergen, names in _NAMES.items()
+}
+_ALLERGY_PATTERN = re.compile(r"\b(" + "|".join(_ALLERGY_WORDS) + r")\b")
+
+
+def allergens_named(text: str) -> frozenset[Allergen]:
+    """The allergens a question mentions by name. A bare "nut" counts as
+    tree nuts; say "peanut" for peanuts."""
+    plain = _plain(text)
+    return frozenset(
+        allergen
+        for allergen, pattern in _NAME_PATTERNS.items()
+        if pattern.search(plain)
+    )
+
+
+def is_about_allergens(text: str) -> bool:
+    """Whether a question is about allergens: one is named, or allergies are."""
+    return bool(allergens_named(text)) or bool(_ALLERGY_PATTERN.search(_plain(text)))
+
+
+def _plain(text: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", text.lower().replace("œ", "oe"))
+    return "".join(char for char in decomposed if not unicodedata.combining(char))

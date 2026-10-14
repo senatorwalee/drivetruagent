@@ -287,11 +287,13 @@ async def allergen_unverified(
     items: Mapping[str, str],
     allergens: list[str],
     *,
+    question: str | None = None,
     tax_rate: Decimal,
 ) -> ActionOutcome:
-    """An allergen question nobody has a reviewed answer to: a person takes
-    over rather than the agent guessing. `items`: code -> display name.
-    `allergens` empty: any allergen."""
+    """An allergen question nobody has a checked answer to: a person takes
+    over rather than the agent guessing. `items`: code -> display name, empty
+    if no item was named. `allergens` empty: any allergen. `question`: the
+    customer's words, when they were searched for."""
     customer_session = await lock_session(db, session_id)
     if customer_session.state in FINAL_SESSION_STATES:
         snapshot = await cart_rules.get_cart(db, session_id, tax_rate=tax_rate)
@@ -316,6 +318,7 @@ async def allergen_unverified(
                 "item_codes": list(items),
                 "items": list(items.values()),
                 "allergens": allergens,
+                **({"question": question} if question else {}),
             },
         ),
         tax_rate,

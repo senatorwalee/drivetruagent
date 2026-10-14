@@ -69,6 +69,15 @@ class Settings(BaseSettings):
     gemini_api_key: SecretStr | None = None
     gemini_text_model: str = "gemini-2.5-flash-lite"
     restaurant_name: str = "Maple Lane Burgers"
+    # Knowledge search. With OPENAI_API_KEY, documents are embedded with this
+    # model; without one, with the local hashing embedder. `make ingest`
+    # indexes with both, so either can search.
+    embedding_model: str = "text-embedding-3-small"
+    # The cosine similarity a passage needs to count as evidence. None: the
+    # embedder's own threshold.
+    knowledge_min_score: float | None = Field(default=None, ge=0, le=1)
+    knowledge_results: int = Field(default=3, ge=1, le=10)
+    knowledge_dir: str = "knowledge"
     # How many times the model may ask for tools within one customer turn.
     agent_max_tool_rounds: int = Field(default=8, ge=1)
 

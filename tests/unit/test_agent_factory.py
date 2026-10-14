@@ -7,13 +7,17 @@ import pytest
 from drivetruagent.agent.demo_model import DemoModel
 from drivetruagent.agent.factory import (
     agent_info,
+    embedder_from_settings,
     guard_from_settings,
+    ingest_embedders,
+    knowledge_from_settings,
     model_from_settings,
 )
 from drivetruagent.agent.gemini_model import GeminiModel
 from drivetruagent.agent.model import ModelUnavailable
-from drivetruagent.agent.openai_model import OpenAIModel
+from drivetruagent.agent.openai_model import OpenAIEmbedder, OpenAIModel
 from drivetruagent.config import Settings
+from drivetruagent.knowledge.embedding import HashingEmbedder
 from drivetruagent.policy.guardrails import StrikeLimits
 
 
@@ -137,3 +141,39 @@ def test_the_strike_limits_come_from_the_settings() -> None:
     )
 
     assert guard.limits == StrikeLimits(abuse=2, confusion=5)
+
+
+# --- Knowledge search -------------------------------------------------------
+
+
+def test_with_an_openai_key_openai_embeds_the_questions() -> None:
+    chosen = embedder_from_settings(settings(**WITH_OPENAI))
+
+    assert isinstance(chosen, OpenAIEmbedder)
+    assert chosen.model == "text-embedding-3-small"
+
+
+@pytest.mark.parametrize(
+    "values", [{"agent_model": "demo", **WITH_OPENAI}, WITH_GEMINI, {}]
+)
+def test_otherwise_the_local_hashing_embedder_is_used(values: dict[str, Any]) -> None:
+    assert isinstance(embedder_from_settings(settings(**values)), HashingEmbedder)
+
+
+def test_ingest_always_indexes_with_hashing_and_with_openai_when_it_can() -> None:
+    assert [e.model for e in ingest_embedders(settings())] == ["hashing-v1"]
+    assert [e.model for e in ingest_embedders(settings(**WITH_OPENAI))] == [
+        "hashing-v1",
+        "text-embedding-3-small",
+    ]
+
+
+def test_the_search_threshold_and_size_come_from_the_settings() -> None:
+    search = knowledge_from_settings(
+        settings(agent_model="demo", knowledge_min_score=0.5, knowledge_results=5)
+    )
+
+    assert (search.threshold, search.limit) == (0.5, 5)
+    assert knowledge_from_settings(settings(agent_model="demo")).threshold == (
+        HashingEmbedder.min_score
+    )

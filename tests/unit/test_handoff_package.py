@@ -331,9 +331,9 @@ def test_an_allergen_question_names_the_items_and_the_allergens() -> None:
 
     assert sentence == (
         "The customer asked about allergens (tree nut) in Chocolate chip cookie "
-        "and Apple pie, which has no checked allergen information. Answer from "
-        "the allergen binder or ask the manager before they order. The cart "
-        "holds 2 items and can be placed as it stands."
+        "and Apple pie, and there is no checked information to answer it. "
+        "Answer from the allergen binder or ask the manager before they order. "
+        "The cart holds 2 items and can be placed as it stands."
     )
     assert reason_title("allergen_unverified") == (
         "Allergen question with no checked answer"
@@ -350,3 +350,24 @@ def test_an_allergen_question_about_any_allergen_does_not_list_them() -> None:
     )
 
     assert sentence.startswith("The customer asked about allergens in Apple pie,")
+
+
+def test_an_unanswered_allergen_question_is_quoted_for_staff() -> None:
+    sentence = outstanding(
+        "allergen_unverified",
+        {
+            "items": [],
+            "allergens": ["sesame"],
+            "question": "Is there sesame oil in the fryer?",
+        },
+        None,
+        item_name=None,
+        cart_item_count=0,
+    )
+
+    assert sentence == (
+        "The customer asked about allergens (sesame), and there is no checked "
+        'information to answer it. They asked: "Is there sesame oil in the '
+        'fryer?". Answer from the allergen binder or ask the manager before '
+        "they order. The cart is empty."
+    )

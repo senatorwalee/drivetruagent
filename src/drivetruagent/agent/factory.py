@@ -12,8 +12,10 @@ from drivetruagent.agent.gemini_model import GeminiModel
 from drivetruagent.agent.guard import Guard, ModelClassifier
 from drivetruagent.agent.loop import AgentConfig
 from drivetruagent.agent.model import ModelClient, ModelUnavailable
-from drivetruagent.agent.openai_model import OpenAIModel
+from drivetruagent.agent.openai_model import OpenAIEmbedder, OpenAIModel
 from drivetruagent.config import Settings
+from drivetruagent.knowledge.embedding import Embedder, HashingEmbedder
+from drivetruagent.knowledge.store import KnowledgeSearch
 from drivetruagent.ordering.offers import SpecialsCache
 from drivetruagent.policy.guardrails import StrikeLimits
 
@@ -80,6 +82,40 @@ def agent_config(
         specials_cache=specials_cache,
         timers=settings.session_timers,
         guard=guard_from_settings(settings),
+        knowledge=knowledge_from_settings(settings),
+    )
+
+
+def embedder_from_settings(settings: Settings) -> Embedder:
+    """OpenAI's embedder when there is a key and a real model is in use;
+    otherwise the local hashing one, which needs nothing and costs nothing."""
+    if settings.agent_model != "demo" and settings.openai_api_key is not None:
+        return OpenAIEmbedder(
+            api_key=settings.openai_api_key.get_secret_value(),
+            model=settings.embedding_model,
+        )
+    return HashingEmbedder()
+
+
+def ingest_embedders(settings: Settings) -> list[Embedder]:
+    """Every embedder documents are indexed with: the hashing one always, so
+    the no-key demo can search, and OpenAI's too when there is a key."""
+    embedders: list[Embedder] = [HashingEmbedder()]
+    if settings.openai_api_key is not None:
+        embedders.append(
+            OpenAIEmbedder(
+                api_key=settings.openai_api_key.get_secret_value(),
+                model=settings.embedding_model,
+            )
+        )
+    return embedders
+
+
+def knowledge_from_settings(settings: Settings) -> KnowledgeSearch:
+    return KnowledgeSearch(
+        embedder_from_settings(settings),
+        limit=settings.knowledge_results,
+        min_score=settings.knowledge_min_score,
     )
 
 
