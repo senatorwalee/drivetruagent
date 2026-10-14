@@ -290,4 +290,7 @@ async def test_agent_info_describes_the_demo_model(
         "model": "demo-script",
         "scripted": True,
         "suggested_lines": list(SUGGESTED_LINES),
+        # The demo plays a script with no key, so there is no voice.
+        "voice_available": False,
+        "voice_model": None,
     }

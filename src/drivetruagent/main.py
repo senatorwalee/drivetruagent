@@ -14,6 +14,7 @@ from drivetruagent.api import (
     menu,
     offers,
     sessions,
+    voice,
 )
 from drivetruagent.api.errors import register_error_handlers
 from drivetruagent.config import get_settings
@@ -42,6 +43,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             )
         )
     yield
+    live_calls = getattr(app.state, "live_calls", None)
+    if live_calls is not None:
+        await live_calls.close_all()
     if sweeping is not None:
         sweeping.cancel()
         with suppress(asyncio.CancelledError):
@@ -60,6 +64,7 @@ def create_app() -> FastAPI:
     app.include_router(inventory.router)
     app.include_router(offers.router)
     app.include_router(handoffs.router)
+    app.include_router(voice.router)
     register_error_handlers(app)
     return app
 

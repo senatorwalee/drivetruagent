@@ -5,6 +5,8 @@
 import type { AgentEvent, AgentInfo, Cart, Session } from '../api/client'
 import type { LiveSession } from '../session/useLiveSession'
 import { buildTimeline } from '../session/timeline'
+import type { Voice } from '../voice/useVoiceCall'
+import { IDLE } from '../voice/voiceCall'
 
 const SESSION_ID = '11111111-1111-4111-8111-111111111111'
 const TURN_ID = '22222222-2222-4222-8222-222222222222'
@@ -39,6 +41,8 @@ export const agentInfo: AgentInfo = {
   model: 'demo-script',
   scripted: true,
   suggested_lines: ['Hi', 'Can I get some fries?', 'Large, and a medium cola.'],
+  voice_available: false,
+  voice_model: null,
 }
 
 export const session: Session = {
@@ -144,6 +148,15 @@ export function eventsUpToHeldCookies(): AgentEvent[] {
   ]
 }
 
+/** Voice as it is with no key for it: the button shows, and is disabled. */
+export const noVoice: Voice = {
+  ...IDLE,
+  available: false,
+  active: false,
+  start: () => {},
+  stop: () => {},
+}
+
 const ITEM_NAMES: Record<string, string> = { cookie: 'Chocolate chip cookie', fries: 'Fries', cola: 'Cola' }
 
 /** A complete LiveSession for rendering a view, mid-order by default. */
@@ -161,6 +174,7 @@ export function liveSession(overrides: Partial<LiveSession> = {}): LiveSession {
     suggestedLine: 'No, just two.',
     itemName: (code) => ITEM_NAMES[code] ?? code,
     paused: false,
+    voice: noVoice,
     canSend: true,
     send: () => {},
     startNewSession: () => {},

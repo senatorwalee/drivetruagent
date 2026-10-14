@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { api, ApiError, type AgentInfo, type Cart, type Menu, type Session } from '../api/client'
 import { deriveAgentState, isFinal, runningSeconds, speakingMilliseconds, timerNote } from './presentation'
+import { useVoiceCall, type Voice } from '../voice/useVoiceCall'
 import { buildTimeline } from './timeline'
 import { useNow } from './useNow'
 import type { AgentState, Timeline } from './types'
@@ -48,6 +49,8 @@ export interface LiveSession {
   itemName: (itemCode: string) => string
   /** The backend's timers are stopped. Set by the backend, not kept here. */
   paused: boolean
+  /** The voice call, if one is on, and how to start or end one. */
+  voice: Voice
   canSend: boolean
   send: (text: string) => void
   startNewSession: () => void
@@ -103,6 +106,8 @@ export function useLiveSession(): LiveSession {
   })
   useEffect(() => () => window.clearTimeout(speakingTimer.current), [])
 
+  // Read when a refetch is due, so polling speeds up as soon as a call starts.
+  const callLive = useRef(false)
   const sessionKey = ['session', sessionId, 'state']
   const sessionQuery = useQuery({
     queryKey: sessionKey,
@@ -113,34 +118,43 @@ export function useLiveSession(): LiveSession {
     // polling shows items arriving one by one instead of all at the end.
     // Between turns the backend's timers may act, so the screen keeps
     // looking, more slowly. A paused or finished session cannot change.
-    refetchInterval: (query) => followInterval(query.state.data, message.isPending),
+    refetchInterval: (query) => followInterval(query.state.data, message.isPending || callLive.current),
   })
-  const follow = {
-    enabled: Boolean(sessionId),
-    refetchInterval: followInterval(sessionQuery.data, message.isPending),
-  } as const
   // Pausing is the backend's state: its timers are what must stop. The
   // answer replaces the session held here, so the button follows at once.
   const pause = useMutation({
     mutationFn: (shouldPause: boolean) => (shouldPause ? api.pause(sessionId!) : api.resume(sessionId!)),
     onSuccess: (session) => queryClient.setQueryData(sessionKey, session),
   })
+
+  const session = sessionQuery.data ?? null
+  const ended = session ? isFinal(session.state) : false
+  const paused = session?.timers.paused ?? false
+  const agent = agentQuery.data ?? null
+
+  const voice = useVoiceCall({ sessionId, enabled: Boolean(agent?.voice_available), ended, paused })
+  useEffect(() => {
+    callLive.current = voice.active
+  }, [voice.active])
+
+  // During a turn or a call, each step is saved as it happens, so the screen
+  // looks often and shows items arriving one by one.
+  const follow = {
+    enabled: Boolean(sessionId),
+    refetchInterval: followInterval(session ?? undefined, message.isPending || voice.active),
+  } as const
   const cartQuery = useQuery({ queryKey: ['session', sessionId, 'cart'], queryFn: () => api.cart(sessionId!), ...follow })
   const eventsQuery = useQuery({
     queryKey: ['session', sessionId, 'events'],
     queryFn: () => api.events(sessionId!),
     ...follow,
   })
-
-  const session = sessionQuery.data ?? null
   const cart = cartQuery.data ?? null
   const language = cart?.language ?? 'en'
   const menuQuery = useQuery({ queryKey: ['menu', language], queryFn: () => api.menu(language), staleTime: Infinity })
 
   const timeline = useMemo(() => (eventsQuery.data ? buildTimeline(eventsQuery.data) : EMPTY_TIMELINE), [eventsQuery.data])
   const itemName = useItemNames(menuQuery.data)
-  const ended = session ? isFinal(session.state) : false
-  const paused = session?.timers.paused ?? false
   const now = useNow()
 
   // Something the agent said without being asked, such as "Are you still
@@ -151,15 +165,17 @@ export function useLiveSession(): LiveSession {
     if (lastAgentLine === undefined || lastAgentLine === spokenLine.current) return
     const firstLoad = spokenLine.current === undefined && !eventsQuery.isFetchedAfterMount
     spokenLine.current = lastAgentLine
-    if (firstLoad || message.isPending) return
+    // On a call the speaking state comes from the call itself.
+    if (firstLoad || message.isPending || voice.active) return
     setSpeaking(true)
     window.clearTimeout(speakingTimer.current)
     speakingTimer.current = window.setTimeout(() => setSpeaking(false), 2500)
-  }, [lastAgentLine, message.isPending, eventsQuery.isFetchedAfterMount])
+  }, [lastAgentLine, message.isPending, voice.active, eventsQuery.isFetchedAfterMount])
 
-  const agent = agentQuery.data ?? null
   const customerTurns = timeline.transcript.filter((line) => line.speaker === 'customer').length
-  const canSend = Boolean(sessionId) && Boolean(agent?.available) && !ended && !paused && !message.isPending
+  // Typing is off during a call: the voice model keeps its own conversation,
+  // and a typed message would go to the text model instead.
+  const canSend = Boolean(sessionId) && Boolean(agent?.available) && !ended && !paused && !message.isPending && !voice.active
 
   const send = useCallback(
     (text: string) => {
@@ -173,13 +189,14 @@ export function useLiveSession(): LiveSession {
     window.sessionStorage.removeItem(STORED_SESSION)
     window.clearTimeout(speakingTimer.current)
     setSpeaking(false)
+    voice.stop()
     message.reset()
     setGeneration((current) => current + 1)
-  }, [message])
+  }, [message, voice])
 
   return {
     status: opened.isError ? 'failed' : sessionId ? 'ready' : 'starting',
-    problem: describeProblem(opened.error, message.error, agent),
+    problem: voice.problem ?? describeProblem(opened.error, message.error, agent),
     agent,
     session,
     cart,
@@ -188,14 +205,15 @@ export function useLiveSession(): LiveSession {
       paused,
       ended,
       waitingForReply: message.isPending,
-      speaking,
-      customerActive,
+      speaking: speaking || voice.agentSpeaking,
+      customerActive: customerActive || voice.customerSpeaking,
     }),
     elapsedSeconds: session ? runningSeconds(session, now) : 0,
     timerNote: ended ? null : timerNote(session?.timers, now),
     suggestedLine: agent?.scripted && !ended ? (agent.suggested_lines[customerTurns] ?? null) : null,
     itemName,
     paused,
+    voice,
     canSend,
     send,
     startNewSession,

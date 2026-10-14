@@ -162,6 +162,8 @@ async def test_agent_info_says_when_no_model_is_configured(
         "model": None,
         "scripted": False,
         "suggested_lines": [],
+        "voice_available": False,
+        "voice_model": None,
     }
 
 

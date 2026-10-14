@@ -752,3 +752,19 @@ a.button {
   align-items: center;
   text-decoration: none;
 }
+
+/* On a call: the button is printed solid, and pressing it again hangs up. */
+.mic[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.mic[data-status='connecting'] {
+  animation: micConnecting 1s ease-in-out infinite;
+}
+
+@keyframes micConnecting {
+  50% {
+    opacity: 0.55;
+  }
+}

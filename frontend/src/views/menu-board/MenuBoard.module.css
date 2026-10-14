@@ -827,3 +827,19 @@ a.button {
   align-items: center;
   text-decoration: none;
 }
+
+/* On a call: the button lights up, and pressing it again hangs up. */
+.mic[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.mic[data-status='connecting'] {
+  animation: micConnecting 1s ease-in-out infinite;
+}
+
+@keyframes micConnecting {
+  50% {
+    opacity: 0.55;
+  }
+}
