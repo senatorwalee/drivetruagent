@@ -103,6 +103,9 @@ class AgentEventKind(StrEnum):
     # Something the backend did because of a clock, not because of the model:
     # asked if the customer was still there, or ended the session.
     TIMER = "timer"
+    # A customer message the guardrail flagged: off topic, abuse, or an
+    # attempt to get round the agent's rules. Messages that pass are not logged.
+    GUARDRAIL = "guardrail"
 
 
 # A session in one of these states is still in progress. Every other state is

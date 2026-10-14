@@ -49,7 +49,9 @@ from drivetruagent.policy.errors import PendingActionNotFound
 from drivetruagent.policy.handoffs import open_handoff
 from drivetruagent.policy.outcome import ActionOutcome, OutcomeError
 from drivetruagent.policy.rules import (
+    ABUSE,
     HUMAN_REQUESTED,
+    REPEATED_CONFUSION,
     SESSION_ENDED,
     SILENCE_TIMEOUT,
     TIME_LIMIT,
@@ -260,6 +262,35 @@ async def time_out(
             Decision.ESCALATE,
             TIME_LIMIT,
             "This order has taken a while, so a team member is taking over.",
+        ),
+        tax_rate,
+    )
+
+
+async def terminate(
+    db: AsyncSession, session_id: uuid.UUID, *, tax_rate: Decimal
+) -> CartSnapshot:
+    """End the session for abuse: three strikes. Its stock is released.
+
+    The caller has already established that the session is in progress.
+    """
+    await _supersede_pending(db, session_id)
+    await end_session(db, session_id, SessionState.TERMINATED, reason=ABUSE)
+    return await cart_rules.get_cart(db, session_id, tax_rate=tax_rate)
+
+
+async def hand_off_for_confusion(
+    db: AsyncSession, session_id: uuid.UUID, strikes: int, *, tax_rate: Decimal
+) -> ActionOutcome:
+    """The conversation kept going nowhere: a person takes over, with the cart."""
+    return await _escalate(
+        db,
+        session_id,
+        PolicyResult(
+            Decision.ESCALATE,
+            REPEATED_CONFUSION,
+            "The conversation kept going off track, so a team member is taking over.",
+            {"confusion_strikes": strikes},
         ),
         tax_rate,
     )

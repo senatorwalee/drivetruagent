@@ -25,7 +25,12 @@ from drivetruagent.enums import (
     ReservationStatus,
 )
 from drivetruagent.ordering.views import CartSnapshot, OrderView
-from drivetruagent.policy.rules import EXTREME_QUANTITY, HUMAN_REQUESTED, TIME_LIMIT
+from drivetruagent.policy.rules import (
+    EXTREME_QUANTITY,
+    HUMAN_REQUESTED,
+    REPEATED_CONFUSION,
+    TIME_LIMIT,
+)
 
 # How much of a conversation a person can take in at a glance.
 TRANSCRIPT_LINES = 12
@@ -35,6 +40,7 @@ _TITLES = {
     EXTREME_QUANTITY: "Very large order",
     HUMAN_REQUESTED: "A person was asked for",
     TIME_LIMIT: "Took longer than the time limit",
+    REPEATED_CONFUSION: "Kept going off track",
 }
 
 
@@ -231,6 +237,11 @@ def _what_happened(
         return (
             f"A person was asked for.{given} Carry on from where the "
             "conversation stopped."
+        )
+    if reason == REPEATED_CONFUSION:
+        return (
+            "The conversation kept going off track: off-topic questions, or the "
+            "agent not understanding. Ask what the customer would like."
         )
     if reason == TIME_LIMIT:
         return (

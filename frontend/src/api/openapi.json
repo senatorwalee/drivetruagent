@@ -163,7 +163,8 @@
           "tool_call",
           "tool_result",
           "assistant_message",
-          "timer"
+          "timer",
+          "guardrail"
         ],
         "title": "AgentEventKind",
         "type": "string"

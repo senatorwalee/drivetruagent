@@ -220,6 +220,7 @@ def test_each_reason_has_a_heading_a_person_can_read() -> None:
     assert reason_title("extreme_quantity") == "Very large order"
     assert reason_title("human_requested") == "A person was asked for"
     assert reason_title("time_limit") == "Took longer than the time limit"
+    assert reason_title("repeated_confusion") == "Kept going off track"
 
 
 def test_an_unknown_reason_still_reads_as_words() -> None:
@@ -285,6 +286,22 @@ def test_the_time_limit_says_to_finish_the_order() -> None:
     assert sentence == (
         "The order was not finished within the time limit. Finish it with the "
         "customer. The cart holds 4 items and can be placed as it stands."
+    )
+
+
+def test_repeated_confusion_says_to_ask_what_the_customer_wants() -> None:
+    sentence = outstanding(
+        "repeated_confusion",
+        {"confusion_strikes": 3},
+        None,
+        item_name=None,
+        cart_item_count=0,
+    )
+
+    assert sentence == (
+        "The conversation kept going off track: off-topic questions, or the "
+        "agent not understanding. Ask what the customer would like. The cart "
+        "is empty."
     )
 
 
