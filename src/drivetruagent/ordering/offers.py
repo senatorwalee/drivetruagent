@@ -7,7 +7,7 @@ record that stops a customer being offered the same thing twice.
 
 import uuid
 from collections.abc import Mapping
-from datetime import date
+from datetime import date, timedelta
 
 from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
@@ -37,10 +37,33 @@ from drivetruagent.ordering.views import (
     DEFAULT_LANGUAGE,
     CategoryRef,
     ComboView,
+    DaySpecialsView,
     SpecialView,
     SuggestionView,
+    WeekOfSpecialsView,
     localize,
 )
+
+_DAY_NAMES = {
+    Language.EN: (
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    ),
+    Language.FR: (
+        "lundi",
+        "mardi",
+        "mercredi",
+        "jeudi",
+        "vendredi",
+        "samedi",
+        "dimanche",
+    ),
+}
 
 # The specials running on a date, as plain values that are safe to share.
 type SpecialsCache = TtlCache[date, tuple[Special, ...]]
@@ -155,6 +178,35 @@ async def todays_specials(
         )
         for special in specials
     ]
+
+
+async def week_of_specials(
+    db: AsyncSession,
+    today: date,
+    language: Language,
+    *,
+    cache: SpecialsCache | None = None,
+) -> WeekOfSpecialsView:
+    """The specials for each day of the week `today` falls in, Monday first.
+
+    For a screen that shows the whole week, so anyone watching can see that
+    the special the agent names is the one for today. Each day is read the
+    same way as today's, through the same cache, with stock read live.
+    """
+    monday = today - timedelta(days=today.isoweekday() - 1)
+    days: list[DaySpecialsView] = []
+    for offset in range(7):
+        day = monday + timedelta(days=offset)
+        days.append(
+            DaySpecialsView(
+                date=day,
+                weekday=day.isoweekday(),
+                day_name=_DAY_NAMES[language][offset],
+                is_today=day == today,
+                specials=await todays_specials(db, day, language, cache=cache),
+            )
+        )
+    return WeekOfSpecialsView(today=today, days=days)
 
 
 async def set_special_active(db: AsyncSession, code: str, is_active: bool) -> None:

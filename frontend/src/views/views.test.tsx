@@ -216,6 +216,42 @@ describe.each(VIEWS)('%s view', (viewId, View) => {
     expect(screen.getByPlaceholderText('Connecting the call…')).toBeInTheDocument()
   })
 
+  it("shows every day of the week's specials, with today marked", () => {
+    show()
+
+    const board = screen.getByRole('region', { name: 'Specials and stock' })
+    const days = within(board).getAllByRole('listitem').filter((item) => /day/.test(item.textContent ?? ''))
+    expect(days).toHaveLength(7)
+    const today = days.find((day) => day.getAttribute('aria-current') === 'date')
+    expect(today).toHaveTextContent('Wednesday')
+    expect(today).toHaveTextContent('today')
+    expect(today).toHaveTextContent('Onion rings')
+    expect(today).toHaveTextContent('$2.29')
+    expect(today).toHaveTextContent('$3.29')
+  })
+
+  it('shows the stock left, and what is held in carts', () => {
+    show()
+
+    const board = screen.getByRole('region', { name: 'Specials and stock' })
+    expect(within(board).getAllByLabelText('99 available')).toHaveLength(2)
+    expect(within(board).getAllByText('1 held')).toHaveLength(2)
+    expect(within(board).getByLabelText('4 available')).toBeInTheDocument()
+  })
+
+  it('says when a special has sold out', () => {
+    const soldOut = {
+      ...liveSession().board.week!,
+      days: liveSession().board.week!.days.map((day) => ({
+        ...day,
+        specials: day.specials.map((special) => ({ ...special, in_stock: !day.is_today })),
+      })),
+    }
+    show({ board: { week: soldOut, stock: [] } })
+
+    expect(screen.getByText('sold out')).toBeInTheDocument()
+  })
+
   it('pauses and resumes', async () => {
     const togglePause = vi.fn()
     show({ togglePause })

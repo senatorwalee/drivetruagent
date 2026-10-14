@@ -843,3 +843,8 @@ a.button {
     opacity: 0.55;
   }
 }
+
+/* The week's specials and the stock, on a row of their own under the decisions. */
+.board {
+  flex: 1 1 100%;
+}

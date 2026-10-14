@@ -9,9 +9,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { api, ApiError, type AgentInfo, type Cart, type Menu, type Session } from '../api/client'
+import { api, ApiError, type AgentInfo, type Cart, type Menu, type Session, type WeekOfSpecials } from '../api/client'
 import { deriveAgentState, isFinal, runningSeconds, speakingMilliseconds, timerNote } from './presentation'
 import { useVoiceCall, type Voice } from '../voice/useVoiceCall'
+import { stockGroups, type StockGroup } from './board'
 import { buildTimeline } from './timeline'
 import { useNow } from './useNow'
 import type { AgentState, Timeline } from './types'
@@ -24,6 +25,10 @@ const FOLLOW_INTERVAL_MS = 400
  * asking a silent customer if they are still there, or ending the session.
  */
 const IDLE_INTERVAL_MS = 1000
+/** Stock also changes when other lanes order, so it is always kept fresh. */
+const STOCK_INTERVAL_MS = 2000
+/** The week's specials rarely change; only whether one has sold out does. */
+const SPECIALS_INTERVAL_MS = 10000
 
 const NO_MODEL = 'No model is configured. In .env, set AGENT_MODEL=demo, or add an OpenAI or Gemini key.'
 
@@ -51,6 +56,8 @@ export interface LiveSession {
   paused: boolean
   /** The voice call, if one is on, and how to start or end one. */
   voice: Voice
+  /** The week's specials and the stock, for the board under the session. */
+  board: { week: WeekOfSpecials | null; stock: StockGroup[] }
   canSend: boolean
   send: (text: string) => void
   startNewSession: () => void
@@ -152,6 +159,22 @@ export function useLiveSession(): LiveSession {
   const cart = cartQuery.data ?? null
   const language = cart?.language ?? 'en'
   const menuQuery = useQuery({ queryKey: ['menu', language], queryFn: () => api.menu(language), staleTime: Infinity })
+  const stockQuery = useQuery({
+    queryKey: ['inventory'],
+    queryFn: api.inventory,
+    // Quick while something is happening in this session, steady otherwise.
+    refetchInterval: follow.refetchInterval || STOCK_INTERVAL_MS,
+  })
+  const weekQuery = useQuery({
+    queryKey: ['specials-week', language],
+    queryFn: () => api.weekOfSpecials(language),
+    refetchInterval: SPECIALS_INTERVAL_MS,
+  })
+  const week = weekQuery.data ?? null
+  const board = useMemo(
+    () => ({ week, stock: stockGroups(menuQuery.data, stockQuery.data ?? [], week) }),
+    [week, menuQuery.data, stockQuery.data],
+  )
 
   const timeline = useMemo(() => (eventsQuery.data ? buildTimeline(eventsQuery.data) : EMPTY_TIMELINE), [eventsQuery.data])
   const itemName = useItemNames(menuQuery.data)
@@ -214,6 +237,7 @@ export function useLiveSession(): LiveSession {
     itemName,
     paused,
     voice,
+    board,
     canSend,
     send,
     startNewSession,

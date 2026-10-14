@@ -5,7 +5,7 @@
 import { vi } from 'vitest'
 
 import type { AgentEvent, Cart, Session } from '../api/client'
-import { agentInfo } from './fixtures'
+import { agentInfo, stockLevels, week } from './fixtures'
 
 interface Request {
   method: string
@@ -112,6 +112,8 @@ export function installFakeBackend() {
       if (path === '/agent') return respond(200, agentInfo)
       if (path === '/menu') return respond(200, { categories: [] })
       if (path === '/handoffs') return respond(200, [])
+      if (path === '/inventory') return respond(200, stockLevels)
+      if (path === '/specials/week') return respond(200, week)
       if (path === '/sessions' && method === 'POST') return respond(201, openSession(body.lane))
 
       const match = /^\/sessions\/([^/]+)(\/\w+)?$/.exec(path)

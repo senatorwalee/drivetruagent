@@ -627,6 +627,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/specials/week": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * This week's specials, day by day
+         * @description Monday to Sunday of the current week, with today marked. Each day's
+         *     `in_stock` is read live.
+         */
+        get: operations["read_week_of_specials_specials_week_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/specials/{code}": {
         parameters: {
             query?: never;
@@ -807,6 +828,22 @@ export interface components {
             saves_cents: number;
             /** Slots */
             slots: components["schemas"]["CategoryRef"][];
+        };
+        /** DaySpecialsView */
+        DaySpecialsView: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Day Name */
+            day_name: string;
+            /** Is Today */
+            is_today: boolean;
+            /** Specials */
+            specials: components["schemas"]["SpecialView"][];
+            /** Weekday */
+            weekday: number;
         };
         /**
          * Decision
@@ -1428,6 +1465,19 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /**
+         * WeekOfSpecialsView
+         * @description The specials for each day of this week, Monday to Sunday.
+         */
+        WeekOfSpecialsView: {
+            /** Days */
+            days: components["schemas"]["DaySpecialsView"][];
+            /**
+             * Today
+             * Format: date
+             */
+            today: string;
         };
     };
     responses: never;
@@ -2764,6 +2814,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpecialView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_week_of_specials_specials_week_get: {
+        parameters: {
+            query?: {
+                /** @description The language names are returned in. */
+                language?: components["schemas"]["Language"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeekOfSpecialsView"];
                 };
             };
             /** @description Validation Error */

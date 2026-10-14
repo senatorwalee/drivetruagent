@@ -1,0 +1,232 @@
+/* Drawn with the host view's own colour tokens. The fallbacks cover the
+   receipt view, which names them differently (ink, paper, rule). */
+
+.board {
+  --b-text: var(--text, var(--ink));
+  --b-muted: var(--muted);
+  --b-line: var(--hairline, var(--rule));
+  --b-surface: var(--panel, var(--paper));
+  --b-accent: var(--accent);
+  --b-good: var(--allow, var(--accent));
+  --b-warn: var(--confirm, var(--accent));
+
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: 20px 24px;
+  color: var(--b-text);
+}
+
+@media (max-width: 1100px) {
+  .board {
+    grid-template-columns: 1fr;
+  }
+}
+
+.part {
+  min-width: 0;
+}
+
+.title {
+  margin: 0 0 10px;
+  color: var(--b-muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.titleNote {
+  margin-left: 8px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* --- The week ------------------------------------------------------------- */
+
+.week {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (max-width: 760px) {
+  .week {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.day {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--b-line);
+  background: var(--b-surface);
+}
+
+/* Today stands out, so the special the agent names can be checked at a glance. */
+.day[aria-current='date'] {
+  border: 2px solid var(--b-accent);
+  padding: 9px;
+}
+
+.dayName {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--b-muted);
+}
+
+.day[aria-current='date'] .dayName {
+  color: var(--b-text);
+  font-weight: 600;
+}
+
+.today {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--b-accent);
+  color: var(--on-accent, var(--paper));
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.special {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.specialItem {
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.prices {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.price {
+  color: var(--b-accent);
+  font-weight: 600;
+}
+
+.was {
+  color: var(--b-muted);
+  font-size: 12px;
+}
+
+.special[data-sold-out='true'] .specialItem,
+.special[data-sold-out='true'] .price {
+  opacity: 0.55;
+}
+
+.soldOut {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--reject, var(--accent));
+}
+
+.none {
+  margin: 0;
+  color: var(--b-muted);
+  font-size: 13px;
+}
+
+/* --- Stock ---------------------------------------------------------------- */
+
+.groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px 16px;
+}
+
+.groupName {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 8px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--b-line);
+  font-size: 13px;
+}
+
+.item:last-child {
+  border-bottom: 0;
+}
+
+.itemName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item[data-special='true'] .itemName {
+  color: var(--b-accent);
+  font-weight: 600;
+}
+
+.count {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  text-align: right;
+  border-radius: 4px;
+  padding: 0 4px;
+  animation: countChanged 1.6s ease-out;
+}
+
+.item[data-low='true'] .count {
+  color: var(--reject, var(--accent));
+}
+
+/* A count that has just changed lights up for a moment, so a drop is seen. */
+@keyframes countChanged {
+  from {
+    background: var(--b-warn);
+    color: var(--b-surface);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .count {
+    animation: none;
+  }
+}
+
+.held {
+  grid-column: 1 / -1;
+  color: var(--b-warn);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.held:empty {
+  display: none;
+}

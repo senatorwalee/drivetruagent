@@ -15,7 +15,7 @@ from drivetruagent.api.menu import LanguageParam
 from drivetruagent.enums import Language
 from drivetruagent.ordering import offers
 from drivetruagent.ordering.errors import UnknownSpecial
-from drivetruagent.ordering.views import ComboView, SpecialView
+from drivetruagent.ordering.views import ComboView, SpecialView, WeekOfSpecialsView
 
 router = APIRouter(tags=["offers"])
 
@@ -58,6 +58,18 @@ async def read_specials(
     from the session's own date, not from this.
     """
     return await offers.todays_specials(db, today, language, cache=cache)
+
+
+@router.get("/specials/week", summary="This week's specials, day by day")
+async def read_week_of_specials(
+    db: SessionDep,
+    today: BusinessDateDep,
+    cache: SpecialsCacheDep,
+    language: LanguageParam = Language.EN,
+) -> WeekOfSpecialsView:
+    """Monday to Sunday of the current week, with today marked. Each day's
+    `in_stock` is read live."""
+    return await offers.week_of_specials(db, today, language, cache=cache)
 
 
 @router.put(

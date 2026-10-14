@@ -213,6 +213,22 @@ class SpecialView(BaseModel):
     in_stock: bool
 
 
+class DaySpecialsView(BaseModel):
+    date: date
+    # ISO weekday: 1 is Monday, 7 is Sunday.
+    weekday: int
+    day_name: str
+    is_today: bool
+    specials: list[SpecialView]
+
+
+class WeekOfSpecialsView(BaseModel):
+    """The specials for each day of this week, Monday to Sunday."""
+
+    today: date
+    days: list[DaySpecialsView]
+
+
 class SuggestionView(BaseModel):
     """Something the agent may offer the customer, once.
 

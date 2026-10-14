@@ -699,3 +699,10 @@ a.button {
     opacity: 0.55;
   }
 }
+
+/* The week's specials and the stock, on a row of their own under the columns. */
+.board {
+  flex: 1 1 100%;
+  padding: 20px 24px 28px;
+  border-top: 1px solid var(--hairline);
+}

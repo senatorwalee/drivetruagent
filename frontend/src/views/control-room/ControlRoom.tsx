@@ -7,6 +7,7 @@ import { PageLink } from '../../app/PageLink'
 import { clock } from '../../session/presentation'
 import type { LiveSession } from '../../session/useLiveSession'
 import { MicButton } from '../shared/MicButton'
+import { ShopBoard } from '../shared/ShopBoard'
 import { useComposer } from '../shared/useComposer'
 import { ViewSwitcher } from '../shared/ViewSwitcher'
 import type { LiveSessionViewProps } from '../shared/viewTypes'
@@ -57,6 +58,7 @@ export function ControlRoom({ live, view, onViewChange }: LiveSessionViewProps) 
         </section>
         <DecisionLog decisions={live.timeline.decisions} />
         <CartTable live={live} />
+        <ShopBoard week={live.board.week} stock={live.board.stock} className={styles.board} />
       </main>
     </div>
   )
