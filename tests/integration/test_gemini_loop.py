@@ -20,6 +20,7 @@ from drivetruagent.agent import events
 from drivetruagent.agent.gemini_model import GeminiModel
 from drivetruagent.agent.loop import AgentConfig, run_turn
 from drivetruagent.agent.messages import ToolCall
+from drivetruagent.agent.tools import TOOL_DEFINITIONS
 from drivetruagent.db.models import AgentEvent
 from drivetruagent.enums import AgentEventKind
 from drivetruagent.ordering.sessions import open_session
@@ -284,4 +285,4 @@ async def test_every_request_carries_the_instructions_and_all_the_tools(
     assert config.system_instruction.startswith("You take orders at the drive-through")
     names = {d.name for d in config.tools[0].function_declarations}
     assert {"add_item", "submit_order", "get_todays_specials", "request_human"} <= names
-    assert len(names) == 13
+    assert len(names) == len(TOOL_DEFINITIONS)

@@ -11,6 +11,7 @@ Nothing here commits. The caller owns the transaction.
 """
 
 import uuid
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
@@ -50,6 +51,7 @@ from drivetruagent.policy.handoffs import open_handoff
 from drivetruagent.policy.outcome import ActionOutcome, OutcomeError
 from drivetruagent.policy.rules import (
     ABUSE,
+    ALLERGEN_UNVERIFIED,
     HUMAN_REQUESTED,
     REPEATED_CONFUSION,
     SESSION_ENDED,
@@ -277,6 +279,47 @@ async def terminate(
     await _supersede_pending(db, session_id)
     await end_session(db, session_id, SessionState.TERMINATED, reason=ABUSE)
     return await cart_rules.get_cart(db, session_id, tax_rate=tax_rate)
+
+
+async def allergen_unverified(
+    db: AsyncSession,
+    session_id: uuid.UUID,
+    items: Mapping[str, str],
+    allergens: list[str],
+    *,
+    tax_rate: Decimal,
+) -> ActionOutcome:
+    """An allergen question nobody has a reviewed answer to: a person takes
+    over rather than the agent guessing. `items`: code -> display name.
+    `allergens` empty: any allergen."""
+    customer_session = await lock_session(db, session_id)
+    if customer_session.state in FINAL_SESSION_STATES:
+        snapshot = await cart_rules.get_cart(db, session_id, tax_rate=tax_rate)
+        return _rejected(
+            PolicyResult(
+                Decision.REJECT,
+                SESSION_ENDED,
+                "This session has ended. Nothing more can be changed.",
+                {"state": customer_session.state.value},
+            ),
+            snapshot,
+        )
+    return await _escalate(
+        db,
+        session_id,
+        PolicyResult(
+            Decision.ESCALATE,
+            ALLERGEN_UNVERIFIED,
+            "There is no checked allergen information for this. Do not guess: "
+            "tell the customer a team member will answer it.",
+            {
+                "item_codes": list(items),
+                "items": list(items.values()),
+                "allergens": allergens,
+            },
+        ),
+        tax_rate,
+    )
 
 
 async def hand_off_for_confusion(

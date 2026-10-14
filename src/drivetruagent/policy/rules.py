@@ -31,6 +31,8 @@ SILENCE_TIMEOUT = "silence_timeout"
 # The guardrail's two outcomes: three strikes for abuse, or for confusion.
 ABUSE = "abuse"
 REPEATED_CONFUSION = "repeated_confusion"
+# An allergen question about an item with no reviewed allergen information.
+ALLERGEN_UNVERIFIED = "allergen_unverified"
 
 
 def evaluate(

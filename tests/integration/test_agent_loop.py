@@ -23,6 +23,7 @@ from drivetruagent.agent.messages import (
 )
 from drivetruagent.agent.model import ModelUnavailable
 from drivetruagent.agent.scripted import ScriptedModel, call, calls, say
+from drivetruagent.agent.tools import TOOL_DEFINITIONS
 from drivetruagent.db.models import AgentEvent, Order
 from drivetruagent.enums import AgentEventKind, SessionState
 from drivetruagent.ordering.errors import SessionNotFound
@@ -175,7 +176,7 @@ async def test_the_model_is_given_instructions_and_every_tool(
     # The menu index comes from the database.
     assert "- fries: Fries / Frites" in request.instructions
     assert "- soft_serve_cone: Soft-serve cone" in request.instructions
-    assert len(request.tools) == 13
+    assert len(request.tools) == len(TOOL_DEFINITIONS)
     assert request.messages == (UserMessage("Hi"),)
 
 

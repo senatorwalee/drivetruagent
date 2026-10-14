@@ -229,6 +229,112 @@
         "title": "AgentInfoResponse",
         "type": "object"
       },
+      "Allergen": {
+        "description": "Health Canada's priority food allergens, with gluten listed apart from\nwheat because a customer avoiding gluten asks about it by that name.",
+        "enum": [
+          "peanut",
+          "tree_nut",
+          "sesame",
+          "milk",
+          "egg",
+          "fish",
+          "shellfish",
+          "soy",
+          "wheat",
+          "gluten",
+          "mustard",
+          "sulphite"
+        ],
+        "title": "Allergen",
+        "type": "string"
+      },
+      "AllergenReport": {
+        "properties": {
+          "contains": {
+            "items": {
+              "$ref": "#/components/schemas/ContainsView"
+            },
+            "title": "Contains",
+            "type": "array"
+          },
+          "item_code": {
+            "title": "Item Code",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "line_no": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line No"
+          },
+          "may_contain": {
+            "items": {
+              "$ref": "#/components/schemas/MayContainView"
+            },
+            "title": "May Contain",
+            "type": "array"
+          },
+          "not_listed": {
+            "items": {
+              "$ref": "#/components/schemas/Allergen"
+            },
+            "title": "Not Listed",
+            "type": "array"
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "options_that_add": {
+            "items": {
+              "$ref": "#/components/schemas/OptionAddsView"
+            },
+            "title": "Options That Add",
+            "type": "array"
+          },
+          "reviewed_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed On"
+          },
+          "verified": {
+            "title": "Verified",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "item_code",
+          "item_name",
+          "verified",
+          "reviewed_on",
+          "options",
+          "contains",
+          "may_contain",
+          "not_listed",
+          "options_that_add"
+        ],
+        "title": "AllergenReport",
+        "type": "object"
+      },
       "CartSnapshot": {
         "properties": {
           "discount_cents": {
@@ -446,6 +552,26 @@
           "saves_cents"
         ],
         "title": "ComboView",
+        "type": "object"
+      },
+      "ContainsView": {
+        "properties": {
+          "allergen": {
+            "$ref": "#/components/schemas/Allergen"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "allergen",
+          "sources"
+        ],
+        "title": "ContainsView",
         "type": "object"
       },
       "DaySpecialsView": {
@@ -1093,6 +1219,26 @@
         "title": "LineView",
         "type": "object"
       },
+      "MayContainView": {
+        "properties": {
+          "allergen": {
+            "$ref": "#/components/schemas/Allergen"
+          },
+          "because": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Because",
+            "type": "array"
+          }
+        },
+        "required": [
+          "allergen",
+          "because"
+        ],
+        "title": "MayContainView",
+        "type": "object"
+      },
       "MenuItemSummary": {
         "properties": {
           "base_price_cents": {
@@ -1244,6 +1390,45 @@
           }
         },
         "title": "OpenSessionRequest",
+        "type": "object"
+      },
+      "OptionAddsView": {
+        "properties": {
+          "contains": {
+            "items": {
+              "$ref": "#/components/schemas/Allergen"
+            },
+            "title": "Contains",
+            "type": "array"
+          },
+          "group_code": {
+            "title": "Group Code",
+            "type": "string"
+          },
+          "may_contain": {
+            "items": {
+              "$ref": "#/components/schemas/Allergen"
+            },
+            "title": "May Contain",
+            "type": "array"
+          },
+          "option_code": {
+            "title": "Option Code",
+            "type": "string"
+          },
+          "option_name": {
+            "title": "Option Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_code",
+          "option_code",
+          "option_name",
+          "contains",
+          "may_contain"
+        ],
+        "title": "OptionAddsView",
         "type": "object"
       },
       "OrderView": {
@@ -2650,6 +2835,70 @@
           }
         },
         "summary": "One item with its choices",
+        "tags": [
+          "menu"
+        ]
+      }
+    },
+    "/menu/items/{item_code}/allergens": {
+      "get": {
+        "description": "What the item contains and may contain with its default choices, and\nwhich other choices would add an allergen. From the allergen matrix.\n\n`verified` false means the item's allergens were never reviewed, and the\nlists say nothing.",
+        "operationId": "read_item_allergens_menu_items__item_code__allergens_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_code",
+            "required": true,
+            "schema": {
+              "title": "Item Code",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The language names are returned in.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Language",
+              "default": "en",
+              "description": "The language names are returned in."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AllergenReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "One item's allergens",
         "tags": [
           "menu"
         ]

@@ -26,6 +26,7 @@ from drivetruagent.enums import (
 )
 from drivetruagent.ordering.views import CartSnapshot, OrderView
 from drivetruagent.policy.rules import (
+    ALLERGEN_UNVERIFIED,
     EXTREME_QUANTITY,
     HUMAN_REQUESTED,
     REPEATED_CONFUSION,
@@ -41,6 +42,7 @@ _TITLES = {
     HUMAN_REQUESTED: "A person was asked for",
     TIME_LIMIT: "Took longer than the time limit",
     REPEATED_CONFUSION: "Kept going off track",
+    ALLERGEN_UNVERIFIED: "Allergen question with no checked answer",
 }
 
 
@@ -243,6 +245,15 @@ def _what_happened(
             "The conversation kept going off track: off-topic questions, or the "
             "agent not understanding. Ask what the customer would like."
         )
+    if reason == ALLERGEN_UNVERIFIED:
+        items = _listed(details.get("items")) or "an item"
+        allergens = _listed(details.get("allergens"))
+        about = f" ({allergens.replace('_', ' ')})" if allergens else ""
+        return (
+            f"The customer asked about allergens{about} in {items}, which has "
+            "no checked allergen information. Answer from the allergen binder "
+            "or ask the manager before they order."
+        )
     if reason == TIME_LIMIT:
         return (
             "The order was not finished within the time limit. Finish it with "
@@ -252,6 +263,16 @@ def _what_happened(
         f"Handed off by the rule '{reason}'. Read the conversation and carry on "
         "from there."
     )
+
+
+def _listed(values: object) -> str:
+    """A list from a handoff's details as words: "a, b and c"."""
+    if not isinstance(values, list):
+        return ""
+    words = [str(value) for value in values if str(value).strip()]
+    if len(words) <= 1:
+        return "".join(words)
+    return f"{', '.join(words[:-1])} and {words[-1]}"
 
 
 def _cart(item_count: int) -> str:

@@ -8,7 +8,8 @@ from fastapi.responses import JSONResponse
 from drivetruagent.api.deps import SessionDep
 from drivetruagent.api.errors import NOT_FOUND, error_response
 from drivetruagent.enums import Language
-from drivetruagent.ordering import menu
+from drivetruagent.ordering import allergen_matrix, menu
+from drivetruagent.ordering.allergen_matrix import AllergenReport
 from drivetruagent.ordering.errors import UnknownItem
 from drivetruagent.ordering.views import ItemDetails, MenuMatch, MenuView
 
@@ -54,4 +55,25 @@ async def read_item(
     except UnknownItem as error:
         # Here the item is the thing addressed by the URL, so a missing one is
         # "not found". As part of a cart request it would be a refused request.
+        return error_response(error, status.HTTP_404_NOT_FOUND)
+
+
+@router.get(
+    "/items/{item_code}/allergens",
+    responses=NOT_FOUND,
+    response_model=AllergenReport,
+    summary="One item's allergens",
+)
+async def read_item_allergens(
+    item_code: str, db: SessionDep, language: LanguageParam = Language.EN
+) -> AllergenReport | JSONResponse:
+    """What the item contains and may contain with its default choices, and
+    which other choices would add an allergen. From the allergen matrix.
+
+    `verified` false means the item's allergens were never reviewed, and the
+    lists say nothing.
+    """
+    try:
+        return await allergen_matrix.item_allergens(db, item_code, None, None, language)
+    except UnknownItem as error:
         return error_response(error, status.HTTP_404_NOT_FOUND)
