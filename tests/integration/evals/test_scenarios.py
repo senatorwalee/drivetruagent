@@ -15,13 +15,19 @@ run with -s: every conversation is printed.
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from drivetruagent.agent.factory import agent_config, model_from_settings
+from drivetruagent.agent.factory import (
+    agent_config,
+    ingest_embedders,
+    model_from_settings,
+)
 from drivetruagent.agent.model import ModelClient, ModelUnavailable
 from drivetruagent.config import Settings
 from drivetruagent.evals.runner import run_scenario
 from drivetruagent.evals.scenario import Scenario, check
 from drivetruagent.evals.scenarios import SCENARIOS
-from tests.integration.conftest import TEST_TAX_RATE
+from drivetruagent.ingest import load_documents
+from drivetruagent.knowledge.store import ingest
+from tests.integration.conftest import KNOWLEDGE_DIR, TEST_TAX_RATE
 
 pytestmark = pytest.mark.usefixtures("specials")
 
@@ -50,6 +56,8 @@ def model(settings: Settings) -> ModelClient:
 async def test_scenario(
     db_session: AsyncSession, scenario: Scenario, model: ModelClient, settings: Settings
 ) -> None:
+    # Indexed with the embedder the agent will search with.
+    await ingest(db_session, load_documents(KNOWLEDGE_DIR), ingest_embedders(settings))
     result = await run_scenario(
         db_session, scenario, model=model, config=agent_config(settings)
     )
