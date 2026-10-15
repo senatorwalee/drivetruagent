@@ -15,7 +15,11 @@ from drivetruagent.policy.decisions import PolicyLimits
 class Settings(BaseSettings):
     """Application settings, read from environment variables and a local .env file."""
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    # env_ignore_empty: a blank line such as `OPENAI_API_KEY=` (as in
+    # .env.example) means "not set", not an empty key.
+    model_config = SettingsConfigDict(
+        env_file=".env", extra="ignore", env_ignore_empty=True
+    )
 
     database_url: str
     environment: Literal["local", "test", "ci"] = "local"

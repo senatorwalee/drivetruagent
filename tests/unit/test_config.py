@@ -109,3 +109,14 @@ def test_a_timer_of_zero_seconds_is_rejected(field: str) -> None:
     """It would fire on every sweep."""
     with pytest.raises(ValidationError, match=field):
         make_settings(**{field: 0})
+
+
+def test_a_blank_setting_counts_as_not_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`OPENAI_API_KEY=` in a copied .env.example is no key, not an empty one."""
+    monkeypatch.setenv("OPENAI_API_KEY", "")
+    monkeypatch.setenv("TRACING_ENDPOINT", "")
+
+    settings = Settings(database_url="unused", _env_file=None)  # pyright: ignore[reportCallIssue]
+
+    assert settings.openai_api_key is None
+    assert settings.tracing_endpoint is None

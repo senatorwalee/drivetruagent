@@ -37,7 +37,8 @@ built piece by piece.
 | 15b | Knowledge search: approved documents, pgvector, escalation on weak evidence | Done; retrieval and answer evals pass against the real model |
 | 16 | Tracing: every turn as a timeline in Arize Phoenix, over OpenTelemetry | Done; checked with real turns in Phoenix |
 | 17 | Faster turns: 6.5 s to 3.7 s on average, measured with the traces | Done; evals pass against the real model |
-| Later | Demo polish: cost readout, one-command Docker, French review, demo script | Planned |
+| 18 | One command: `make demo` runs the whole app in Docker, with or without a key | Done; checked in a browser |
+| Later | Demo polish: cost readout, French review, demo script | Planned |
 
 ## Stack
 
@@ -52,7 +53,29 @@ built piece by piece.
 | Web app | React, TypeScript and Vite; TanStack Query; types generated from the API |
 | Tooling | uv, ruff, pyright, oxlint, Vitest, pre-commit, GitHub Actions |
 
-## Getting started
+## Try it: one command
+
+You need Docker and `make`.
+
+```bash
+make demo
+```
+
+Then open <http://localhost:8080> (staff screen: <http://localhost:8080/staff>).
+That builds and starts Postgres, the API and the web app; the API migrates the
+database and loads the menu and the knowledge documents on every start, and
+nginx serves the web app and forwards `/api` to the API.
+
+- **No key needed.** Without an `OPENAI_API_KEY` it plays the scripted demo
+  conversation (type the suggested lines), and knowledge search uses the local
+  embedder.
+- **With a key**, put it in `.env` (`cp .env.example .env`, then add
+  `OPENAI_API_KEY`) and run `make demo` again: the real model answers, and the mic
+  button talks to it by voice.
+- `make down` stops everything. Traces go to Phoenix if `make phoenix` is running
+  and `TRACING_ENDPOINT` is set in `.env`.
+
+## Getting started (development)
 
 You need [uv](https://docs.astral.sh/uv/), Docker and `make`.
 
@@ -76,7 +99,8 @@ collide with a Postgres installed directly on your machine.
 
 | Command | What it does |
 |---|---|
-| `make up` / `make down` | Start and stop the local Postgres (`down` stops Phoenix too) |
+| `make demo` | Build and run the whole app in Docker on <http://localhost:8080> |
+| `make up` / `make down` | Start and stop the local Postgres (`down` stops the demo and Phoenix too) |
 | `make phoenix` | Start Arize Phoenix on <http://localhost:6006> for tracing |
 | `make dev` | Run the API with auto-reload |
 | `make migrate` | Apply all database migrations |
