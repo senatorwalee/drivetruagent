@@ -96,7 +96,9 @@ SCENARIOS: tuple[Scenario, ...] = (
         ),
         total_cents=879,  # (379 + 399) + 13%
         language=Language.FR,
-        must_use=ORDERING_TOOLS | {"set_language"},
+        # The language is set in code from what the customer says, and checked
+        # by `language` above, so the model need not call set_language.
+        must_use=ORDERING_TOOLS,
     ),
     Scenario(
         name="combo_taken_up",

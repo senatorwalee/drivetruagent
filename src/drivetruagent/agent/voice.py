@@ -52,7 +52,12 @@ from drivetruagent.db.models import AgentEvent
 from drivetruagent.enums import FINAL_SESSION_STATES, AgentEventKind
 from drivetruagent.ordering.errors import OrderingError
 from drivetruagent.ordering.offers import close_suggestions
-from drivetruagent.ordering.sessions import begin_turn, end_turn, get_session
+from drivetruagent.ordering.sessions import (
+    begin_turn,
+    end_turn,
+    follow_language,
+    get_session,
+)
 from drivetruagent.policy.guardrails import GuardAction
 
 logger = logging.getLogger(__name__)
@@ -204,6 +209,9 @@ class VoiceBridge:
             )
             # As in text mode: anything offered last turn has had its chance.
             await close_suggestions(db, self.session_id)
+            # And the language follows what was said, so names in tool
+            # results come back in it.
+            await follow_language(db, self.session_id, text)
             await db.commit()
         await self._check(text)
 
