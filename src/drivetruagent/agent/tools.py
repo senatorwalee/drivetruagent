@@ -21,9 +21,11 @@ from datetime import timedelta
 from decimal import Decimal
 from typing import Any
 
+from openinference.semconv.trace import OpenInferenceSpanKindValues, SpanAttributes
 from pydantic import BaseModel, ConfigDict, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from drivetruagent.agent import tracing
 from drivetruagent.agent.model import ToolDefinition
 from drivetruagent.enums import Allergen, Language
 from drivetruagent.knowledge.embedding import EmbeddingUnavailable
@@ -362,12 +364,41 @@ async def _search_knowledge(context: ToolContext, args: KnowledgeArgs) -> ToolOu
 
     retrieval: Retrieval | None = None
     if context.knowledge is not None:
-        try:
-            retrieval = await context.knowledge.find(
-                context.db, args.query, item_code=args.item_code
-            )
-        except EmbeddingUnavailable as error:
-            logger.warning("Knowledge search unavailable: %s", error)
+        with tracing.span(
+            "knowledge search",
+            OpenInferenceSpanKindValues.RETRIEVER,
+            session_id=context.session_id,
+            input_value=args.query,
+        ) as search_span:
+            try:
+                retrieval = await context.knowledge.find(
+                    context.db, args.query, item_code=args.item_code
+                )
+            except EmbeddingUnavailable as error:
+                logger.warning("Knowledge search unavailable: %s", error)
+                tracing.set_error(search_span, str(error))
+            else:
+                search_span.set_attributes(
+                    tracing.document_attributes(
+                        [
+                            {
+                                "id": hit.chunk_id,
+                                "score": hit.score,
+                                "text": hit.text,
+                                "document": hit.document,
+                            }
+                            for hit in retrieval.hits
+                        ]
+                    )
+                    | tracing.metadata(
+                        {
+                            "model": retrieval.model,
+                            "min_score": retrieval.min_score,
+                            "best_score": retrieval.best_score,
+                            "item_code": args.item_code,
+                        }
+                    )
+                )
     # Kept in the event log with the result: which model scored what.
     trace = {
         "retrieval": {
@@ -704,6 +735,31 @@ async def run_tool(
     context: ToolContext, name: str, arguments: dict[str, Any]
 ) -> ToolOutput:
     """Run one tool call from the model and return what it should be shown."""
+    with tracing.span(
+        f"tool {name}",
+        OpenInferenceSpanKindValues.TOOL,
+        session_id=context.session_id,
+        input_value=arguments,
+        attributes={SpanAttributes.TOOL_NAME: name},
+    ) as tool_span:
+        output = await _run_tool(context, name, arguments)
+        tracing.set_output(tool_span, output)
+        error = output.get("error")
+        tool_span.set_attributes(
+            tracing.metadata(
+                {
+                    "decision": output.get("decision"),
+                    "rule": output.get("rule"),
+                    "error": error.get("code") if isinstance(error, dict) else None,
+                }
+            )
+        )
+        return output
+
+
+async def _run_tool(
+    context: ToolContext, name: str, arguments: dict[str, Any]
+) -> ToolOutput:
     tool = _TOOLS_BY_NAME.get(name)
     if tool is None:
         return _error(

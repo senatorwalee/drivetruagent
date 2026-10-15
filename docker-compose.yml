@@ -16,5 +16,18 @@ services:
       timeout: 5s
       retries: 5
 
+  # Tracing UI and collector: http://localhost:6006. Not started by `make up`;
+  # `make phoenix` starts it. Traces are kept in its own volume.
+  phoenix:
+    image: arizephoenix/phoenix:version-20.17.0
+    profiles: ["tracing"]
+    ports:
+      - "6006:6006"
+    environment:
+      PHOENIX_WORKING_DIR: /phoenix
+    volumes:
+      - phoenix_data:/phoenix
+
 volumes:
   db_data:
+  phoenix_data:

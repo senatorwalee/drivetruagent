@@ -35,7 +35,8 @@ built piece by piece.
 | 14 | Guardrails: misuse detected, counted and acted on by code | Done; evals pass against the real model |
 | 15a | Allergens: the allergen matrix, checked by a tool, never guessed | Done; evals pass against the real model |
 | 15b | Knowledge search: approved documents, pgvector, escalation on weak evidence | Done; retrieval and answer evals pass against the real model |
-| Later | Tracing | Planned |
+| 16 | Tracing: every turn as a timeline in Arize Phoenix, over OpenTelemetry | Done; checked with real turns in Phoenix |
+| Later | Demo polish | Planned |
 
 ## Stack
 
@@ -74,7 +75,8 @@ collide with a Postgres installed directly on your machine.
 
 | Command | What it does |
 |---|---|
-| `make up` / `make down` | Start and stop the local Postgres |
+| `make up` / `make down` | Start and stop the local Postgres (`down` stops Phoenix too) |
+| `make phoenix` | Start Arize Phoenix on <http://localhost:6006> for tracing |
 | `make dev` | Run the API with auto-reload |
 | `make migrate` | Apply all database migrations |
 | `make seed` | Load `data/menu.json` into the database; safe to run repeatedly |
@@ -771,6 +773,50 @@ it: 23 of 23 found first, 4 of 4 kept out. The same questions run as a plain tes
 with the hashing embedder.
 
 
+## Tracing: each turn as a timeline in Arize Phoenix
+
+The event log is the record of what happened. Tracing is a **view** of the same
+work, built for looking at it: each turn as a timeline, with the guardrail, the
+model calls, the tools and the knowledge searches nested under it and timed. It
+is off by default, and nothing depends on it.
+
+```bash
+make phoenix                                          # Phoenix on http://localhost:6006
+echo "TRACING_ENDPOINT=http://localhost:6006/v1/traces" >> .env
+make dev                                              # or make chat
+```
+
+![A turn in Phoenix: guardrail, model calls, tools and the knowledge search nested under it](docs/images/phoenix-trace.png)
+
+Spans follow the **OpenInference** conventions, so Phoenix draws each kind
+properly:
+
+| Span | Kind | Carries |
+|---|---|---|
+| `turn` | AGENT | the customer's words, the reply, the tools used, the session's state |
+| `guardrail` | GUARDRAIL | the message; verdict, which layer decided, the action |
+| `model` | LLM | the instructions and conversation sent, the answer and tool calls, token counts |
+| `tool <name>` | TOOL | the arguments, the result, the policy decision |
+| `knowledge search` | RETRIEVER | the query; each passage with its id, score and text |
+
+- **Every span carries the session id**, so Phoenix's Sessions tab shows a whole
+  visit. Tool and guardrail spans come from shared code, so voice calls get them
+  too.
+- **One place makes spans.** Only `agent/tracing.py` and `telemetry.py` import
+  OpenTelemetry, and a layering test keeps it that way. With no endpoint set, no
+  provider is installed and every span is a no-op.
+- **Exported in batches, off the request path**, over OTLP HTTP. Phoenix runs from
+  a pinned image with its own volume, under a compose profile, so `make up` is still
+  just Postgres.
+- Tested with an in-memory exporter: the nesting and kinds of a turn with tools, a
+  blocked message (a guardrail span and no model call), a retriever span with its
+  passages, and a model failure marking the turn as an error.
+
+What it showed straight away: a first turn that asked about the fryer oil took
+about 10 seconds, because it made three round trips to the model (language,
+search, answer). That is the kind of thing the event log records but nobody
+notices until it is drawn.
+
 ## Policy engine
 
 The model proposes; code decides. Every action the agent proposes goes
@@ -903,7 +949,8 @@ src/drivetruagent/
 ├── agent/           the model, its tools and instructions, the turn loop, the event log
 ├── evals/           scenarios, the checker, and labelled retrieval questions
 ├── seed.py          loads the menu file into the database
-└── ingest.py        loads and embeds the knowledge documents
+├── ingest.py        loads and embeds the knowledge documents
+└── telemetry.py     sends traces to Arize Phoenix when TRACING_ENDPOINT is set
 data/menu.json       the menu: items, choices, prices, aliases, allergens
 knowledge/           approved documents the agent may quote (synthetic)
 frontend/src/

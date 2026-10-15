@@ -19,6 +19,7 @@ from drivetruagent.api import (
 from drivetruagent.api.errors import register_error_handlers
 from drivetruagent.config import get_settings
 from drivetruagent.db.session import create_engine, create_session_factory
+from drivetruagent.telemetry import setup_tracing
 
 
 @asynccontextmanager
@@ -26,6 +27,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Create the database engine and start the timekeeper at startup; stop
     the timekeeper and close the pool at shutdown."""
     settings = get_settings()
+    # Off unless TRACING_ENDPOINT is set.
+    tracer_provider = setup_tracing(settings)
     engine = create_engine(settings.database_url)
     app.state.engine = engine
     app.state.session_factory = create_session_factory(engine)
@@ -51,6 +54,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         with suppress(asyncio.CancelledError):
             await sweeping
     await engine.dispose()
+    if tracer_provider is not None:
+        # Sends whatever spans are still waiting.
+        tracer_provider.shutdown()
 
 
 def create_app() -> FastAPI:
