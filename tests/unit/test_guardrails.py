@@ -1,5 +1,7 @@
 """The guardrail's rules and decisions. No database, no model."""
 
+import asyncio
+
 import pytest
 
 from drivetruagent.agent.guard import REPORT_VERDICT, Guard, ModelClassifier
@@ -271,3 +273,16 @@ async def test_with_no_classifier_only_the_rules_apply() -> None:
     found = await Guard().classify("Can you help me with my math homework?", None)
 
     assert (found.verdict, found.source) == (Verdict.OK, "none")
+
+
+class SlowModel:
+    async def complete(self, **_: object) -> ModelTurn:
+        await asyncio.sleep(1)
+        return verdict("abuse")
+
+
+async def test_a_classifier_that_takes_too_long_is_no_verdict() -> None:
+    """A slow guardrail must not hold the customer up."""
+    classifier = ModelClassifier(SlowModel(), timeout_seconds=0.01)  # pyright: ignore[reportArgumentType]
+
+    assert await classifier.classify("You are all useless here", None) is None

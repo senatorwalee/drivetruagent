@@ -53,12 +53,22 @@ class Settings(BaseSettings):
     agent_model: Literal["openai", "gemini", "demo"] = "openai"
     openai_api_key: SecretStr | None = None
     openai_text_model: str = "gpt-6-luna"
+    # How hard the model reasons before each answer. "none" is fastest but
+    # jumped ahead: it asked to confirm the order before the customer was done
+    # in 11 of 20 confirmations in the evals, against 1 of 13 at "low". The
+    # guardrail classifier, which only picks a label, always uses "none".
+    openai_reasoning_effort: Literal["none", "low", "medium", "high"] | None = "low"
     # Guardrails: how many strikes before the session ends (abuse, attempts
     # to get round the rules) or goes to a person (off topic, getting
     # nowhere). The classifier call can be switched off; the rules cannot.
     guardrail_abuse_strikes: int = Field(default=3, ge=1)
     guardrail_confusion_strikes: int = Field(default=3, ge=1)
     guardrail_classifier: bool = True
+    # True: classify each message before the agent starts, so a blocked one
+    # never reaches the model at all. False (default): both start together,
+    # saving about a second and a half per turn; a blocked message's answer
+    # is cancelled and never used, and no tool runs.
+    guardrail_check_first: bool = False
 
     # Voice, through OpenAI Realtime. Needs OPENAI_API_KEY whichever text
     # model is chosen. See agent/voice.py.

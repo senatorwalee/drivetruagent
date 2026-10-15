@@ -18,7 +18,8 @@ jobs:
   check:
     name: Backend lint, type check and test
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # The tests take about 5 minutes; a slow runner once took twice that.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 

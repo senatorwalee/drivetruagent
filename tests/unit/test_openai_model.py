@@ -204,8 +204,42 @@ async def test_complete_sends_the_whole_conversation_and_stores_nothing() -> Non
     assert client.request["tools"][0]["name"] == "remove_item"
     # The event log is the only record of the conversation.
     assert client.request["store"] is False
-    # The request must be something that can be sent as JSON.
-    json.dumps(client.request)
+    # The request must be something that can be sent as JSON. `omit` is the
+    # SDK's marker for "leave this out", which it drops before sending.
+    json.dumps({k: v for k, v in client.request.items() if v is not openai.omit})
+    # With no effort set, the model's default is used.
+    assert client.request["reasoning"] is openai.omit
+
+
+async def test_the_reasoning_effort_is_sent_when_set() -> None:
+    client = RecordingClient(reply=response(text="Hi"))
+    model = OpenAIModel(
+        api_key="unused",
+        model="gpt-test",
+        client=client,  # pyright: ignore[reportArgumentType]
+        reasoning_effort="low",
+    )
+
+    await model.complete(instructions="", messages=[], tools=[])
+
+    assert client.request["reasoning"] == {"effort": "low"}
+
+
+async def test_a_copy_can_reason_at_another_effort_on_the_same_connection() -> None:
+    client = RecordingClient(reply=response(text="Hi"))
+    model = OpenAIModel(
+        api_key="unused",
+        model="gpt-test",
+        client=client,  # pyright: ignore[reportArgumentType]
+        reasoning_effort="low",
+    )
+
+    await model.with_reasoning_effort("none").complete(
+        instructions="", messages=[], tools=[]
+    )
+
+    assert client.request["reasoning"] == {"effort": "none"}
+    assert client.request["model"] == "gpt-test"
 
 
 async def test_a_provider_failure_becomes_model_unavailable() -> None:

@@ -7,6 +7,7 @@ import pytest
 from drivetruagent.agent.demo_model import DemoModel
 from drivetruagent.agent.factory import (
     agent_info,
+    classifier_model_from_settings,
     embedder_from_settings,
     guard_from_settings,
     ingest_embedders,
@@ -176,4 +177,29 @@ def test_the_search_threshold_and_size_come_from_the_settings() -> None:
     assert (search.threshold, search.limit) == (0.5, 5)
     assert knowledge_from_settings(settings(agent_model="demo")).threshold == (
         HashingEmbedder.min_score
+    )
+
+
+# --- Reasoning effort -------------------------------------------------------
+
+
+def test_the_agent_reasons_at_the_configured_effort() -> None:
+    model = model_from_settings(settings(**WITH_OPENAI))
+
+    assert isinstance(model, OpenAIModel)
+    assert model._reasoning_effort == "low"  # pyright: ignore[reportPrivateUsage]
+    other = model_from_settings(settings(**WITH_OPENAI, openai_reasoning_effort=None))
+    assert other._reasoning_effort is None  # pyright: ignore[reportAttributeAccessIssue, reportPrivateUsage]
+
+
+def test_the_classifier_does_not_reason_at_all() -> None:
+    model = classifier_model_from_settings(settings(**WITH_OPENAI))
+
+    assert isinstance(model, OpenAIModel)
+    assert model._reasoning_effort == "none"  # pyright: ignore[reportPrivateUsage]
+
+
+def test_other_providers_classify_with_the_agents_model() -> None:
+    assert isinstance(
+        classifier_model_from_settings(settings(**WITH_GEMINI)), GeminiModel
     )

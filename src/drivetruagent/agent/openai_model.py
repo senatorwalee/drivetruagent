@@ -9,11 +9,12 @@ is asked not to store it (`store=False`). The event log is the only record.
 
 import json
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Literal
 
 import openai
 from openai import AsyncOpenAI
 from openai.types.responses import Response
+from openai.types.shared_params import Reasoning
 
 from drivetruagent.agent.messages import (
     AssistantMessage,
@@ -34,12 +35,30 @@ from drivetruagent.knowledge.embedding import DIMENSIONS, EmbeddingUnavailable
 UNPARSEABLE_ARGUMENTS = "_unparseable_arguments"
 
 
+# How hard a reasoning model thinks before answering. Lower is faster: on the
+# agent's own requests, interleaved, gpt-6-luna took a median 2.3 s at its
+# default, 2.0 s at "low" and 1.1 s at "none". None: the model's default.
+type ReasoningEffort = Literal["none", "low", "medium", "high"] | None
+
+
 class OpenAIModel:
     def __init__(
-        self, api_key: str, model: str, client: AsyncOpenAI | None = None
+        self,
+        api_key: str,
+        model: str,
+        client: AsyncOpenAI | None = None,
+        *,
+        reasoning_effort: ReasoningEffort = None,
     ) -> None:
         self._model = model
         self._client = client or AsyncOpenAI(api_key=api_key)
+        self._reasoning_effort: ReasoningEffort = reasoning_effort
+
+    def with_reasoning_effort(self, effort: ReasoningEffort) -> "OpenAIModel":
+        """The same model and connection, reasoning at another effort."""
+        return OpenAIModel(
+            api_key="", model=self._model, client=self._client, reasoning_effort=effort
+        )
 
     async def complete(
         self,
@@ -55,6 +74,11 @@ class OpenAIModel:
                 input=to_input_items(messages),  # pyright: ignore[reportArgumentType]
                 tools=to_tool_params(tools),  # pyright: ignore[reportArgumentType]
                 store=False,
+                reasoning=(
+                    Reasoning(effort=self._reasoning_effort)
+                    if self._reasoning_effort is not None
+                    else openai.omit
+                ),
             )
         except openai.OpenAIError as error:
             raise ModelUnavailable(str(error)) from error

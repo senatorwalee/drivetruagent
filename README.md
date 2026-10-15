@@ -36,7 +36,8 @@ built piece by piece.
 | 15a | Allergens: the allergen matrix, checked by a tool, never guessed | Done; evals pass against the real model |
 | 15b | Knowledge search: approved documents, pgvector, escalation on weak evidence | Done; retrieval and answer evals pass against the real model |
 | 16 | Tracing: every turn as a timeline in Arize Phoenix, over OpenTelemetry | Done; checked with real turns in Phoenix |
-| Later | Demo polish | Planned |
+| 17 | Faster turns: 6.5 s to 3.7 s on average, measured with the traces | Done; evals pass against the real model |
+| Later | Demo polish: cost readout, one-command Docker, French review, demo script | Planned |
 
 ## Stack
 
@@ -664,12 +665,17 @@ guardrail must not stop people ordering; the rules still apply, and so does
 everything the policy engine enforces. `GUARDRAIL_CLASSIFIER=false` turns the
 classifier off (rules only, no extra cost or latency).
 
-**A blocked message never reaches the model, then or later.** The event log
-keeps what was said, for staff. When the conversation is rebuilt for the next
-turn, a blocked message is replaced by *"The customer said something the
-guardrail withheld."*, so an injection attempt cannot come back in later
-context. Replies to blocked messages are fixed sentences in the customer's
-language, so the model has nothing to be manipulated into saying.
+**A blocked message is never acted on, then or later.** To save time, the model
+starts on each message while the classifier decides (see
+[Faster turns](#faster-turns-measured-then-cut)); if the message is blocked, that
+request is cancelled and its answer never used, so no tool runs and nothing it
+said is shown or kept. `GUARDRAIL_CHECK_FIRST=true` restores the strict order, in
+which a blocked message never reaches the model at all. The event log keeps what
+was said, for staff. When the conversation is rebuilt for the next turn, a
+blocked message is replaced by *"The customer said something the guardrail
+withheld."*, so an injection attempt cannot come back in later context. Replies
+to blocked messages are fixed sentences in the customer's language, so the model
+has nothing to be manipulated into saying.
 
 **Ended is ended.** A session ended for abuse refuses further messages with
 `409 session_ended`. A customer who has just placed an order can still say
@@ -816,6 +822,50 @@ What it showed straight away: a first turn that asked about the fryer oil took
 about 10 seconds, because it made three round trips to the model (language,
 search, answer). That is the kind of thing the event log records but nobody
 notices until it is drawn.
+
+## Faster turns: measured, then cut
+
+The first trace showed a turn taking 10 seconds. A profiling run (six typical
+lines, timed span by span against the real model) gave the baseline, and each
+change was measured before the next:
+
+| | Before | After |
+|---|---|---|
+| Average turn | 6.5 s | **3.7 s** |
+| Slowest turn | 10.0 s | 6.6 s |
+| Model calls per turn | 2.67 | 2.17 |
+
+What made the difference:
+
+- **The guardrail runs alongside the model, not before it.** The classifier took
+  1.4 to 2.4 s on every message of four words or more, and the agent waited for
+  it. Now the model's first request starts at the same time; if the message is
+  blocked, that request is cancelled and its answer never used, no tool runs and
+  nothing it said is kept. Set `GUARDRAIL_CHECK_FIRST=true` to have a blocked
+  message never reach the model at all, at the old speed.
+- **The classifier has five seconds.** Measured: median 1.55 s, 90th percentile
+  2.6 s, with rare stalls past ten. Since it overlaps the model's first round,
+  waiting five costs nothing on a normal turn. A two-second limit was tried first
+  and cut off a quarter of verdicts in the evals, which quietly let a subtle
+  insult through; the abuse eval caught it.
+- **Language is detected in code** (a weighted English and French word list that
+  only answers when the margin is clear), so the model no longer spends a whole
+  round calling `set_language` on the first turn.
+- **Fewer needless rounds**, by prompt: call `add_item` straight away rather than
+  looking the item up first, batch independent calls (two items at once), never
+  bundle the order confirmation with anything else, and do not re-read the cart
+  after a change.
+- **Reasoning effort `low`.** Timed interleaved, `gpt-6-luna` took a median 2.3 s
+  at its default, 2.0 s at `low` and 1.1 s at `none`. `none` was tried and the
+  evals passed, but reading the transcripts showed it jumping ahead: it asked to
+  confirm the order before the customer had finished in 11 of 20 confirmations,
+  against 1 of 13 at `low` (0 of 13 with the prompt above). With the other changes,
+  `low` is as fast end to end. It is a setting, `OPENAI_REASONING_EFFORT`; the
+  classifier, which only picks a label, uses `none`.
+
+Final check: all 17 evals pass, with no classifier timeouts and no early
+confirmations. The rest is the model itself: a turn with tools needs one request
+to choose them and one to answer.
 
 ## Policy engine
 

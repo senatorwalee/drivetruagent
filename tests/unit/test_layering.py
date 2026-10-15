@@ -27,6 +27,7 @@ PURE_MODULES = [
     "ordering/timers.py",
     "ordering/search.py",
     "ordering/allergens.py",
+    "ordering/language.py",
     "knowledge/documents.py",
     "knowledge/embedding.py",
     "ordering/errors.py",

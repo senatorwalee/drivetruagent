@@ -8,9 +8,15 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from drivetruagent.db.models import Cart, CustomerSession
-from drivetruagent.enums import SessionState
+from drivetruagent.enums import Language, SessionState
 from drivetruagent.ordering.errors import LaneBusy, SessionEnded, SessionNotFound
-from drivetruagent.ordering.sessions import end_session, lock_session, open_session
+from drivetruagent.ordering.sessions import (
+    end_session,
+    follow_language,
+    get_session,
+    lock_session,
+    open_session,
+)
 
 
 async def test_open_session_creates_a_session_with_an_empty_cart(
@@ -122,3 +128,28 @@ async def test_two_cars_racing_for_one_lane_cannot_both_get_it(
     results = await asyncio.gather(*(try_to_open() for _ in range(5)))
 
     assert sorted(results) == ["busy", "busy", "busy", "busy", "opened"]
+
+
+# --- Following the customer's language --------------------------------------
+
+
+async def test_the_session_follows_a_clear_language_and_ignores_unclear_words(
+    db_session: AsyncSession,
+) -> None:
+    session_id = (await open_session(db_session, "lane-lang")).id
+
+    assert await follow_language(db_session, session_id, "Bonjour, merci") is (
+        Language.FR
+    )
+    # Too little to tell, or already French: nothing changes.
+    assert await follow_language(db_session, session_id, "ok") is None
+    assert await follow_language(db_session, session_id, "Oui merci") is None
+    assert (await get_session(db_session, session_id)).language is Language.FR
+    assert await follow_language(db_session, session_id, "Yes please") is Language.EN
+
+
+async def test_an_ended_session_keeps_its_language(db_session: AsyncSession) -> None:
+    session_id = (await open_session(db_session, "lane-lang")).id
+    await end_session(db_session, session_id, SessionState.SUBMITTED, reason="done")
+
+    assert await follow_language(db_session, session_id, "Bonjour, merci") is None

@@ -47,6 +47,9 @@ CONFIG = AgentConfig(
     ),
     max_tool_rounds=4,
     guard=Guard(),
+    # Strict order: these tests show a blocked message never reaches the
+    # model. The faster default is tested at the end.
+    guard_first=True,
 )
 
 INSULT = "You're useless."
@@ -334,3 +337,70 @@ async def test_with_no_guard_configured_every_message_reaches_the_agent(
 
     assert reply.text == "Let's keep it friendly."
     assert await guardrail_events(db_session, session_id) == []
+
+
+# --- The default: the guardrail and the model start together ----------------
+
+TOGETHER = replace(CONFIG, guard_first=False)
+
+
+async def model_calls(db: AsyncSession, session_id: uuid.UUID) -> int:
+    return sum(
+        1
+        for event in await events.load_events(db, session_id)
+        if event.kind is AgentEventKind.MODEL_CALL
+    )
+
+
+async def test_together_a_blocked_messages_answer_is_never_used(
+    db_session: AsyncSession, session_id: uuid.UUID, menu: None
+) -> None:
+    """The model may have started on it, but no tool runs and nothing it
+    said is kept or shown."""
+    agent = ScriptedModel(
+        [call("add_item", item_code="cookie", quantity=1, selections=[])]
+    )
+
+    reply = await turn(db_session, session_id, INJECTION, agent, TOGETHER)
+
+    assert reply.text == BLOCKED[Verdict.EXTRACTION][Language.EN]
+    assert reply.cart.lines == []
+    assert [e.kind.value for e in await events.load_events(db_session, session_id)] == [
+        "user_message",
+        "guardrail",
+        "assistant_message",
+    ]
+
+
+async def test_together_a_message_that_passes_uses_the_answer_already_asked_for(
+    db_session: AsyncSession, session_id: uuid.UUID
+) -> None:
+    agent = ScriptedModel(
+        [
+            call("add_item", item_code="cookie", quantity=1, selections=[]),
+            say("One cookie. Anything else?"),
+        ]
+    )
+
+    reply = await turn(db_session, session_id, "A cookie please", agent, TOGETHER)
+
+    assert reply.text == "One cookie. Anything else?"
+    assert [line.item_code for line in reply.cart.lines] == ["cookie"]
+    # Two rounds, two requests: the first was not asked for again.
+    assert len(agent.requests) == 2
+    assert await model_calls(db_session, session_id) == 2
+
+
+async def test_together_a_failing_model_does_not_matter_when_the_message_is_blocked(
+    db_session: AsyncSession, session_id: uuid.UUID
+) -> None:
+    reply = await turn(db_session, session_id, INSULT, BrokenModel(), TOGETHER)  # pyright: ignore[reportArgumentType]
+
+    assert reply.text == BLOCKED[Verdict.ABUSE][Language.EN]
+
+
+async def test_together_a_failing_model_still_fails_the_turn_when_it_passes(
+    db_session: AsyncSession, session_id: uuid.UUID
+) -> None:
+    with pytest.raises(ModelUnavailable):
+        await turn(db_session, session_id, "A cookie please", BrokenModel(), TOGETHER)  # pyright: ignore[reportArgumentType]

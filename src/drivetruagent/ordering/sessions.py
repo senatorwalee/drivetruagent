@@ -15,6 +15,7 @@ from drivetruagent.db.models import Cart, CustomerSession
 from drivetruagent.enums import FINAL_SESSION_STATES, Language, SessionState
 from drivetruagent.ordering.errors import LaneBusy, SessionEnded, SessionNotFound
 from drivetruagent.ordering.inventory import release_reservations
+from drivetruagent.ordering.language import detect_language
 from drivetruagent.ordering.timers import (
     SessionClock,
     TimerSettings,
@@ -103,6 +104,24 @@ async def set_language(
     customer_session.language = language
     await db.flush()
     return customer_session
+
+
+async def follow_language(
+    db: AsyncSession, session_id: uuid.UUID, text: str
+) -> Language | None:
+    """Switch the session to the language the customer just spoke, when the
+    words make it clear and it differs. Returns the new language, or None if
+    nothing changed. Does not commit."""
+    detected = detect_language(text)
+    if detected is None:
+        return None
+    customer_session = await get_session(db, session_id)
+    if customer_session.state in FINAL_SESSION_STATES:
+        return None
+    if customer_session.language is detected:
+        return None
+    await set_language(db, session_id, detected)
+    return detected
 
 
 async def end_session(
