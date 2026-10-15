@@ -21,7 +21,8 @@ from drivetruagent.config import Settings
 def setup_tracing(settings: Settings) -> TracerProvider | None:
     """Install a tracer provider that exports to Phoenix. Returns it, or None
     when tracing is off."""
-    if settings.tracing_endpoint is None:
+    # Unset or blank: off.
+    if not settings.tracing_endpoint:
         return None
     provider = build_provider(
         settings, OTLPSpanExporter(endpoint=settings.tracing_endpoint)
