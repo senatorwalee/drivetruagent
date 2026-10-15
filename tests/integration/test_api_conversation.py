@@ -142,12 +142,14 @@ async def test_a_session_ended_for_abuse_takes_no_more_messages(
     replies = [
         await client.post(url, json={"text": "You're useless."}) for _ in range(3)
     ]
+    asked_before = len(model.requests)
     response = await client.post(url, json={"text": "Sorry. A cookie, please."})
 
     assert replies[-1].json()["cart"]["state"] == "terminated"
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "session_ended"
-    assert model.requests == []
+    # Refused before anything else happens: the model is not asked.
+    assert len(model.requests) == asked_before
 
 
 @pytest.mark.parametrize(

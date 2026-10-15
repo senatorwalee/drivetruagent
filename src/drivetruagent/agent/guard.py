@@ -10,6 +10,7 @@ fixed text in their language, never model output: a message built to
 manipulate the model never reaches it.
 """
 
+import asyncio
 import logging
 import uuid
 from collections.abc import Sequence
@@ -124,11 +125,24 @@ class Classification:
     source: str
 
 
-class ModelClassifier:
-    """Asks a model for a label. Any failure is reported as no verdict."""
+# How long a turn waits for the classifier. Measured: median 1.55 s, 90th
+# percentile 2.6 s, slowest 3.4 s, with rare stalls past ten seconds. It runs
+# alongside the model's first round (1 to 2.5 s), so waiting this long costs
+# nothing on a normal turn; past it, the message counts as fine and the rules
+# and the policy engine still apply. (2 s was tried, and cut off a quarter of
+# verdicts.)
+CLASSIFIER_TIMEOUT_SECONDS = 5.0
 
-    def __init__(self, model: ModelClient) -> None:
+
+class ModelClassifier:
+    """Asks a model for a label. Any failure, or no answer in time, is
+    reported as no verdict."""
+
+    def __init__(
+        self, model: ModelClient, *, timeout_seconds: float = CLASSIFIER_TIMEOUT_SECONDS
+    ) -> None:
         self._model = model
+        self._timeout_seconds = timeout_seconds
 
     async def classify(
         self, text: str, agent_said: str | None
@@ -136,11 +150,18 @@ class ModelClassifier:
         context = f"The assistant last said: {agent_said}\n" if agent_said else ""
         prompt = f'{context}The customer said:\n"""\n{text}\n"""'
         try:
-            turn = await self._model.complete(
-                instructions=CLASSIFIER_INSTRUCTIONS,
-                messages=[UserMessage(prompt)],
-                tools=[REPORT_VERDICT],
+            async with asyncio.timeout(self._timeout_seconds):
+                turn = await self._model.complete(
+                    instructions=CLASSIFIER_INSTRUCTIONS,
+                    messages=[UserMessage(prompt)],
+                    tools=[REPORT_VERDICT],
+                )
+        except TimeoutError:
+            logger.warning(
+                "The guardrail classifier took over %ss; carrying on without it",
+                self._timeout_seconds,
             )
+            return None
         except Exception:
             # A broken guardrail must not stop people ordering.
             logger.exception("The guardrail classifier failed")
@@ -190,11 +211,13 @@ async def check_message(
     *,
     guard: Guard,
     tax_rate: Decimal,
+    classified: Classification | None = None,
 ) -> GuardOutcome:
     """Check one customer message and act on the verdict. Does not commit.
 
     The classification runs before the session is locked: a model call must
-    not hold a row lock.
+    not hold a row lock. `classified`: a verdict already reached (the turn
+    loop classifies while the model starts on its answer).
     """
     with tracing.span(
         "guardrail",
@@ -203,7 +226,13 @@ async def check_message(
         input_value=text,
     ) as guard_span:
         outcome, found = await _check(
-            db, session_id, turn_id, text, guard=guard, tax_rate=tax_rate
+            db,
+            session_id,
+            turn_id,
+            text,
+            guard=guard,
+            tax_rate=tax_rate,
+            classified=classified,
         )
         tracing.set_output(
             guard_span,
@@ -225,9 +254,12 @@ async def _check(
     *,
     guard: Guard,
     tax_rate: Decimal,
+    classified: Classification | None,
 ) -> tuple[GuardOutcome, Classification]:
-    agent_said = _last_agent_line(await events.load_messages(db, session_id))
-    found = await guard.classify(text, agent_said)
+    found = classified
+    if found is None:
+        agent_said = last_agent_line(await events.load_messages(db, session_id))
+        found = await guard.classify(text, agent_said)
     if found.verdict is Verdict.OK:
         return GuardOutcome(GuardAction.CONTINUE), found
 
@@ -336,7 +368,8 @@ async def _apply(
     return GuardOutcome(decision.action, reply)
 
 
-def _last_agent_line(messages: Sequence[Message]) -> str | None:
+def last_agent_line(messages: Sequence[Message]) -> str | None:
+    """What the agent said last, for the classifier's context."""
     for message in reversed(messages):
         if isinstance(message, AssistantMessage):
             return message.text

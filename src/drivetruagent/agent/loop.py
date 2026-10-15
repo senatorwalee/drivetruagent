@@ -14,8 +14,11 @@ is released before the next model call, which can take seconds, and the order
 screen sees each change as it happens.
 """
 
+import asyncio
 import time
 import uuid
+from collections.abc import Sequence
+from contextlib import suppress
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -24,8 +27,19 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues, SpanAttribu
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from drivetruagent.agent import events, timekeeper, tracing
-from drivetruagent.agent.guard import Guard, check_message, turn_went_nowhere
-from drivetruagent.agent.messages import AssistantMessage, ToolResult, UserMessage
+from drivetruagent.agent.guard import (
+    Guard,
+    GuardOutcome,
+    check_message,
+    last_agent_line,
+    turn_went_nowhere,
+)
+from drivetruagent.agent.messages import (
+    AssistantMessage,
+    Message,
+    ToolResult,
+    UserMessage,
+)
 from drivetruagent.agent.model import ModelClient, ModelTurn
 from drivetruagent.agent.prompt import build_instructions
 from drivetruagent.agent.tools import TOOL_DEFINITIONS, ToolContext, run_tool
@@ -35,7 +49,12 @@ from drivetruagent.ordering.cart import get_cart
 from drivetruagent.ordering.errors import SessionEnded
 from drivetruagent.ordering.inventory import DEFAULT_RESERVATION_TTL
 from drivetruagent.ordering.offers import SpecialsCache, close_suggestions
-from drivetruagent.ordering.sessions import begin_turn, end_turn, get_session
+from drivetruagent.ordering.sessions import (
+    begin_turn,
+    end_turn,
+    follow_language,
+    get_session,
+)
 from drivetruagent.ordering.timers import TimerSettings
 from drivetruagent.ordering.views import CartSnapshot
 from drivetruagent.policy.decisions import PolicyLimits
@@ -58,6 +77,10 @@ class AgentConfig:
     timers: TimerSettings | None = None
     # Checks each customer message for misuse. None: no checks.
     guard: Guard | None = None
+    # True: classify before the model is asked, so a blocked message never
+    # reaches it. False: both at once, about a second and a half quicker per
+    # turn; a blocked message's answer is cancelled and never used.
+    guard_first: bool = False
     # Searches the approved knowledge documents. None: search finds nothing.
     knowledge: KnowledgeSearch | None = None
 
@@ -71,6 +94,16 @@ class AgentReply:
     tools_used: tuple[str, ...]
     # True if the round limit was hit and the fixed fallback was said.
     gave_up: bool = False
+
+
+@dataclass(frozen=True)
+class _FirstRound:
+    """The model's first answer of a turn, asked for while the guardrail
+    was still deciding."""
+
+    instructions: str
+    turn: ModelTurn
+    latency_ms: int
 
 
 async def run_turn(
@@ -141,7 +174,11 @@ async def _answer(
     handed_off = await _hand_off_if_over_time(db, session_id, config)
     if handed_off is not None:
         return await _fixed_reply(db, session_id, turn_id, handed_off, config)
-    if config.guard is not None:
+    # Detected in code, so the model need not spend a round on set_language.
+    await follow_language(db, session_id, user_text)
+    await db.commit()
+    first: _FirstRound | None = None
+    if config.guard is not None and config.guard_first:
         checked = await check_message(
             db,
             session_id,
@@ -154,8 +191,17 @@ async def _answer(
         if checked.reply is not None:
             # Blocked, or the session ended: the model is not asked.
             return await _fixed_reply(db, session_id, turn_id, checked.reply, config)
+    elif config.guard is not None:
+        checked, first = await _check_while_thinking(
+            db, session_id, turn_id, user_text, model, config, config.guard
+        )
+        if checked.reply is not None:
+            # Blocked, or the session ended: the model's answer is not used.
+            return await _fixed_reply(db, session_id, turn_id, checked.reply, config)
 
-    reply = await _converse(db, session_id, turn_id, model=model, config=config)
+    reply = await _converse(
+        db, session_id, turn_id, model=model, config=config, first=first
+    )
     if reply.gave_up and config.guard is not None:
         # Getting nowhere counts toward a person taking over.
         stuck = await turn_went_nowhere(
@@ -208,9 +254,15 @@ async def _converse(
     *,
     model: ModelClient,
     config: AgentConfig,
+    first: _FirstRound | None = None,
 ) -> AgentReply:
-    """Ask the model, run the tools it asks for, and repeat until it answers."""
-    instructions = await build_instructions(db, config.restaurant_name)
+    """Ask the model, run the tools it asks for, and repeat until it answers.
+    `first`: the first round's answer, when it was already asked for."""
+    instructions = (
+        first.instructions
+        if first is not None
+        else await build_instructions(db, config.restaurant_name)
+    )
     context = ToolContext(
         db,
         session_id,
@@ -223,24 +275,17 @@ async def _converse(
     tools_used: list[str] = []
     reply: str | None = None
 
-    for _ in range(config.max_tool_rounds):
-        # The conversation is read from the event log each round. Nothing
-        # about it is held in memory between requests.
-        messages = await events.load_messages(db, session_id)
-        started = time.perf_counter()
-        with tracing.span(
-            "model",
-            OpenInferenceSpanKindValues.LLM,
-            session_id=session_id,
-            attributes=tracing.message_attributes(
-                SpanAttributes.LLM_INPUT_MESSAGES, messages, system=instructions
-            ),
-        ) as model_span:
-            turn = await model.complete(
-                instructions=instructions, messages=messages, tools=TOOL_DEFINITIONS
+    for round_number in range(config.max_tool_rounds):
+        if round_number == 0 and first is not None:
+            turn, latency_ms = first.turn, first.latency_ms
+        else:
+            # The conversation is read from the event log each round. Nothing
+            # about it is held in memory between requests.
+            messages = await events.load_messages(db, session_id)
+            turn, latency_ms = await _ask_model(
+                model, instructions, messages, session_id
             )
-            model_span.set_attributes(tracing.model_turn_attributes(turn))
-        await _record_model_call(db, session_id, turn_id, turn, started)
+        await _record_model_call(db, session_id, turn_id, turn, latency_ms)
 
         if not turn.tool_calls:
             reply = turn.text or ""
@@ -279,12 +324,89 @@ async def _converse(
     )
 
 
+async def _check_while_thinking(
+    db: AsyncSession,
+    session_id: uuid.UUID,
+    turn_id: uuid.UUID,
+    user_text: str,
+    model: ModelClient,
+    config: AgentConfig,
+    guard: Guard,
+) -> tuple[GuardOutcome, _FirstRound | None]:
+    """Run the guardrail and the model's first round at the same time.
+
+    The classifier and the model each take about a second; one after the
+    other, every turn paid for both. The model's request is built from the
+    log before either starts and touches no database while it runs. If the
+    message is blocked, the request is cancelled and its answer never seen:
+    no tool runs and nothing it said is kept.
+    """
+    instructions = await build_instructions(db, config.restaurant_name)
+    messages = await events.load_messages(db, session_id)
+    thinking = asyncio.create_task(
+        _ask_model(model, instructions, messages, session_id)
+    )
+    try:
+        with tracing.span(
+            "guardrail classifier",
+            OpenInferenceSpanKindValues.GUARDRAIL,
+            session_id=session_id,
+            input_value=user_text,
+        ):
+            found = await guard.classify(user_text, last_agent_line(messages[:-1]))
+        checked = await check_message(
+            db,
+            session_id,
+            turn_id,
+            user_text,
+            guard=guard,
+            tax_rate=config.tax_rate,
+            classified=found,
+        )
+        await db.commit()
+    except BaseException:
+        thinking.cancel()
+        raise
+    if checked.reply is not None:
+        thinking.cancel()
+        # Whatever became of the request, its answer is not wanted.
+        with suppress(asyncio.CancelledError, Exception):
+            await thinking
+        return checked, None
+    turn, latency_ms = await thinking
+    return checked, _FirstRound(instructions, turn, latency_ms)
+
+
+async def _ask_model(
+    model: ModelClient,
+    instructions: str,
+    messages: Sequence[Message],
+    session_id: uuid.UUID,
+) -> tuple[ModelTurn, int]:
+    """One request to the model, traced. Returns its answer and how many
+    milliseconds it took."""
+    started = time.perf_counter()
+    with tracing.span(
+        "model",
+        OpenInferenceSpanKindValues.LLM,
+        session_id=session_id,
+        attributes=tracing.message_attributes(
+            SpanAttributes.LLM_INPUT_MESSAGES, messages, system=instructions
+        ),
+    ) as model_span:
+        turn = await model.complete(
+            instructions=instructions, messages=messages, tools=TOOL_DEFINITIONS
+        )
+        model_span.set_attributes(tracing.model_turn_attributes(turn))
+    return turn, round((time.perf_counter() - started) * 1000)
+
+
 async def _record_model_call(
     db: AsyncSession,
     session_id: uuid.UUID,
     turn_id: uuid.UUID,
     turn: ModelTurn,
-    started: float,
+    latency_ms: int,
 ) -> None:
     await events.record(
         db,
@@ -293,7 +415,7 @@ async def _record_model_call(
         AgentEventKind.MODEL_CALL,
         {
             "model": turn.model,
-            "latency_ms": round((time.perf_counter() - started) * 1000),
+            "latency_ms": latency_ms,
             "input_tokens": turn.usage.input_tokens if turn.usage else None,
             "output_tokens": turn.usage.output_tokens if turn.usage else None,
             "tool_calls": len(turn.tool_calls),

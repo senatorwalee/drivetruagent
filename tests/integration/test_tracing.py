@@ -39,6 +39,9 @@ CONFIG = AgentConfig(
     limits=LIMITS,
     max_tool_rounds=4,
     guard=Guard(),
+    # Strict order, so the spans start in a fixed order. Running the guardrail
+    # alongside the model is tested at the end.
+    guard_first=True,
 )
 EXPORTER = InMemorySpanExporter()
 
@@ -210,3 +213,34 @@ async def test_a_model_failure_marks_the_turn_as_an_error(
     turn = next(s for s in spans() if s.name == "turn")
     assert turn.status.status_code is StatusCode.ERROR
     assert any(event.name == "exception" for event in turn.events)
+
+
+async def test_with_the_guardrail_alongside_the_model_both_are_under_the_turn(
+    db_session: AsyncSession, session_id: uuid.UUID
+) -> None:
+    model = ScriptedModel(
+        [
+            call("add_item", item_code="cookie", quantity=1, selections=[]),
+            say("One cookie."),
+        ]
+    )
+
+    await run_turn(
+        db_session,
+        session_id,
+        "A cookie please",
+        model=model,
+        config=replace(CONFIG, guard_first=False),
+    )
+
+    # They overlap, so their start order is not fixed: compare as a set.
+    assert sorted(tree(spans())) == sorted(
+        [
+            (0, "turn", "AGENT"),
+            (1, "guardrail classifier", "GUARDRAIL"),
+            (1, "guardrail", "GUARDRAIL"),
+            (1, "model", "LLM"),
+            (1, "tool add_item", "TOOL"),
+            (1, "model", "LLM"),
+        ]
+    )

@@ -55,7 +55,17 @@ def model_from_settings(settings: Settings) -> ModelClient:
     return OpenAIModel(
         api_key=settings.openai_api_key.get_secret_value(),
         model=settings.openai_text_model,
+        reasoning_effort=settings.openai_reasoning_effort,
     )
+
+
+def classifier_model_from_settings(settings: Settings) -> ModelClient:
+    """The model the guardrail classifier asks. The agent's, but with no
+    reasoning on OpenAI: picking a label needs none, and it runs every turn."""
+    model = model_from_settings(settings)
+    if isinstance(model, OpenAIModel):
+        return model.with_reasoning_effort("none")
+    return model
 
 
 def agent_info(settings: Settings) -> AgentInfo:
@@ -82,6 +92,7 @@ def agent_config(
         specials_cache=specials_cache,
         timers=settings.session_timers,
         guard=guard_from_settings(settings),
+        guard_first=settings.guardrail_check_first,
         knowledge=knowledge_from_settings(settings),
     )
 
@@ -132,6 +143,6 @@ def guard_from_settings(settings: Settings) -> Guard:
     if not settings.guardrail_classifier or settings.agent_model == "demo":
         return Guard(limits)
     try:
-        return Guard(limits, ModelClassifier(model_from_settings(settings)))
+        return Guard(limits, ModelClassifier(classifier_model_from_settings(settings)))
     except ModelUnavailable:
         return Guard(limits)

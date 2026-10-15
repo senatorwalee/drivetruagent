@@ -693,8 +693,9 @@ TOOLS: tuple[Tool[Any], ...] = (
     ),
     _tool(
         "set_language",
-        "Record the language the customer is speaking, as soon as you know it "
-        "and whenever it changes. Names in later results follow it.",
+        "Rarely needed: the customer's language is detected from what they say "
+        "and set for you. Use it only when they ask for the other language "
+        "without speaking it. Names in later results follow it.",
         _object(
             {
                 "language": {
