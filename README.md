@@ -34,7 +34,8 @@ built piece by piece.
 | 13 | The week's specials and live stock on the live screen | Done |
 | 14 | Guardrails: misuse detected, counted and acted on by code | Done; evals pass against the real model |
 | 15a | Allergens: the allergen matrix, checked by a tool, never guessed | Done; evals pass against the real model |
-| Later | Knowledge search over approved documents (pgvector), tracing | Planned |
+| 15b | Knowledge search: approved documents, pgvector, escalation on weak evidence | Done; retrieval and answer evals pass against the real model |
+| Later | Tracing | Planned |
 
 ## Stack
 
@@ -60,6 +61,7 @@ make hooks               # install the git hooks
 make up                  # start Postgres on localhost:5433
 make migrate             # apply database migrations
 make seed                # load the menu from data/menu.json
+make ingest              # load the knowledge documents from knowledge/
 make dev                 # run the API on http://127.0.0.1:8000
 ```
 
@@ -76,6 +78,7 @@ collide with a Postgres installed directly on your machine.
 | `make dev` | Run the API with auto-reload |
 | `make migrate` | Apply all database migrations |
 | `make seed` | Load `data/menu.json` into the database; safe to run repeatedly |
+| `make ingest` | Load `knowledge/` into the database and embed it; only changes are re-embedded |
 | `make chat` | Talk to the agent in the terminal (needs an OpenAI or Gemini key) |
 | `make eval` | Run the evals against the real model (needs an OpenAI or Gemini key) |
 | `make ui` | Run the web app on <http://localhost:5174> (needs `make dev` running too) |
@@ -366,6 +369,8 @@ order, the session state and the tools used, never at the agent's wording.
 | `keeps_going_off_topic` | Three questions about anything but food get the customer a person, unanswered |
 | `asks_about_dairy` | The answer comes from the allergen tool, and the order still goes through |
 | `checks_the_order_for_a_nut_allergy` | The whole order is checked; the cookie that may contain nuts comes off |
+| `asks_about_the_fryer_oil` | "Do you fry in peanut oil?" is answered from the approved documents, then the order |
+| `asks_if_the_veggie_burger_is_vegan` | Answered from the documents (not as served), never "it's vegan" |
 
 Every scenario is played on a fixed Monday, so a total never depends on which
 day the evals happen to be run.
@@ -396,6 +401,11 @@ working against the real model.
 With allergens (14 October 2026): all 14 passed. Read with `-s`, the agent
 said what was "listed" and what "may contain" nuts and why, never called
 anything safe, and offered a team member for the nut allergy.
+
+With knowledge search (14 October 2026): all 16 conversations and the
+retrieval eval passed. Asked "is the veggie burger vegan?", the agent answered
+from the document: not as served, because the house sauce has egg and the grill
+is shared, and the customer ordered it anyway.
 
 ## Stock: two cars cannot buy the last item
 
@@ -710,10 +720,56 @@ allergen, level, note) and `menu_items.allergens_reviewed_on`; both are made to
 match the file on every seed. `GET /menu/items/{code}/allergens` serves the same
 report for screens.
 
-Next: questions the matrix cannot answer ("do you fry in peanut oil?", "is the
-veggie patty vegan?") from approved documents with pgvector, escalating when the
-evidence is weak, and with staff-only documents never reachable by the
-customer-facing agent.
+## Knowledge search: approved documents, never the model's memory
+
+Questions the allergen matrix cannot answer ("do you fry in peanut oil?", "is
+the veggie burger vegan?", "how much caffeine is in a coffee?") are answered
+from **approved documents** in `knowledge/`: Markdown with TOML front matter
+saying what each is about, who may see it (`customer` or `staff`) and its
+version. Like the menu, they are **synthetic**.
+
+```
+knowledge/*.md  ──make ingest──▶  documents ─▶ chunks (one per ## section) ─▶ embeddings
+                                                                              (one row per model)
+question ──embed──▶ nearest chunks (pgvector, cosine) ──filter──▶ evidence, or none
+```
+
+- **Chunks are sections.** Each `##` section is one chunk, and its text starts
+  with the document's title and the heading, so "What oil we fry in" still says
+  what it is about once it stands alone.
+- **Two embedders, one table.** OpenAI's `text-embedding-3-small` (at 384
+  dimensions) when there is a key; a local **hashing embedder** otherwise, which
+  matches words, not meaning, and needs nothing. `make ingest` indexes with both,
+  one row per chunk and model, so the no-key demo can search too. Vectors from
+  different models are never compared.
+- **Ingest is idempotent.** An unchanged section keeps its vectors; a changed one
+  is re-embedded; a document removed from the folder is retired and never
+  searched again.
+- **Evidence, or nothing.** `search_knowledge` returns the top passages scoring at
+  or above the embedder's threshold, with their chunk ids and scores, and tells
+  the agent to answer only from them. The tool result is in the event log, so the
+  event log is the retrieval trace.
+- **Weak evidence on an allergen question goes to a person.** If nothing scores
+  high enough and the question names an allergen (a fixed English and French word
+  list), the session is handed off with `allergen_unverified`, and the handoff
+  quotes the question. Otherwise the agent says it does not know.
+- **Staff documents cannot leak.** The complaint procedure and supplier contacts
+  are ingested, but the audience filter is fixed in code, not an argument the
+  model sends. A test asks for a staff passage word for word and checks it never
+  comes back.
+
+**Thresholds were measured, not guessed.** On the labelled questions in
+`evals/retrieval.py`, with `text-embedding-3-small`: the passage that answers
+scored 0.50 to 0.78 in English and 0.38 in French; off-topic questions scored at
+most 0.20. The threshold is 0.35. The hashing embedder's is 0.15 (off-topic at
+most 0.11).
+
+**Retrieval is evaluated apart from answers.** `tests/integration/evals/test_retrieval.py`
+checks, against the real embedder, that every labelled question finds its
+document in the top 3 above the threshold and every off-topic one stays below
+it: 23 of 23 found first, 4 of 4 kept out. The same questions run as a plain test
+with the hashing embedder.
+
 
 ## Policy engine
 
@@ -841,12 +897,15 @@ src/drivetruagent/
 ├── config.py        settings from environment variables
 ├── api/             HTTP endpoints and error mapping
 ├── db/              engine, sessions and table models
-├── ordering/        the rules: sessions, carts, pricing, orders, menu search
+├── ordering/        the rules: sessions, carts, pricing, orders, menu search, allergens
+├── knowledge/       approved documents: parsing, chunking, embedding, ingest and search
 ├── policy/          allow, reject, confirm or escalate each proposed action
 ├── agent/           the model, its tools and instructions, the turn loop, the event log
-├── evals/           scenarios and the checker that judges a finished conversation
-└── seed.py          loads the menu file into the database
-data/menu.json       the menu: items, choices, prices, aliases
+├── evals/           scenarios, the checker, and labelled retrieval questions
+├── seed.py          loads the menu file into the database
+└── ingest.py        loads and embeds the knowledge documents
+data/menu.json       the menu: items, choices, prices, aliases, allergens
+knowledge/           approved documents the agent may quote (synthetic)
 frontend/src/
 ├── api/             typed client; types generated from the backend
 ├── session/         the live session: fetching, and what to show (no JSX)

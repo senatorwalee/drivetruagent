@@ -13,6 +13,7 @@ Rules that hold for every tool:
   - Anything that changes an order goes through the policy gateway.
 """
 
+import logging
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -25,15 +26,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from drivetruagent.agent.model import ToolDefinition
 from drivetruagent.enums import Allergen, Language
+from drivetruagent.knowledge.embedding import EmbeddingUnavailable
+from drivetruagent.knowledge.store import KnowledgeSearch, Retrieval
 from drivetruagent.ordering import allergen_matrix
 from drivetruagent.ordering import cart as cart_rules
 from drivetruagent.ordering import menu as menu_rules
 from drivetruagent.ordering import offers as offer_rules
 from drivetruagent.ordering import sessions as session_rules
-from drivetruagent.ordering.errors import OrderingError
+from drivetruagent.ordering.allergens import allergens_named, is_about_allergens
+from drivetruagent.ordering.catalog import load_item_by_code
+from drivetruagent.ordering.errors import OrderingError, UnknownItem
 from drivetruagent.ordering.inventory import DEFAULT_RESERVATION_TTL
 from drivetruagent.ordering.offers import SpecialsCache
-from drivetruagent.ordering.views import DEFAULT_LANGUAGE
+from drivetruagent.ordering.views import DEFAULT_LANGUAGE, localize
 from drivetruagent.policy import gateway
 from drivetruagent.policy.actions import (
     Action,
@@ -46,6 +51,8 @@ from drivetruagent.policy.actions import (
 from drivetruagent.policy.decisions import PolicyLimits
 
 INVALID_TOOL_CALL = "invalid_tool_call"
+
+logger = logging.getLogger(__name__)
 
 type ToolOutput = dict[str, Any]
 
@@ -63,6 +70,8 @@ class ToolContext:
     idempotency_key: str | None = None
     # Where the day's specials are kept between questions. None: read each time.
     specials_cache: SpecialsCache | None = None
+    # How approved documents are searched. None: nothing is found.
+    knowledge: KnowledgeSearch | None = None
 
 
 # --- Arguments --------------------------------------------------------------
@@ -118,6 +127,11 @@ class LanguageArgs(Args):
 
 class HumanArgs(Args):
     reason: str
+
+
+class KnowledgeArgs(Args):
+    query: str
+    item_code: str | None
 
 
 class AllergenArgs(Args):
@@ -326,6 +340,76 @@ async def _check_allergens(context: ToolContext, args: AllergenArgs) -> ToolOutp
     }
 
 
+KNOWLEDGE_INSTRUCTIONS = (
+    "Answer only from these passages, in a sentence or two. If they do not "
+    "answer the question, say you do not know. Never call anything safe or "
+    "allergen-free."
+)
+NO_SOURCE = (
+    "No approved information answers this. Say you do not know, and offer to "
+    "get a team member if it matters to the customer."
+)
+
+
+async def _search_knowledge(context: ToolContext, args: KnowledgeArgs) -> ToolOutput:
+    items: dict[str, str] = {}
+    if args.item_code is not None:
+        item = await load_item_by_code(context.db, args.item_code)
+        if item is None:
+            raise UnknownItem(args.item_code)
+        # For the handoff, which staff read in English.
+        items[item.code] = localize(item.name, DEFAULT_LANGUAGE)
+
+    retrieval: Retrieval | None = None
+    if context.knowledge is not None:
+        try:
+            retrieval = await context.knowledge.find(
+                context.db, args.query, item_code=args.item_code
+            )
+        except EmbeddingUnavailable as error:
+            logger.warning("Knowledge search unavailable: %s", error)
+    # Kept in the event log with the result: which model scored what.
+    trace = {
+        "retrieval": {
+            "model": retrieval.model if retrieval else None,
+            "min_score": retrieval.min_score if retrieval else None,
+            "best_score": retrieval.best_score if retrieval else None,
+        }
+    }
+
+    if retrieval is not None and retrieval.hits:
+        return {
+            "sources": [
+                {
+                    "chunk_id": str(hit.chunk_id),
+                    "document": hit.document,
+                    "heading": hit.heading,
+                    "text": hit.text,
+                    "score": hit.score,
+                }
+                for hit in retrieval.hits
+            ],
+            "message": KNOWLEDGE_INSTRUCTIONS,
+            **trace,
+        }
+    if is_about_allergens(args.query):
+        # An allergen question with no checked answer is not guessed at.
+        outcome = await gateway.allergen_unverified(
+            context.db,
+            context.session_id,
+            items,
+            sorted(allergen.value for allergen in allergens_named(args.query)),
+            question=args.query,
+            tax_rate=context.tax_rate,
+        )
+        return {
+            **outcome.model_dump(mode="json", exclude_none=True),
+            "sources": [],
+            **trace,
+        }
+    return {"sources": [], "message": NO_SOURCE, **trace}
+
+
 async def _request_human(context: ToolContext, args: HumanArgs) -> ToolOutput:
     outcome = await gateway.hand_to_human(
         context.db, context.session_id, args.reason, tax_rate=context.tax_rate
@@ -471,6 +555,28 @@ TOOLS: tuple[Tool[Any], ...] = (
         ),
         AllergenArgs,
         _check_allergens,
+    ),
+    _tool(
+        "search_knowledge",
+        "Search the restaurant's approved information about ingredients, "
+        "preparation, frying, nutrition and diets (vegetarian, vegan, halal, "
+        "gluten). Use it for questions check_allergens cannot answer, such as "
+        "what oil is used or what is in a sauce, and answer only from what it "
+        "returns.",
+        _object(
+            {
+                "query": {
+                    "type": "string",
+                    "description": "The customer's question, in their words.",
+                },
+                "item_code": {
+                    "type": ["string", "null"],
+                    "description": "The item it is about, or null.",
+                },
+            }
+        ),
+        KnowledgeArgs,
+        _search_knowledge,
     ),
     _tool(
         "add_item",

@@ -19,6 +19,11 @@ from drivetruagent.db.models.inventory import (
     Inventory,
     Reservation,
 )
+from drivetruagent.db.models.knowledge import (
+    KnowledgeChunk,
+    KnowledgeDocument,
+    KnowledgeEmbedding,
+)
 from drivetruagent.db.models.offers import (
     ComboRule,
     ComboRuleSlot,
@@ -51,6 +56,9 @@ __all__ = [
     "Handoff",
     "IdempotencyRecord",
     "Inventory",
+    "KnowledgeChunk",
+    "KnowledgeDocument",
+    "KnowledgeEmbedding",
     "MenuCategory",
     "MenuItem",
     "MenuItemAlias",

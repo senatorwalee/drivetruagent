@@ -1,6 +1,6 @@
 """The layers may only depend downwards. These tests read the import lines.
 
-    api  ->  agent  ->  policy  ->  ordering  ->  db
+    api  ->  agent  ->  policy  ->  knowledge  ->  ordering  ->  db
 
 A lower layer importing a higher one, or the web framework, is how a tidy
 codebase turns into a tangle. Checking it here means it fails in CI instead
@@ -16,7 +16,7 @@ PACKAGE = "drivetruagent"
 SOURCE = Path(__file__).resolve().parents[2] / "src" / PACKAGE
 
 # Each layer, lowest first. A layer may import the ones before it, not after.
-LAYERS = ["db", "ordering", "policy", "agent", "api"]
+LAYERS = ["db", "ordering", "knowledge", "policy", "agent", "api"]
 
 # Files that are pure logic: plain values in, plain values out.
 PURE_MODULES = [
@@ -27,6 +27,8 @@ PURE_MODULES = [
     "ordering/timers.py",
     "ordering/search.py",
     "ordering/allergens.py",
+    "knowledge/documents.py",
+    "knowledge/embedding.py",
     "ordering/errors.py",
     "policy/rules.py",
     "policy/decisions.py",

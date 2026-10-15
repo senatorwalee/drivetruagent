@@ -29,6 +29,7 @@ from drivetruagent.agent.model import ModelClient, ModelTurn
 from drivetruagent.agent.prompt import build_instructions
 from drivetruagent.agent.tools import TOOL_DEFINITIONS, ToolContext, run_tool
 from drivetruagent.enums import AgentEventKind, SessionState
+from drivetruagent.knowledge.store import KnowledgeSearch
 from drivetruagent.ordering.cart import get_cart
 from drivetruagent.ordering.errors import SessionEnded
 from drivetruagent.ordering.inventory import DEFAULT_RESERVATION_TTL
@@ -56,6 +57,8 @@ class AgentConfig:
     timers: TimerSettings | None = None
     # Checks each customer message for misuse. None: no checks.
     guard: Guard | None = None
+    # Searches the approved knowledge documents. None: search finds nothing.
+    knowledge: KnowledgeSearch | None = None
 
 
 @dataclass(frozen=True)
@@ -185,6 +188,7 @@ async def _converse(
         config.limits,
         config.reservation_ttl,
         specials_cache=config.specials_cache,
+        knowledge=config.knowledge,
     )
     tools_used: list[str] = []
     reply: str | None = None

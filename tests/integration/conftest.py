@@ -26,6 +26,9 @@ from testcontainers.community.postgres import PostgresContainer
 from drivetruagent.api.deps import get_session
 from drivetruagent.config import Settings, get_settings
 from drivetruagent.db.base import Base
+from drivetruagent.ingest import load_documents
+from drivetruagent.knowledge.embedding import HashingEmbedder
+from drivetruagent.knowledge.store import ingest
 from drivetruagent.main import create_app
 from drivetruagent.seed import load_menu, seed_menu
 
@@ -33,6 +36,7 @@ POSTGRES_IMAGE = "pgvector/pgvector:pg17"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = REPO_ROOT / "alembic.ini"
 MENU_PATH = REPO_ROOT / "data" / "menu.json"
+KNOWLEDGE_DIR = REPO_ROOT / "knowledge"
 # Ontario HST, the app's default.
 TEST_TAX_RATE = Decimal("0.13")
 
@@ -141,6 +145,13 @@ async def specials(db_session: AsyncSession, menu: None) -> None:
     milkshake. Tests pick the day by giving the session a business date.
     """
     await seed_menu(db_session, load_menu(MENU_PATH))
+    await db_session.commit()
+
+
+@pytest.fixture
+async def knowledge(db_session: AsyncSession) -> None:
+    """The real knowledge documents, indexed with the local hashing embedder."""
+    await ingest(db_session, load_documents(KNOWLEDGE_DIR), [HashingEmbedder()])
     await db_session.commit()
 
 

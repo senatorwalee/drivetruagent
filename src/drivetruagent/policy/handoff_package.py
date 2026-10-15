@@ -246,13 +246,16 @@ def _what_happened(
             "agent not understanding. Ask what the customer would like."
         )
     if reason == ALLERGEN_UNVERIFIED:
-        items = _listed(details.get("items")) or "an item"
+        items = _listed(details.get("items"))
         allergens = _listed(details.get("allergens"))
         about = f" ({allergens.replace('_', ' ')})" if allergens else ""
+        in_items = f" in {items}" if items else ""
+        question = str(details.get("question", "")).strip()
+        asked = f' They asked: "{question}".' if question else ""
         return (
-            f"The customer asked about allergens{about} in {items}, which has "
-            "no checked allergen information. Answer from the allergen binder "
-            "or ask the manager before they order."
+            f"The customer asked about allergens{about}{in_items}, and there is "
+            f"no checked information to answer it.{asked} Answer from the "
+            "allergen binder or ask the manager before they order."
         )
     if reason == TIME_LIMIT:
         return (

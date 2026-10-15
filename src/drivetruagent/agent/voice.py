@@ -247,6 +247,7 @@ class VoiceBridge:
                 # the turn and the call: run twice, it takes effect once.
                 idempotency_key=f"{response_id}:{call_id}",
                 specials_cache=self._config.specials_cache,
+                knowledge=self._config.knowledge,
             )
             result = await run_tool(context, name, tool_call.arguments)
             await events.record_message(db, self.session_id, self._turn_id, tool_call)

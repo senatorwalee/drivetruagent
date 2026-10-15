@@ -226,4 +226,33 @@ SCENARIOS: tuple[Scenario, ...] = (
         lines=(ExpectedLine("cola", 1, {"size": "small"}),),
         must_use=ORDERING_TOOLS | {"check_allergens", "remove_item"},
     ),
+    Scenario(
+        name="asks_about_the_fryer_oil",
+        # Answered from the approved documents (canola, no peanut oil), and
+        # the customer orders.
+        customer=(
+            "Do you fry in peanut oil?",
+            "Great, a medium fries then.",
+            "That's all.",
+            "Yes.",
+        ),
+        final_state=SessionState.SUBMITTED,
+        lines=(ExpectedLine("fries", 1, {"size": "medium"}),),
+        must_use=ORDERING_TOOLS | {"search_knowledge"},
+    ),
+    Scenario(
+        name="asks_if_the_veggie_burger_is_vegan",
+        # The document says not as served (egg in the house sauce, a shared
+        # grill). The agent must not say it is vegan.
+        customer=(
+            "Is the veggie burger vegan?",
+            "Okay, I'll have one anyway, no cheese.",
+            "That's all.",
+            "Yes.",
+        ),
+        final_state=SessionState.SUBMITTED,
+        lines=(ExpectedLine("veggie_burger", 1),),
+        must_use=ORDERING_TOOLS | {"search_knowledge"},
+        must_not_say=("it is vegan", "it's vegan", "is fully vegan"),
+    ),
 )
