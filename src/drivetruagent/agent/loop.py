@@ -20,9 +20,10 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
+from openinference.semconv.trace import OpenInferenceSpanKindValues, SpanAttributes
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from drivetruagent.agent import events, timekeeper
+from drivetruagent.agent import events, timekeeper, tracing
 from drivetruagent.agent.guard import Guard, check_message, turn_went_nowhere
 from drivetruagent.agent.messages import AssistantMessage, ToolResult, UserMessage
 from drivetruagent.agent.model import ModelClient, ModelTurn
@@ -100,41 +101,70 @@ async def run_turn(
     await db.commit()
 
     try:
-        handed_off = await _hand_off_if_over_time(db, session_id, config)
-        if handed_off is not None:
-            return await _fixed_reply(db, session_id, turn_id, handed_off, config)
-        if config.guard is not None:
-            checked = await check_message(
-                db,
-                session_id,
-                turn_id,
-                user_text,
-                guard=config.guard,
-                tax_rate=config.tax_rate,
-            )
-            await db.commit()
-            if checked.reply is not None:
-                # Blocked, or the session ended: the model is not asked.
-                return await _fixed_reply(
-                    db, session_id, turn_id, checked.reply, config
+        with tracing.span(
+            "turn",
+            OpenInferenceSpanKindValues.AGENT,
+            session_id=session_id,
+            input_value=user_text,
+            attributes=tracing.metadata({"turn_id": str(turn_id)}),
+        ) as turn_span:
+            reply = await _answer(db, session_id, turn_id, user_text, model, config)
+            tracing.set_output(turn_span, reply.text)
+            turn_span.set_attributes(
+                tracing.metadata(
+                    {
+                        "turn_id": str(turn_id),
+                        "tools_used": list(reply.tools_used),
+                        "gave_up": reply.gave_up,
+                        "state": reply.cart.state.value,
+                    }
                 )
-
-        reply = await _converse(db, session_id, turn_id, model=model, config=config)
-        if reply.gave_up and config.guard is not None:
-            # Getting nowhere counts toward a person taking over.
-            stuck = await turn_went_nowhere(
-                db, session_id, turn_id, guard=config.guard, tax_rate=config.tax_rate
             )
-            await db.commit()
-            if stuck.reply is not None:
-                return await _fixed_reply(db, session_id, turn_id, stuck.reply, config)
-        return reply
+            return reply
     finally:
         # Whatever happened, the turn is over. Anything left unsaved by a
         # failure is dropped first, so this always has a usable transaction.
         await db.rollback()
         await end_turn(db, session_id, now=datetime.now(UTC))
         await db.commit()
+
+
+async def _answer(
+    db: AsyncSession,
+    session_id: uuid.UUID,
+    turn_id: uuid.UUID,
+    user_text: str,
+    model: ModelClient,
+    config: AgentConfig,
+) -> AgentReply:
+    """The turn itself: the time limit, the guardrail, then the model."""
+    handed_off = await _hand_off_if_over_time(db, session_id, config)
+    if handed_off is not None:
+        return await _fixed_reply(db, session_id, turn_id, handed_off, config)
+    if config.guard is not None:
+        checked = await check_message(
+            db,
+            session_id,
+            turn_id,
+            user_text,
+            guard=config.guard,
+            tax_rate=config.tax_rate,
+        )
+        await db.commit()
+        if checked.reply is not None:
+            # Blocked, or the session ended: the model is not asked.
+            return await _fixed_reply(db, session_id, turn_id, checked.reply, config)
+
+    reply = await _converse(db, session_id, turn_id, model=model, config=config)
+    if reply.gave_up and config.guard is not None:
+        # Getting nowhere counts toward a person taking over.
+        stuck = await turn_went_nowhere(
+            db, session_id, turn_id, guard=config.guard, tax_rate=config.tax_rate
+        )
+        await db.commit()
+        if stuck.reply is not None:
+            return await _fixed_reply(db, session_id, turn_id, stuck.reply, config)
+    return reply
 
 
 async def _fixed_reply(
@@ -198,9 +228,18 @@ async def _converse(
         # about it is held in memory between requests.
         messages = await events.load_messages(db, session_id)
         started = time.perf_counter()
-        turn = await model.complete(
-            instructions=instructions, messages=messages, tools=TOOL_DEFINITIONS
-        )
+        with tracing.span(
+            "model",
+            OpenInferenceSpanKindValues.LLM,
+            session_id=session_id,
+            attributes=tracing.message_attributes(
+                SpanAttributes.LLM_INPUT_MESSAGES, messages, system=instructions
+            ),
+        ) as model_span:
+            turn = await model.complete(
+                instructions=instructions, messages=messages, tools=TOOL_DEFINITIONS
+            )
+            model_span.set_attributes(tracing.model_turn_attributes(turn))
         await _record_model_call(db, session_id, turn_id, turn, started)
 
         if not turn.tool_calls:

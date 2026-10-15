@@ -16,9 +16,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 
+from openinference.semconv.trace import OpenInferenceSpanKindValues
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from drivetruagent.agent import events
+from drivetruagent.agent import events, tracing
 from drivetruagent.agent.messages import AssistantMessage, Message, UserMessage
 from drivetruagent.agent.model import ModelClient, ToolDefinition
 from drivetruagent.db.models import CustomerSession
@@ -195,19 +196,49 @@ async def check_message(
     The classification runs before the session is locked: a model call must
     not hold a row lock.
     """
+    with tracing.span(
+        "guardrail",
+        OpenInferenceSpanKindValues.GUARDRAIL,
+        session_id=session_id,
+        input_value=text,
+    ) as guard_span:
+        outcome, found = await _check(
+            db, session_id, turn_id, text, guard=guard, tax_rate=tax_rate
+        )
+        tracing.set_output(
+            guard_span,
+            {
+                "verdict": found.verdict.value,
+                "source": found.source,
+                "reason": found.reason,
+                "action": outcome.action.value,
+            },
+        )
+        return outcome
+
+
+async def _check(
+    db: AsyncSession,
+    session_id: uuid.UUID,
+    turn_id: uuid.UUID,
+    text: str,
+    *,
+    guard: Guard,
+    tax_rate: Decimal,
+) -> tuple[GuardOutcome, Classification]:
     agent_said = _last_agent_line(await events.load_messages(db, session_id))
     found = await guard.classify(text, agent_said)
     if found.verdict is Verdict.OK:
-        return GuardOutcome(GuardAction.CONTINUE)
+        return GuardOutcome(GuardAction.CONTINUE), found
 
     customer_session = await lock_session(db, session_id)
     if customer_session.state in FINAL_SESSION_STATES:
-        return GuardOutcome(GuardAction.CONTINUE)
+        return GuardOutcome(GuardAction.CONTINUE), found
     strikes = Strikes(
         customer_session.abuse_strikes, customer_session.confusion_strikes
     )
     decision = decide(found.verdict, strikes, guard.limits)
-    return await _apply(
+    outcome = await _apply(
         db,
         customer_session,
         turn_id,
@@ -217,6 +248,7 @@ async def check_message(
         tax_rate,
         withheld=True,
     )
+    return outcome, found
 
 
 async def turn_went_nowhere(

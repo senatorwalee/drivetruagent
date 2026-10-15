@@ -1,11 +1,15 @@
-.PHONY: up down dev migrate seed ingest chat ui gen-api lint format test test-unit eval check check-ui hooks
+.PHONY: up down phoenix dev migrate seed ingest chat ui gen-api lint format test test-unit eval check check-ui hooks
 
 # Start and stop the local Postgres.
 up:
 	docker compose up -d --wait
 
 down:
-	docker compose down
+	docker compose --profile tracing down
+
+# Arize Phoenix on http://localhost:6006. Set TRACING_ENDPOINT to send it traces.
+phoenix:
+	docker compose --profile tracing up -d phoenix
 
 # Run the API with auto-reload.
 dev:

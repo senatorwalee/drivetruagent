@@ -18,6 +18,7 @@ from drivetruagent.db.session import create_engine, create_session_factory
 from drivetruagent.enums import FINAL_SESSION_STATES
 from drivetruagent.ordering.sessions import open_session
 from drivetruagent.ordering.views import CartSnapshot
+from drivetruagent.telemetry import setup_tracing
 
 
 def describe(cart: CartSnapshot) -> str:
@@ -43,6 +44,7 @@ async def chat() -> None:
     settings = get_settings()
     model = model_from_settings(settings)
     config = agent_config(settings)
+    tracer_provider = setup_tracing(settings)
     engine = create_engine(settings.database_url)
     session_factory = create_session_factory(engine)
     try:
@@ -73,6 +75,8 @@ async def chat() -> None:
                     break
     finally:
         await engine.dispose()
+        if tracer_provider is not None:
+            tracer_provider.shutdown()
 
 
 def main() -> None:

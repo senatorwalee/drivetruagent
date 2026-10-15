@@ -119,3 +119,15 @@ def test_only_the_gemini_adapter_imports_googles_library() -> None:
     }
 
     assert users == {"agent/gemini_model.py"}
+
+
+def test_only_the_tracing_modules_import_opentelemetry() -> None:
+    """Spans are made in agent/tracing.py and exported from telemetry.py;
+    everything else calls agent/tracing.py."""
+    users = {
+        str(path.relative_to(SOURCE))
+        for path in SOURCE.rglob("*.py")
+        if imports_from(path, "opentelemetry")
+    }
+
+    assert users == {"agent/tracing.py", "telemetry.py"}

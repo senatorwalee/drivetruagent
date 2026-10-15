@@ -78,6 +78,10 @@ class Settings(BaseSettings):
     knowledge_min_score: float | None = Field(default=None, ge=0, le=1)
     knowledge_results: int = Field(default=3, ge=1, le=10)
     knowledge_dir: str = "knowledge"
+    # Tracing to Arize Phoenix. Unset: off. With `make phoenix` running, set
+    # it to http://localhost:6006/v1/traces. See telemetry.py.
+    tracing_endpoint: str | None = None
+    tracing_project: str = "drivetruagent"
     # How many times the model may ask for tools within one customer turn.
     agent_max_tool_rounds: int = Field(default=8, ge=1)
 
