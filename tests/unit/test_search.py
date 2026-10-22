@@ -8,7 +8,14 @@ from pathlib import Path
 
 import pytest
 
-from drivetruagent.ordering.search import Candidate, normalise, score, search
+from drivetruagent.ordering.search import (
+    Candidate,
+    contains_phrase,
+    normalise,
+    not_offered,
+    score,
+    search,
+)
 from drivetruagent.seed import load_menu
 
 MENU_PATH = Path(__file__).resolve().parents[2] / "data" / "menu.json"
@@ -221,3 +228,30 @@ def test_results_are_sorted_best_first() -> None:
 
 def test_search_is_deterministic() -> None:
     assert found("chocolate") == found("chocolate")
+
+
+# --- What the search couldn't account for -----------------------------------
+
+
+def test_a_match_reports_the_words_its_phrase_did_not_cover() -> None:
+    (found,) = search("oat milk shake", [Candidate("milkshake", ("milk shake",))])
+
+    assert found.leftover == ("oat",)
+
+
+def test_an_exact_match_has_nothing_left_over() -> None:
+    (found,) = search("milk shake", [Candidate("milkshake", ("milk shake",))])
+
+    assert found.leftover == ()
+
+
+def test_choices_counts_and_filler_are_never_not_offered() -> None:
+    leftover = ("two", "large", "oat", "2", "actually")
+
+    assert not_offered(leftover, offered={"large", "small"}) == ("oat",)
+
+
+def test_a_phrase_counts_only_as_whole_words_in_order() -> None:
+    assert contains_phrase(("medium", "fry", "cheeseburger"), ("cheeseburger",))
+    assert not contains_phrase(("iced", "coffee"), ("iced", "tea"))
+    assert not contains_phrase(("anything",), ())

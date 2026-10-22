@@ -2,6 +2,7 @@
 in a cart, with the choices on each line."""
 
 import uuid
+from collections.abc import Collection
 from datetime import date
 from decimal import Decimal
 
@@ -9,12 +10,13 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from drivetruagent.db.models import AllergenDeclaration, MenuItem
+from drivetruagent.db.models import AllergenDeclaration, MenuCategory, MenuItem
 from drivetruagent.enums import Allergen, AllergenLevel, Language
 from drivetruagent.ordering.allergens import Assessment, Declaration, assess
 from drivetruagent.ordering.cart import get_cart
 from drivetruagent.ordering.catalog import load_item_by_code
 from drivetruagent.ordering.errors import UnknownItem, UnknownOption, UnknownOptionGroup
+from drivetruagent.ordering.inventory import sold_out_item_ids
 from drivetruagent.ordering.selection import ItemSpec, OptionSpec, Selections
 from drivetruagent.ordering.views import localize
 
@@ -85,6 +87,49 @@ async def item_allergens(
     declarations = [] if reviewed_on is None else await _declarations(db, item_id)
     assessment = assess(declarations, {o.id for o in chosen}, asked)
     return _report(item, chosen, assessment, reviewed_on, language, line_no)
+
+
+class ItemWithout(BaseModel):
+    item_code: str
+    item_name: str
+
+
+async def items_without(
+    db: AsyncSession,
+    allergens: Collection[Allergen],
+    language: Language,
+    *,
+    category_code: str | None = None,
+    exclude: Collection[str] = (),
+    limit: int = 3,
+) -> list[ItemWithout]:
+    """In-stock items whose reviewed allergen information lists none of
+    `allergens`, as contained or as "may contain", with their default
+    choices. From one category when given, in menu order.
+
+    What to offer someone avoiding an allergen. Items never reviewed are left
+    out: nothing may be said about them.
+    """
+    statement = (
+        select(MenuItem.code)
+        .join(MenuCategory, MenuItem.category_id == MenuCategory.id)
+        .where(MenuItem.is_active, MenuItem.allergens_reviewed_on.is_not(None))
+        .order_by(MenuCategory.sort_order, MenuItem.sort_order)
+    )
+    if category_code is not None:
+        statement = statement.where(MenuCategory.code == category_code)
+    sold_out = await sold_out_item_ids(db)
+    rows = (await db.execute(statement.add_columns(MenuItem.id))).all()
+    found: list[ItemWithout] = []
+    for code, item_id in rows:
+        if len(found) >= limit:
+            break
+        if code in exclude or item_id in sold_out:
+            continue
+        report = await item_allergens(db, code, None, list(allergens), language)
+        if report.verified and not report.contains and not report.may_contain:
+            found.append(ItemWithout(item_code=code, item_name=report.item_name))
+    return found
 
 
 async def cart_allergens(

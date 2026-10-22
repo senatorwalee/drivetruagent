@@ -6,7 +6,7 @@ always return the same items in the same order.
 """
 
 import unicodedata
-from collections.abc import Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass
 
 EXACT = 100
@@ -39,6 +39,22 @@ class Candidate[T]:
 class Match[T]:
     value: T
     score: int
+    # The customer's words the best phrase did not account for: "large" in
+    # "large fries", "oat" in "oat milk shake". Whether a leftover word is a
+    # choice the item offers is for the caller to decide.
+    leftover: tuple[str, ...] = ()
+
+
+# Words that say how many or are politeness, never what is wanted. A
+# leftover word from this set is never "not offered".
+_COUNT_AND_FILLER_TEXT = """
+one two three four five six seven eight nine ten eleven twelve dozen half
+deux trois quatre cinq six sept huit neuf dix douze demi
+order commande piece morceau portion x also aussi just juste then alors
+thank merci okay ok yes oui more another encore again for me pour
+moi us nous sure great perfect parfait instead plutot actually
+"""
+_COUNT_AND_FILLER = frozenset(_COUNT_AND_FILLER_TEXT.split())
 
 
 def normalise(text: str) -> tuple[str, ...]:
@@ -83,14 +99,37 @@ def search[T](
     query_words = normalise(query)
     matches: list[Match[T]] = []
     for candidate in candidates:
-        best = max(
-            (score(query_words, normalise(phrase)) for phrase in candidate.phrases),
-            default=0,
-        )
+        best, best_words = 0, ()
+        for phrase in candidate.phrases:
+            words = normalise(phrase)
+            found = score(query_words, words)
+            if found > best:
+                best, best_words = found, words
         if best > 0:
-            matches.append(Match(candidate.value, best))
+            used = set(best_words)
+            leftover = tuple(word for word in query_words if word not in used)
+            matches.append(Match(candidate.value, best, leftover))
     # sorted() is stable, so equal scores stay in menu order.
     return sorted(matches, key=lambda match: -match.score)[:limit]
+
+
+def not_offered(leftover: Sequence[str], offered: Collection[str]) -> tuple[str, ...]:
+    """The leftover words that name something the item does not have.
+
+    `offered` holds every word that is fine to have left over: the item's own
+    choices ("large", "vanilla") and words of other items the customer also
+    named ("fries and a cheeseburger"). Counts and filler are always fine.
+    """
+    return tuple(
+        word
+        for word in leftover
+        if word not in offered and word not in _COUNT_AND_FILLER and not word.isdigit()
+    )
+
+
+def contains_phrase(words: Sequence[str], phrase: Sequence[str]) -> bool:
+    """True if `phrase` appears in `words` as a run of whole words."""
+    return bool(phrase) and _contains(words, phrase)
 
 
 def _without_accents(word: str) -> str:

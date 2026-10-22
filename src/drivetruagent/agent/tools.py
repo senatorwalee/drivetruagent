@@ -35,12 +35,16 @@ from drivetruagent.ordering import cart as cart_rules
 from drivetruagent.ordering import menu as menu_rules
 from drivetruagent.ordering import offers as offer_rules
 from drivetruagent.ordering import sessions as session_rules
-from drivetruagent.ordering.allergens import allergens_named, is_about_allergens
+from drivetruagent.ordering.allergens import (
+    allergens_avoided,
+    allergens_named,
+    is_about_allergens,
+)
 from drivetruagent.ordering.catalog import load_item_by_code
 from drivetruagent.ordering.errors import OrderingError, UnknownItem
 from drivetruagent.ordering.inventory import DEFAULT_RESERVATION_TTL
 from drivetruagent.ordering.offers import SpecialsCache
-from drivetruagent.ordering.views import DEFAULT_LANGUAGE, localize
+from drivetruagent.ordering.views import DEFAULT_LANGUAGE, MenuMatch, localize
 from drivetruagent.policy import gateway
 from drivetruagent.policy.actions import (
     Action,
@@ -178,7 +182,81 @@ async def _propose(context: ToolContext, action: Action) -> ToolOutput:
 async def _search_menu(context: ToolContext, args: SearchMenuArgs) -> ToolOutput:
     language = await _session_language(context)
     matches = await menu_rules.search_menu(context.db, args.query, language)
-    return {"matches": [match.model_dump(mode="json") for match in matches]}
+    views = [match.model_dump(mode="json") for match in matches]
+    output: ToolOutput = {
+        "query": args.query,
+        # The best match decides: "close" and "none" are requests the menu
+        # couldn't fill, and stay in the event log for insights.
+        "match": matches[0].match if matches else "none",
+        "matches": views,
+    }
+
+    avoided = sorted(allergens_avoided(args.query), key=list(Allergen).index)
+    unsafe: set[str] = set()
+    if avoided:
+        names = [allergen.value for allergen in avoided]
+        for match, view in zip(matches, views, strict=True):
+            report = await allergen_matrix.item_allergens(
+                context.db, match.item_code, None, avoided, language
+            )
+            found = (
+                [f.allergen.value for f in report.contains]
+                + [f.allergen.value for f in report.may_contain]
+                if report.verified
+                else names  # never reviewed: assume the worst
+            )
+            view["contains_avoided"] = found
+            if found:
+                unsafe.add(match.item_code)
+        output["avoiding"] = names
+        output["options_without"] = [
+            option.model_dump(mode="json")
+            for option in await allergen_matrix.items_without(
+                context.db,
+                avoided,
+                language,
+                category_code=matches[0].category_code if matches else None,
+            )
+        ]
+    output["message"] = _search_message(matches, avoided, unsafe)
+    return output
+
+
+def _search_message(
+    matches: list[MenuMatch], avoided: list[Allergen], unsafe: set[str]
+) -> str:
+    """What the agent should do with the result, in words it can follow."""
+    parts: list[str] = []
+    if not matches:
+        parts.append(
+            "Nothing on the menu matches. Say plainly that you don't have it. Never "
+            "invent an item."
+        )
+    elif matches[0].match == "close":
+        top = matches[0]
+        missing = " ".join(top.not_offered)
+        parts.append(
+            f"Close match only: {top.item_name} has no {missing}. Say plainly that "
+            f"you don't have {missing} {top.item_name.lower()}."
+        )
+        if top.item_code not in unsafe:
+            parts.append(f"You may offer {top.item_name} as it comes.")
+        for other in top.offered_elsewhere:
+            if other.item_code not in unsafe:
+                parts.append(
+                    f"{other.item_name} does have {other.word}: offer it if it fits."
+                )
+    elif len(matches) > 1 and matches[0].score == matches[1].score:
+        parts.append("Several items fit equally: ask which one the customer means.")
+    if avoided:
+        words = ", ".join(allergen.value.replace("_", " ") for allergen in avoided)
+        parts.append(
+            f"The customer seems to be avoiding {words}. Never suggest an item whose "
+            "contains_avoided is not empty. If you suggest something, choose from "
+            f"options_without and say it is not listed as containing {words}; never "
+            "call anything safe."
+        )
+    return " ".join(parts) or "Use the best match."
 
 
 async def _get_item_details(context: ToolContext, args: ItemArgs) -> ToolOutput:
@@ -517,10 +595,13 @@ def _tool[ArgsT: Args](
 TOOLS: tuple[Tool[Any], ...] = (
     _tool(
         "search_menu",
-        "Find menu items matching what the customer said. Use it when their "
-        "words do not clearly match one item in the menu index. Several "
-        "results with the same score mean the customer was vague: ask which "
-        "one they want.",
+        "Find menu items matching what the customer said. Use it whenever "
+        "their words do not clearly match one item in the menu index, and "
+        "always before saying you don't have something. The result says "
+        "whether the match is exact, close (something they asked for isn't "
+        "offered) or none, and what to offer instead. Pass their words "
+        "including any dietary need, such as 'oat milk shake' or "
+        "'gluten-free bun'.",
         _object(
             {
                 "query": {

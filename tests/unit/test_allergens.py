@@ -9,6 +9,7 @@ from drivetruagent.enums import Allergen, AllergenLevel
 from drivetruagent.ordering.allergens import (
     Declaration,
     OptionAdds,
+    allergens_avoided,
     allergens_named,
     assess,
     is_about_allergens,
@@ -182,3 +183,27 @@ def test_allergens_are_recognised_by_name(question: str, named: set[Allergen]) -
 )
 def test_an_allergen_question_is_recognised(question: str, about: bool) -> None:
     assert is_about_allergens(question) is about
+
+
+@pytest.mark.parametrize(
+    ("request_text", "avoided"),
+    [
+        ("an oat milk shake", {Allergen.MILK}),
+        ("something dairy-free", {Allergen.MILK}),
+        ("I'm lactose intolerant", {Allergen.MILK}),
+        ("a vegan burger", {Allergen.MILK, Allergen.EGG}),
+        ("gluten-free bun", {Allergen.GLUTEN}),
+        ("no nuts please", {Allergen.TREE_NUT}),
+        ("I'm allergic to eggs", {Allergen.EGG}),
+        ("without sesame", {Allergen.SESAME}),
+        ("sans gluten", {Allergen.GLUTEN}),
+        ("allergique aux arachides", {Allergen.PEANUT}),
+        ("Is there milk in it?", set()),
+        ("a large fries", set()),
+        ("hold the cheese", set()),
+    ],
+)
+def test_what_a_customer_is_avoiding_is_read_from_how_they_ask(
+    request_text: str, avoided: set[Allergen]
+) -> None:
+    assert allergens_avoided(request_text) == avoided
