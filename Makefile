@@ -1,11 +1,18 @@
-.PHONY: up down phoenix dev migrate seed ingest chat ui gen-api lint format test test-unit eval check check-ui hooks
+.PHONY: up down demo phoenix dev migrate seed ingest chat ui gen-api lint format test test-unit eval check check-ui hooks
 
 # Start and stop the local Postgres.
 up:
 	docker compose up -d --wait
 
 down:
-	docker compose --profile tracing down
+	docker compose --profile tracing --profile app down
+
+# The whole app in Docker: database, API (menu and knowledge loaded) and web
+# app on http://localhost:8080. Uses .env if there is one; with no key it
+# plays the scripted demo.
+demo:
+	docker compose --profile app up --build -d --wait
+	@echo "Open http://localhost:8080 (staff screen: http://localhost:8080/staff)"
 
 # Arize Phoenix on http://localhost:6006. Set TRACING_ENDPOINT to send it traces.
 phoenix:

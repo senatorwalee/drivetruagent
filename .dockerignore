@@ -1,0 +1,12 @@
+# Only what the API image needs goes into the build context.
+.git
+.venv
+**/__pycache__
+.pytest_cache
+.ruff_cache
+frontend
+docs
+tests
+*.docx
+.env
+.env.*
