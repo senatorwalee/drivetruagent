@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 
-import { STAFF_PATH, usePath } from './app/navigation'
+import { INSIGHTS_PATH, STAFF_PATH, usePath } from './app/navigation'
+import { InsightsPage } from './insights/InsightsPage'
 import { StaffPage } from './staff/StaffPage'
 import { LiveSessionPage } from './views/LiveSessionPage'
 
@@ -23,6 +24,8 @@ export function App() {
   const path = usePath()
 
   return (
-    <QueryClientProvider client={queryClient}>{path === STAFF_PATH ? <StaffPage /> : <LiveSessionPage />}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      {path === STAFF_PATH ? <StaffPage /> : path === INSIGHTS_PATH ? <InsightsPage /> : <LiveSessionPage />}
+    </QueryClientProvider>
   )
 }

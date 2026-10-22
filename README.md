@@ -39,6 +39,7 @@ built piece by piece.
 | 17 | Faster turns: 6.5 s to 3.7 s on average, measured with the traces | Done; evals pass against the real model |
 | 18 | One command: `make demo` runs the whole app in Docker, with or without a key | Done; checked in a browser |
 | 19 | Not on the menu: say so, offer what's close, never what the guest is avoiding | Done; evals pass against the real model |
+| 20 | Insights page: what guests asked for that the menu couldn't fill, at `/insights` | Done; checked in a browser with real conversations |
 | Later | Demo polish: cost readout, French review, demo script | Planned |
 
 ## Stack
@@ -922,6 +923,10 @@ for, and the code decides what may be offered:
 - **Every unmet request is counted.** Searches are already in the event log;
   `GET /insights/unmet-requests` ranks the close and missing ones ("oat milk shake",
   asked 41 times this week), the first real piece of the insights feature.
+  The **Insights page** (<http://localhost:5174/insights>, or `/insights` under
+  `make demo`, linked from the staff and live screens) shows them ranked, with how
+  often, whether the menu came close, when each was last asked, and a suggested
+  action for the top one. It refreshes every 30 seconds.
 
 Against the real model: *"Sorry, we don't have an oat milkshake. We do have
 cola, lemon-lime soda, or iced tea, none listed as containing milk."*

@@ -2,7 +2,7 @@ import '@fontsource-variable/archivo'
 import '@fontsource/space-mono/400.css'
 import '@fontsource/space-mono/700.css'
 
-import { STAFF_PATH } from '../../app/navigation'
+import { INSIGHTS_PATH, STAFF_PATH } from '../../app/navigation'
 import { PageLink } from '../../app/PageLink'
 import { clock, progressSteps } from '../../session/presentation'
 import type { LiveSession } from '../../session/useLiveSession'
@@ -35,6 +35,9 @@ export function Receipt({ live, view, onViewChange }: LiveSessionViewProps) {
           />
           <PageLink to={STAFF_PATH} className={styles.button}>
             Staff
+          </PageLink>
+          <PageLink to={INSIGHTS_PATH} className={styles.button}>
+            Insights
           </PageLink>
           <button type="button" className={styles.button} aria-pressed={live.paused} onClick={live.togglePause}>
             {live.paused ? 'Resume' : 'Pause'}

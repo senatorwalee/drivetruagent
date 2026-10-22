@@ -26,6 +26,7 @@ export type HandoffPackage = Schemas['HandoffPackage']
 export type HandoffStep = Schemas['Step']
 export type HeldStock = Schemas['HeldStock']
 export type HandoffOutcome = Schemas['HandoffOutcome']
+export type UnmetRequest = Schemas['UnmetRequest']
 
 const BASE = '/api'
 
@@ -113,4 +114,7 @@ export const api = {
     post<HandoffPackage>(`/handoffs/${handoffId}/acknowledge`, { by }),
   resolveHandoff: (handoffId: string, outcome: HandoffOutcome, note: string | null) =>
     post<HandoffPackage>(`/handoffs/${handoffId}/resolve`, { outcome, note }),
+
+  /** What guests asked for that the menu couldn't fill, most asked first. */
+  unmetRequests: (days: number) => request<UnmetRequest[]>(`/insights/unmet-requests?days=${days}`),
 }
