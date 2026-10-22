@@ -257,4 +257,43 @@ SCENARIOS: tuple[Scenario, ...] = (
         must_use=ORDERING_TOOLS | {"search_knowledge"},
         must_not_say=("it is vegan", "it's vegan", "is fully vegan"),
     ),
+    Scenario(
+        name="asks_for_something_not_on_the_menu",
+        # There is no oat milk shake, and asking for oat milk usually means
+        # avoiding dairy, so the regular milkshake must not be offered. The
+        # agent says so plainly and the customer picks a drink without milk.
+        customer=(
+            "Can I get an oat milk shake?",
+            "Okay, a small orange juice then.",
+            "That's all.",
+            "Yes.",
+        ),
+        final_state=SessionState.SUBMITTED,
+        lines=(ExpectedLine("orange_juice", 1, {"size": "small"}),),
+        must_use=ORDERING_TOOLS | {"search_menu"},
+        must_say_one_of=(
+            "don't have",
+            "do not have",
+            "don't offer",
+            "don't carry",
+            "not available",
+            "isn't available",
+            "no oat",
+        ),
+    ),
+    Scenario(
+        name="gets_offered_something_similar",
+        # Nuggets don't come spicy; the chicken burger does. The backend says
+        # so, the agent offers it, and the customer takes it.
+        customer=(
+            "Can I get some spicy nuggets?",
+            "Sure, a spicy chicken burger then.",
+            "That's all.",
+            "Yes.",
+        ),
+        final_state=SessionState.SUBMITTED,
+        lines=(ExpectedLine("chicken_burger", 1, {"spice": "spicy"}),),
+        must_use=ORDERING_TOOLS | {"search_menu"},
+        must_say_one_of=("chicken burger",),
+    ),
 )
