@@ -2,7 +2,7 @@ import '@fontsource-variable/sora'
 import '@fontsource/ibm-plex-mono/400.css'
 import '@fontsource/ibm-plex-mono/500.css'
 
-import { STAFF_PATH } from '../../app/navigation'
+import { INSIGHTS_PATH, STAFF_PATH } from '../../app/navigation'
 import { PageLink } from '../../app/PageLink'
 import { clock } from '../../session/presentation'
 import type { LiveSession } from '../../session/useLiveSession'
@@ -34,6 +34,9 @@ export function ControlRoom({ live, view, onViewChange }: LiveSessionViewProps) 
           />
           <PageLink to={STAFF_PATH} className={styles.button}>
             Staff
+          </PageLink>
+          <PageLink to={INSIGHTS_PATH} className={styles.button}>
+            Insights
           </PageLink>
           <button type="button" className={styles.button} aria-pressed={live.paused} onClick={live.togglePause}>
             {live.paused ? 'Resume' : 'Pause'}
