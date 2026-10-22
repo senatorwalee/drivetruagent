@@ -1,5 +1,6 @@
-# Design docs and project spec (kept local only)
+# Design docs, the demo plan and the project spec (kept local only)
 docs/design/
+docs/demo/
 drive_through_ai_engineering_build_spec.docx
 
 # Python
