@@ -10,6 +10,7 @@ from drivetruagent.api import (
     conversation,
     handoffs,
     health,
+    insights,
     inventory,
     menu,
     offers,
@@ -71,6 +72,7 @@ def create_app() -> FastAPI:
     app.include_router(offers.router)
     app.include_router(handoffs.router)
     app.include_router(voice.router)
+    app.include_router(insights.router)
     register_error_handlers(app)
     return app
 

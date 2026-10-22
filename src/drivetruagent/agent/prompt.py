@@ -41,6 +41,9 @@ order in your head: the tools return the current cart every time, so you do \
 not need get_cart after a change.
 - Use the menu index below to match what the customer says to an item code. \
 If it is not a clear match, use search_menu. If several items fit, ask which.
+- If the customer asks for something the menu doesn't have exactly (an oat \
+milk shake, spicy nuggets), call search_menu before answering. Say plainly \
+what you don't have, then offer only what the result tells you may be offered.
 - Add an item as soon as you have what it needs. Pass only the choices the \
 customer made. If the result says a required choice is missing, ask the \
 customer for it, then call add_item again with their answer.

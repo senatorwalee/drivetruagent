@@ -169,6 +169,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/insights/unmet-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What guests asked for that the menu couldn't fill
+         * @description Requests whose best menu match was only close ("oat milk shake") or
+         *     nothing at all ("gluten-free bun"), most asked first.
+         */
+        get: operations["read_unmet_requests_insights_unmet_requests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory": {
         parameters: {
             query?: never;
@@ -1196,8 +1217,18 @@ export interface components {
             item_code: string;
             /** Item Name */
             item_name: string;
+            /**
+             * Match
+             * @default exact
+             * @enum {string}
+             */
+            match: "exact" | "close";
             /** Must Ask */
             must_ask: string[];
+            /** Not Offered */
+            not_offered?: string[];
+            /** Offered Elsewhere */
+            offered_elsewhere?: components["schemas"]["OfferedElsewhere"][];
             /** Score */
             score: number;
         };
@@ -1218,6 +1249,19 @@ export interface components {
             reply: string;
             /** Tools Used */
             tools_used: string[];
+        };
+        /**
+         * OfferedElsewhere
+         * @description Another item that has what this match lacks: "spicy" on the chicken
+         *     burger, "iced" in the iced tea.
+         */
+        OfferedElsewhere: {
+            /** Item Code */
+            item_code: string;
+            /** Item Name */
+            item_name: string;
+            /** Word */
+            word: string;
         };
         /** OpenSessionRequest */
         OpenSessionRequest: {
@@ -1503,6 +1547,20 @@ export interface components {
             speaker: "customer" | "agent";
             /** Text */
             text: string;
+        };
+        /** UnmetRequest */
+        UnmetRequest: {
+            /**
+             * Last Asked
+             * Format: date-time
+             */
+            last_asked: string;
+            /** Match */
+            match: string;
+            /** Request */
+            request: string;
+            /** Times */
+            times: number;
         };
         /** UpdateLine */
         UpdateLine: {
@@ -1845,6 +1903,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    read_unmet_requests_insights_unmet_requests_get: {
+        parameters: {
+            query?: {
+                /** @description How far back to look. */
+                days?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnmetRequest"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

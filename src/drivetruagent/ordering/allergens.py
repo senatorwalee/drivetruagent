@@ -224,3 +224,42 @@ def is_about_allergens(text: str) -> bool:
 def _plain(text: str) -> str:
     decomposed = unicodedata.normalize("NFKD", text.lower().replace("œ", "oe"))
     return "".join(char for char in decomposed if not unicodedata.combining(char))
+
+
+# --- Recognising what a customer is avoiding --------------------------------
+
+# Asking for a plant milk, or for vegan food, usually means avoiding dairy:
+# offering a milkshake instead would miss the point of the question.
+_AVOIDS_MILK = re.compile(
+    r"\b(non[- ]?dairy|dairy[- ]?free|lactose|vegan|plant[- ]based|"
+    r"(oat|almond|soy|soya|coconut|rice|cashew)\s+milk|"
+    r"lait\s+(d'avoine|d.amande|de\s+soja|de\s+coco)|vegetalien(ne)?)\b"
+)
+_AVOIDS_EGG = re.compile(r"\b(vegan|vegetalien(ne)?)\b")
+# "nut-free", "gluten free", "sans gluten"
+_FREE_OF = re.compile(r"\b([a-z]+)[- ]free\b|\bsans\s+([a-z]+(?:\s+de\s+mer)?)\b")
+# "no peanuts", "without egg", "allergic to sesame", "allergique aux noix"
+_WITHOUT = re.compile(
+    r"\b(?:no|without|hold the|allergic to|allergy to|intolerant to|"
+    r"pas de|allergique (?:a|au|aux))\s+([a-z' ]{2,40})"
+)
+
+
+def allergens_avoided(text: str) -> frozenset[Allergen]:
+    """The allergens a customer is steering clear of, from how they ask:
+    "gluten-free", "no nuts", "allergic to eggs", "oat milk", "vegan".
+
+    Only what the words show. "Is there milk in it?" names milk but avoids
+    nothing; that is a question for check_allergens.
+    """
+    plain = _plain(text)
+    avoided: set[Allergen] = set()
+    if _AVOIDS_MILK.search(plain):
+        avoided.add(Allergen.MILK)
+    if _AVOIDS_EGG.search(plain):
+        avoided.add(Allergen.EGG)
+    for match in _FREE_OF.finditer(plain):
+        avoided |= allergens_named(match.group(1) or match.group(2) or "")
+    for match in _WITHOUT.finditer(plain):
+        avoided |= allergens_named(match.group(1))
+    return frozenset(avoided)

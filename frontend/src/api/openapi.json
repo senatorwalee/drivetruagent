@@ -1298,11 +1298,34 @@
             "title": "Item Name",
             "type": "string"
           },
+          "match": {
+            "default": "exact",
+            "enum": [
+              "exact",
+              "close"
+            ],
+            "title": "Match",
+            "type": "string"
+          },
           "must_ask": {
             "items": {
               "type": "string"
             },
             "title": "Must Ask",
+            "type": "array"
+          },
+          "not_offered": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Not Offered",
+            "type": "array"
+          },
+          "offered_elsewhere": {
+            "items": {
+              "$ref": "#/components/schemas/OfferedElsewhere"
+            },
+            "title": "Offered Elsewhere",
             "type": "array"
           },
           "score": {
@@ -1376,6 +1399,30 @@
           "tools_used"
         ],
         "title": "MessageResponse",
+        "type": "object"
+      },
+      "OfferedElsewhere": {
+        "description": "Another item that has what this match lacks: \"spicy\" on the chicken\nburger, \"iced\" in the iced tea.",
+        "properties": {
+          "item_code": {
+            "title": "Item Code",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "word": {
+            "title": "Word",
+            "type": "string"
+          }
+        },
+        "required": [
+          "word",
+          "item_code",
+          "item_name"
+        ],
+        "title": "OfferedElsewhere",
         "type": "object"
       },
       "OpenSessionRequest": {
@@ -2068,6 +2115,35 @@
         "title": "TranscriptLine",
         "type": "object"
       },
+      "UnmetRequest": {
+        "properties": {
+          "last_asked": {
+            "format": "date-time",
+            "title": "Last Asked",
+            "type": "string"
+          },
+          "match": {
+            "title": "Match",
+            "type": "string"
+          },
+          "request": {
+            "title": "Request",
+            "type": "string"
+          },
+          "times": {
+            "title": "Times",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "request",
+          "times",
+          "match",
+          "last_asked"
+        ],
+        "title": "UnmetRequest",
+        "type": "object"
+      },
       "UpdateLine": {
         "additionalProperties": false,
         "properties": {
@@ -2640,6 +2716,70 @@
         "summary": "Ready",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/insights/unmet-requests": {
+      "get": {
+        "description": "Requests whose best menu match was only close (\"oat milk shake\") or\nnothing at all (\"gluten-free bun\"), most asked first.",
+        "operationId": "read_unmet_requests_insights_unmet_requests_get",
+        "parameters": [
+          {
+            "description": "How far back to look.",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 7,
+              "description": "How far back to look.",
+              "maximum": 90,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UnmetRequest"
+                  },
+                  "title": "Response Read Unmet Requests Insights Unmet Requests Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "What guests asked for that the menu couldn't fill",
+        "tags": [
+          "insights"
         ]
       }
     },

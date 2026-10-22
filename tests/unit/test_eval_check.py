@@ -375,3 +375,27 @@ def test_the_discount_is_not_checked_when_the_scenario_gives_none() -> None:
 
     assert check(scenario(), actual) == []
     assert check(scenario(discount_cents=200), actual) == []
+
+
+def test_a_phrase_the_agent_had_to_say_is_checked() -> None:
+    must = scenario(must_say_one_of=("don't have", "not available"))
+
+    said_it = result(
+        line("fries", size="large"), agent_said="Sorry, we don't have that."
+    )
+    said_neither = result(line("fries", size="large"), agent_said="Sure thing!")
+
+    assert check(must, said_it) == []
+    assert check(must, said_neither) == [
+        'the agent said none of: "don\'t have", "not available"'
+    ]
+
+
+def test_a_typographic_apostrophe_counts_as_a_straight_one() -> None:
+    must = scenario(must_say_one_of=("don't have",))
+
+    curly = result(
+        line("fries", size="large"), agent_said="We don" + chr(0x2019) + "t have that."
+    )
+
+    assert check(must, curly) == []

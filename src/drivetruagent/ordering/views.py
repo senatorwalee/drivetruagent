@@ -8,8 +8,9 @@ do its own arithmetic.
 import uuid
 from collections.abc import Mapping
 from datetime import date, datetime
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from drivetruagent.enums import DiscountKind, Language, SessionState
 
@@ -139,11 +140,26 @@ class MenuItemSummary(BaseModel):
     in_stock: bool = True
 
 
+class OfferedElsewhere(BaseModel):
+    """Another item that has what this match lacks: "spicy" on the chicken
+    burger, "iced" in the iced tea."""
+
+    word: str
+    item_code: str
+    item_name: str
+
+
 class MenuMatch(MenuItemSummary):
     category_code: str
     # 100 is an exact match. Several matches with the same score mean the
     # customer was vague, and should be asked which one they meant.
     score: int
+    # "exact": everything the customer said is this item or one of its
+    # choices. "close": some of their words name something it doesn't have.
+    match: Literal["exact", "close"] = "exact"
+    # Those words, as the search saw them: ["oat"] for "oat milk shake".
+    not_offered: list[str] = Field(default_factory=list)
+    offered_elsewhere: list[OfferedElsewhere] = Field(default_factory=list)
 
 
 class ChoiceOptionView(BaseModel):

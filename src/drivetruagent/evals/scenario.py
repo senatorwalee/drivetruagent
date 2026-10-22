@@ -40,6 +40,9 @@ class Scenario:
     must_not_use: frozenset[str] = frozenset()
     # Words that must not appear in anything the agent said (case ignored).
     must_not_say: tuple[str, ...] = ()
+    # At least one of these must appear in something the agent said (case
+    # ignored). Empty: not checked.
+    must_say_one_of: tuple[str, ...] = ()
     # The restaurant's date for the session: decides which specials run.
     business_date: date = DEFAULT_BUSINESS_DATE
 
@@ -115,12 +118,24 @@ def check(scenario: Scenario, result: ScenarioResult) -> list[str]:
         for tool in sorted(scenario.must_not_use & used)
     )
 
-    said = " ".join(exchange.agent for exchange in result.exchanges).lower()
+    # Typographic apostrophes made straight, as models often write them.
+    said = (
+        " ".join(exchange.agent for exchange in result.exchanges)
+        .lower()
+        .replace(chr(0x2019), "'")
+    )
     failures.extend(
         f'the agent said "{phrase}"'
         for phrase in scenario.must_not_say
         if phrase.lower() in said
     )
+    if scenario.must_say_one_of and not any(
+        phrase.lower() in said for phrase in scenario.must_say_one_of
+    ):
+        failures.append(
+            "the agent said none of: "
+            + ", ".join(f'"{phrase}"' for phrase in scenario.must_say_one_of)
+        )
     return failures
 
 

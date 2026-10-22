@@ -16,7 +16,13 @@ from drivetruagent.enums import Language
 from drivetruagent.ordering.catalog import to_item_spec
 from drivetruagent.ordering.errors import UnknownItem
 from drivetruagent.ordering.inventory import sold_out_item_ids
-from drivetruagent.ordering.search import Candidate, search
+from drivetruagent.ordering.search import (
+    Candidate,
+    contains_phrase,
+    normalise,
+    not_offered,
+    search,
+)
 from drivetruagent.ordering.selection import GroupSpec, ItemSpec
 from drivetruagent.ordering.views import (
     CategoryView,
@@ -26,6 +32,7 @@ from drivetruagent.ordering.views import (
     MenuItemSummary,
     MenuMatch,
     MenuView,
+    OfferedElsewhere,
     localize,
 )
 
@@ -58,25 +65,82 @@ async def search_menu(
     """
     entries = await _load_active_entries(db)
     sold_out = await sold_out_item_ids(db)
-    candidates = [
-        Candidate(
-            value=entry,
-            phrases=(
-                *entry.item.name.values(),
-                *entry.aliases,
-                entry.item.code.replace("_", " "),
-            ),
+    candidates = [Candidate(value=entry, phrases=_phrases(entry)) for entry in entries]
+    query_words = normalise(query)
+    # Other items named in the same breath ("a medium fries and a
+    # cheeseburger"): their words, and their choices ("medium"), are not
+    # something missing from the item matched.
+    also_named: set[str] = set()
+    for entry in entries:
+        for phrase in _phrases(entry):
+            words = normalise(phrase)
+            if contains_phrase(query_words, words):
+                also_named.update(words)
+                also_named.update(_choice_words(entry.item))
+    results: list[MenuMatch] = []
+    for found in search(query, candidates, limit):
+        entry = found.value
+        missing = not_offered(found.leftover, _choice_words(entry.item) | also_named)
+        results.append(
+            MenuMatch(
+                **_summary(entry.item, language, sold_out).model_dump(),
+                category_code=entry.category_code,
+                score=found.score,
+                match="close" if missing else "exact",
+                not_offered=list(missing),
+                offered_elsewhere=_offered_elsewhere(missing, entry, entries, language),
+            )
         )
-        for entry in entries
-    ]
-    return [
-        MenuMatch(
-            **_summary(match.value.item, language, sold_out).model_dump(),
-            category_code=match.value.category_code,
-            score=match.score,
-        )
-        for match in search(query, candidates, limit)
-    ]
+    return results
+
+
+def _phrases(entry: CatalogEntry) -> tuple[str, ...]:
+    """Every phrase an item is known by: its names, aliases and code."""
+    return (
+        *entry.item.name.values(),
+        *entry.aliases,
+        entry.item.code.replace("_", " "),
+    )
+
+
+def _choice_words(item: ItemSpec) -> set[str]:
+    """Words for the item's choices, in every language: "large", "vanilla",
+    "size". Saying one of them is asking for this item, not something else."""
+    words: set[str] = set()
+    for group in item.groups:
+        for name in group.name.values():
+            words.update(normalise(name))
+        for option in group.available_options:
+            for name in option.name.values():
+                words.update(normalise(name))
+            words.update(normalise(option.code.replace("_", " ")))
+    return words
+
+
+def _offered_elsewhere(
+    missing: tuple[str, ...],
+    entry: CatalogEntry,
+    entries: list[CatalogEntry],
+    language: Language,
+    limit: int = 3,
+) -> list[OfferedElsewhere]:
+    """Other items that have a missing word, as a choice or in their name:
+    the "something similar" the agent can offer."""
+    found: list[OfferedElsewhere] = []
+    for word in missing:
+        for other in entries:
+            if other is entry or len(found) >= limit:
+                continue
+            name_words = {w for phrase in _phrases(other) for w in normalise(phrase)}
+            if word in name_words or word in _choice_words(other.item):
+                found.append(
+                    OfferedElsewhere(
+                        word=word,
+                        item_code=other.item.code,
+                        item_name=localize(other.item.name, language),
+                    )
+                )
+    return found
 
 
 async def get_item_details(

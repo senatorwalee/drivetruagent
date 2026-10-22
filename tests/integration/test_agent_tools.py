@@ -51,9 +51,9 @@ async def test_search_menu_returns_ranked_matches(context: ToolContext) -> None:
 async def test_search_menu_with_no_match_returns_an_empty_list(
     context: ToolContext,
 ) -> None:
-    assert await run_tool(context, "search_menu", {"query": "lobster"}) == {
-        "matches": []
-    }
+    result = await run_tool(context, "search_menu", {"query": "lobster"})
+
+    assert (result["matches"], result["match"]) == ([], "none")
 
 
 async def test_get_item_details_lists_the_choices(context: ToolContext) -> None:
