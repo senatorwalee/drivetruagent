@@ -38,6 +38,7 @@ built piece by piece.
 | 16 | Tracing: every turn as a timeline in Arize Phoenix, over OpenTelemetry | Done; checked with real turns in Phoenix |
 | 17 | Faster turns: 6.5 s to 3.7 s on average, measured with the traces | Done; evals pass against the real model |
 | 18 | One command: `make demo` runs the whole app in Docker, with or without a key | Done; checked in a browser |
+| 19 | Not on the menu: say so, offer what's close, never what the guest is avoiding | Done; evals pass against the real model |
 | Later | Demo polish: cost readout, French review, demo script | Planned |
 
 ## Stack
@@ -398,6 +399,8 @@ order, the session state and the tools used, never at the agent's wording.
 | `checks_the_order_for_a_nut_allergy` | The whole order is checked; the cookie that may contain nuts comes off |
 | `asks_about_the_fryer_oil` | "Do you fry in peanut oil?" is answered from the approved documents, then the order |
 | `asks_if_the_veggie_burger_is_vegan` | Answered from the documents (not as served), never "it's vegan" |
+| `asks_for_something_not_on_the_menu` | "Oat milk shake": says it isn't offered and suggests drinks without milk, never the regular shake |
+| `gets_offered_something_similar` | "Spicy nuggets": nuggets don't come spicy, the chicken burger does, and the guest takes it |
 
 Every scenario is played on a fixed Monday, so a total never depends on which
 day the evals happen to be run.
@@ -891,6 +894,38 @@ Final check: all 17 evals pass, with no classifier timeouts and no early
 confirmations. The rest is the model itself: a turn with tools needs one request
 to choose them and one to answer.
 
+## Not on the menu: say so, offer what's close, never what they're avoiding
+
+Menu search forgives how people talk ("a large fries", "coke", "un
+cheeseburger"), and that forgiveness used to hide a problem: "oat milk shake"
+came back as **Milkshake** with a score as good as "a large fries", so the
+agent could hear it as a yes. Now the search reports what it couldn't account
+for, and the code decides what may be offered:
+
+| The guest says | The search reports | The agent is told |
+|---|---|---|
+| "a large fries" | exact ("large" is a size fries come in) | add it |
+| "spicy nuggets" | close: nuggets have no "spicy"; the chicken burger does | say so, offer either |
+| "iced coffee" | close: coffee has no "iced"; iced tea does | say so, offer either |
+| "oat milk shake" | close, and the guest **avoids milk**: the milkshake contains it | don't offer the shake; offer drinks not listed as containing milk |
+| "gluten-free bun" | none, and avoids gluten; fries **may contain** gluten (shared fryer) | say so; offer items without gluten, not the fries |
+
+- **Leftover words are judged by code.** A word the item offers as a choice
+  ("large", "vanilla"), a count ("two") or another item named in the same breath
+  ("fries and a cheeseburger") is fine; anything else is something the menu
+  doesn't have, and the result says which other items do have it.
+- **Avoidance is read from the words** ("dairy-free", "no nuts", "allergic to
+  eggs", "oat milk", "vegan"), and checked against the reviewed allergen matrix.
+  "May contain" counts as contains; items never reviewed are never offered.
+  "Is there milk in it?" asks about milk without avoiding it, so it doesn't count.
+- **Nothing is invented.** No match means the agent says it doesn't have it.
+- **Every unmet request is counted.** Searches are already in the event log;
+  `GET /insights/unmet-requests` ranks the close and missing ones ("oat milk shake",
+  asked 41 times this week), the first real piece of the insights feature.
+
+Against the real model: *"Sorry, we don't have an oat milkshake. We do have
+cola, lemon-lime soda, or iced tea, none listed as containing milk."*
+
 ## Policy engine
 
 The model proposes; code decides. Every action the agent proposes goes
@@ -959,6 +994,7 @@ Run `make dev` and open <http://127.0.0.1:8000/docs> to try these.
 | `GET /menu/search?q=` | Find items matching what a customer said |
 | `GET /menu/items/{code}` | One item with its choices |
 | `GET /menu/items/{code}/allergens` | One item's allergens, and which choices add more |
+| `GET /insights/unmet-requests?days=7` | What guests asked for that the menu couldn't fill, most asked first |
 | `GET /handoffs` | The handoff queue, longest waiting first; `?status=`, `?session_id=` |
 | `GET /handoffs/{id}` | One handoff's package |
 | `POST /handoffs/{id}/acknowledge` | Say you have picked it up |
