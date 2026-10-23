@@ -1,0 +1,37 @@
+/* The app's one look: a cool, dark console with a cyan accent, Sora for text
+   and IBM Plex Mono for numbers and labels. Every page and view draws with
+   these tokens, so changing a colour here changes it everywhere. */
+
+:root {
+  color-scheme: dark;
+
+  /* Surfaces, darkest first */
+  --ground: oklch(0.16 0.02 255);
+  --panel: oklch(0.2 0.022 255);
+  --raised: oklch(0.245 0.024 255);
+  --hairline: oklch(0.32 0.025 255);
+  /* Text */
+  --text: oklch(0.94 0.01 250);
+  --muted: oklch(0.74 0.025 250);
+  --faint: oklch(0.62 0.03 250);
+  /* Accents */
+  --accent: oklch(0.82 0.12 200);
+  --on-accent: oklch(0.18 0.03 220);
+  --listening: oklch(0.82 0.12 300);
+  /* Decisions: same lightness and strength, different hue */
+  --allow: oklch(0.82 0.12 165);
+  --confirm: oklch(0.82 0.12 85);
+  --reject: oklch(0.76 0.14 25);
+  --escalate: oklch(0.78 0.12 300);
+  /* Dark text for a filled light badge */
+  --on-light: oklch(0.2 0.04 85);
+  /* Type */
+  --font: 'Sora Variable', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+body {
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--font);
+}
