@@ -1,0 +1,637 @@
+/* The menu page. It sits inside the staff screen's frame and colours
+   (Staff.module.css): a back-office tool, dense but calm. Photos are the one
+   place colour comes from, so everything around them stays quiet. */
+
+.main {
+  flex: 1;
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+.main[data-editing='true'] {
+  grid-template-columns: minmax(0, 1fr) minmax(380px, 460px);
+}
+
+.listPane {
+  min-width: 0;
+  padding: 24px;
+  display: grid;
+  gap: 20px;
+  align-content: start;
+}
+
+/* --- Toolbar ------------------------------------------------------------- */
+
+.toolbar {
+  display: grid;
+  gap: 14px;
+}
+
+.toolbarHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 16px;
+}
+
+.heading {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.lede {
+  margin: 4px 0 0;
+  max-width: 62ch;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.filters > [role='group'] {
+  margin-bottom: 0;
+  flex: 0 1 280px;
+}
+
+.search {
+  flex: 1 1 240px;
+  display: flex;
+}
+
+.search input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid var(--hairline);
+  background: var(--ground);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--hairline);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.chip:hover {
+  color: var(--text);
+  border-color: var(--muted);
+}
+
+.chip[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.empty {
+  margin: 0;
+  padding: 32px 0;
+  color: var(--muted);
+}
+
+/* --- Item list ----------------------------------------------------------- */
+
+.group {
+  display: grid;
+  gap: 8px;
+}
+
+.groupTitle {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.groupCount {
+  margin-left: 4px;
+  color: var(--faint);
+}
+
+.rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+  gap: 8px;
+}
+
+.row {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px 10px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--hairline);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row:hover {
+  border-color: var(--muted);
+}
+
+.row[aria-current='true'] {
+  border-color: var(--accent);
+  background: var(--raised);
+}
+
+.row:focus-visible,
+.chip:focus-visible,
+.search input:focus-visible,
+.linkButton:focus-visible,
+.dangerButton:focus-visible,
+.dangerButtonSolid:focus-visible,
+.field :is(input, select, textarea):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.rowText {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.rowName {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.rowFrench {
+  color: var(--muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+/* A word in a pill, never a colour alone. */
+.flag {
+  padding: 0 7px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.rowNumbers {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+
+.rowPrice {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.rowStock {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.rowStock[data-sold-out='true'] {
+  color: var(--reject);
+}
+
+/* --- Photos and placeholders --------------------------------------------- */
+
+.picture {
+  display: block;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--raised);
+}
+
+.picture[data-size='thumb'] {
+  width: 72px;
+  height: 54px;
+}
+
+.picture[data-size='large'] {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 10px;
+}
+
+.picture img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--faint);
+  /* A faint tint per category, so a missing photo still says what it is. */
+  background: radial-gradient(circle at 50% 40%, color-mix(in oklch, var(--tint) 22%, var(--raised)), var(--raised) 70%);
+  --tint: var(--faint);
+}
+
+.placeholder[data-category='burgers'] {
+  --tint: var(--confirm);
+}
+
+.placeholder[data-category='sides'] {
+  --tint: var(--reject);
+}
+
+.placeholder[data-category='drinks'] {
+  --tint: var(--accent);
+}
+
+.placeholder[data-category='desserts'] {
+  --tint: var(--escalate);
+}
+
+.placeholderIcon {
+  width: 45%;
+  max-width: 28px;
+  color: var(--muted);
+}
+
+.picture[data-size='large'] .placeholderIcon {
+  max-width: 64px;
+}
+
+.placeholderText {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* --- Editor -------------------------------------------------------------- */
+
+.editor {
+  position: sticky;
+  top: 0;
+  max-height: 100vh;
+  overflow-y: auto;
+  border-left: 1px solid var(--hairline);
+  background: var(--panel);
+}
+
+.editorForm {
+  padding: 20px 24px 32px;
+  display: grid;
+  gap: 20px;
+}
+
+.editorHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.editorKicker {
+  margin: 0 0 2px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.editorTitle {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -0.015em;
+  overflow-wrap: anywhere;
+}
+
+.notice {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--allow);
+  color: var(--allow);
+}
+
+.removedBanner {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--confirm);
+}
+
+.removedBanner p {
+  margin: 0;
+}
+
+.photoSection {
+  display: grid;
+  gap: 10px;
+}
+
+.dropZone {
+  border-radius: 12px;
+  outline: 2px dashed transparent;
+  outline-offset: 4px;
+}
+
+.dropZone[data-dragging='true'] {
+  outline-color: var(--accent);
+}
+
+.photoActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.linkButton {
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.fieldRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 14px;
+}
+
+.fieldRow[data-columns='3'] {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid var(--hairline);
+  background: var(--ground);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.field textarea {
+  padding: 10px 12px;
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.field [aria-invalid='true'] {
+  border-color: var(--reject);
+}
+
+.prefixed {
+  position: relative;
+  display: flex;
+}
+
+.prefixed > span {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  translate: 0 -50%;
+  color: var(--muted);
+  font-family: var(--mono);
+  pointer-events: none;
+}
+
+.field .prefixed input {
+  padding-left: 26px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.help {
+  margin: 0;
+  color: var(--faint);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.fieldProblem {
+  margin: 0;
+  color: var(--reject);
+  font-size: 13px;
+}
+
+.facts {
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--hairline);
+  background: var(--ground);
+}
+
+.facts dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 8px 16px;
+  font-size: 14px;
+}
+
+.facts dt {
+  color: var(--muted);
+}
+
+.facts dd {
+  margin: 0;
+}
+
+.facts code {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.choices {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+
+.warning {
+  color: var(--confirm);
+}
+
+.editorFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--hairline);
+}
+
+.saveActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dangerButton,
+.dangerButtonSolid {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 6px;
+  border: 1px solid var(--reject);
+  background: transparent;
+  color: var(--reject);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.dangerButtonSolid {
+  background: var(--reject);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.dangerButton:disabled,
+.dangerButtonSolid:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.confirm {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 8px;
+  border: 1px solid var(--reject);
+}
+
+.confirm p {
+  margin: 0;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* --- Narrow screens: the editor goes above the list ----------------------- */
+
+@media (max-width: 960px) {
+  .main[data-editing='true'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .editor {
+    position: static;
+    max-height: none;
+    order: -1;
+    border-left: 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+}
+
+@media (max-width: 560px) {
+  .listPane,
+  .editorForm {
+    padding: 16px;
+  }
+
+  .fieldRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .picture[data-size='thumb'] {
+    width: 60px;
+    height: 48px;
+  }
+}
+
+@media (forced-colors: active) {
+  .chip[aria-pressed='true'],
+  .row[aria-current='true'] {
+    outline: 2px solid Highlight;
+  }
+}

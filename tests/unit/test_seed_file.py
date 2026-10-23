@@ -8,7 +8,8 @@ import pytest
 from pydantic import ValidationError
 
 from drivetruagent.enums import Allergen, Language
-from drivetruagent.seed import MenuSeed, OptionGroupSeed, load_menu
+from drivetruagent.ordering.photos import check_photo
+from drivetruagent.seed import MenuSeed, OptionGroupSeed, load_menu, photos_dir_for
 
 MENU_PATH = Path(__file__).resolve().parents[2] / "data" / "menu.json"
 
@@ -521,3 +522,23 @@ def test_option_allergens_on_an_unreviewed_item_are_rejected() -> None:
 
     with pytest.raises(ValidationError, match="no reviewed allergens"):
         MenuSeed.model_validate(menu(item(option_groups=[cheesy])))
+
+
+# --- Photos -----------------------------------------------------------------
+
+
+def test_every_item_in_the_real_menu_has_a_photo_that_is_accepted() -> None:
+    loaded = load_menu(MENU_PATH)
+    photos_dir = photos_dir_for(MENU_PATH)
+
+    for category in loaded.categories:
+        for menu_item in category.items:
+            assert menu_item.photo is not None, menu_item.code
+            assert menu_item.photo.credit, menu_item.code
+            data = (photos_dir / menu_item.photo.file).read_bytes()
+            assert check_photo(data).content_type == "image/jpeg"
+
+
+def test_photo_file_names_are_plain() -> None:
+    with pytest.raises(ValidationError, match="photo"):
+        MenuSeed.model_validate(menu(item(photo={"file": "../secrets.jpg"})))

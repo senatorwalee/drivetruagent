@@ -7,7 +7,14 @@ choices an item needs by reading these tables through tools.
 import uuid
 from datetime import date
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, UniqueConstraint, text
+from sqlalchemy import (
+    CheckConstraint,
+    ForeignKey,
+    Index,
+    LargeBinary,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -80,6 +87,34 @@ class MenuItem(UuidPrimaryKey, Timestamps, Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+
+
+class MenuItemPhoto(Timestamps, Base):
+    """An item's photo, at most one per item.
+
+    Kept apart from menu_items so that reading the menu never loads image
+    bytes. The type is checked from the bytes themselves before it is stored.
+    """
+
+    __tablename__ = "menu_item_photos"
+    __table_args__ = (
+        CheckConstraint(
+            "content_type IN ('image/jpeg', 'image/png', 'image/webp')",
+            name="content_type_valid",
+        ),
+        CheckConstraint("octet_length(data) > 0", name="data_not_empty"),
+    )
+
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("menu_items.id", ondelete="CASCADE"), primary_key=True
+    )
+    content_type: Mapped[str]
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+    # Of the bytes, in hex. A new photo has a new hash, so a URL carrying it
+    # can be cached for good.
+    sha256: Mapped[str]
+    # Who took it, for photos that need credit: "Jane Doe on Unsplash".
+    credit: Mapped[str | None]
 
 
 class OptionGroup(UuidPrimaryKey, Timestamps, Base):

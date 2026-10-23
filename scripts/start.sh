@@ -1,6 +1,8 @@
 #!/bin/sh
 # Starts the API in its container: migrate, load the menu and the knowledge
-# documents, then serve. Each step is safe to repeat on every start.
+# documents, then serve. Each step is safe to repeat on every start. The menu
+# is loaded only the first time, so changes made on the menu page survive a
+# restart; `make seed` resets it on purpose.
 set -e
 
 # No model key and no choice made: play the scripted demo, which needs none.
@@ -16,7 +18,7 @@ if [ -n "$TRACING_ENDPOINT" ]; then
 fi
 
 alembic upgrade head
-python -m drivetruagent.seed
+python -m drivetruagent.seed --if-empty
 # Without it the agent still takes orders; knowledge search just finds nothing.
 python -m drivetruagent.ingest || echo "Knowledge ingest failed; carrying on without it."
 

@@ -9,6 +9,7 @@ from drivetruagent.db.models.catalog import (
     MenuCategory,
     MenuItem,
     MenuItemAlias,
+    MenuItemPhoto,
     Option,
     OptionGroup,
 )
@@ -62,6 +63,7 @@ __all__ = [
     "MenuCategory",
     "MenuItem",
     "MenuItemAlias",
+    "MenuItemPhoto",
     "Option",
     "OptionGroup",
     "Order",

@@ -17,6 +17,10 @@
             "en": "Beef patty, lettuce, tomato, pickles and house sauce.",
             "fr": "Galette de bœuf, laitue, tomate, cornichons et sauce maison."
           },
+          "photo": {
+            "file": "classic_burger.jpg",
+            "credit": "amirali mirhashemian on Unsplash"
+          },
           "base_price_cents": 549,
           "stock": 100,
           "aliases": {
@@ -96,6 +100,10 @@
             "en": "Beef patty with melted cheese, pickles and house sauce.",
             "fr": "Galette de bœuf avec fromage fondu, cornichons et sauce maison."
           },
+          "photo": {
+            "file": "cheeseburger.jpg",
+            "credit": "Stanley Kustamin on Unsplash"
+          },
           "base_price_cents": 599,
           "stock": 100,
           "aliases": {
@@ -154,6 +162,10 @@
             "en": "Two beef patties with two slices of cheese.",
             "fr": "Deux galettes de bœuf avec deux tranches de fromage."
           },
+          "photo": {
+            "file": "double_cheeseburger.jpg",
+            "credit": "amirali mirhashemian on Unsplash"
+          },
           "base_price_cents": 799,
           "stock": 100,
           "aliases": {
@@ -206,6 +218,10 @@
           "description": {
             "en": "Breaded chicken fillet with lettuce and mayonnaise.",
             "fr": "Filet de poulet pané avec laitue et mayonnaise."
+          },
+          "photo": {
+            "file": "chicken_burger.jpg",
+            "credit": "Bilal Rana on Unsplash"
           },
           "base_price_cents": 649,
           "stock": 100,
@@ -277,6 +293,10 @@
           "description": {
             "en": "Plant-based patty with lettuce, tomato and house sauce.",
             "fr": "Galette végétale avec laitue, tomate et sauce maison."
+          },
+          "photo": {
+            "file": "veggie_burger.jpg",
+            "credit": "Zoshua Colah on Unsplash"
           },
           "base_price_cents": 629,
           "stock": 100,
@@ -353,6 +373,10 @@
           "name": {
             "en": "Fries",
             "fr": "Frites"
+          },
+          "photo": {
+            "file": "fries.jpg",
+            "credit": "Mitchell Luo on Unsplash"
           },
           "base_price_cents": 249,
           "stock": 100,
@@ -486,6 +510,10 @@
             "en": "Onion rings",
             "fr": "Rondelles d'oignon"
           },
+          "photo": {
+            "file": "onion_rings.jpg",
+            "credit": "Esperanza Doronila on Unsplash"
+          },
           "base_price_cents": 329,
           "stock": 100,
           "aliases": {
@@ -536,6 +564,10 @@
           "name": {
             "en": "Chicken nuggets",
             "fr": "Croquettes de poulet"
+          },
+          "photo": {
+            "file": "chicken_nuggets.jpg",
+            "credit": "Tyson on Unsplash"
           },
           "base_price_cents": 449,
           "stock": 100,
@@ -652,6 +684,10 @@
             "en": "Side salad",
             "fr": "Salade d'accompagnement"
           },
+          "photo": {
+            "file": "side_salad.jpg",
+            "credit": "Kelly Visel on Unsplash"
+          },
           "base_price_cents": 349,
           "stock": 100,
           "aliases": {
@@ -724,6 +760,10 @@
             "en": "Cola",
             "fr": "Cola"
           },
+          "photo": {
+            "file": "cola.jpg",
+            "credit": "Qasim Malick on Unsplash"
+          },
           "base_price_cents": 199,
           "stock": 100,
           "aliases": {
@@ -784,6 +824,10 @@
           "name": {
             "en": "Lemon-lime soda",
             "fr": "Boisson gazeuse citron-lime"
+          },
+          "photo": {
+            "file": "lemon_lime_soda.jpg",
+            "credit": "montatip lilitsanong on Unsplash"
           },
           "base_price_cents": 199,
           "stock": 100,
@@ -847,6 +891,10 @@
           "name": {
             "en": "Iced tea",
             "fr": "Thé glacé"
+          },
+          "photo": {
+            "file": "iced_tea.jpg",
+            "credit": "Mae Mu on Unsplash"
           },
           "base_price_cents": 219,
           "stock": 100,
@@ -932,6 +980,10 @@
             "en": "Orange juice",
             "fr": "Jus d'orange"
           },
+          "photo": {
+            "file": "orange_juice.jpg",
+            "credit": "Abhishek Hajare on Unsplash"
+          },
           "base_price_cents": 259,
           "stock": 100,
           "aliases": {
@@ -980,6 +1032,10 @@
           "name": {
             "en": "Coffee",
             "fr": "Café"
+          },
+          "photo": {
+            "file": "coffee.jpg",
+            "credit": "Mike Kenneally on Unsplash"
           },
           "base_price_cents": 179,
           "stock": 100,
@@ -1096,6 +1152,10 @@
             "en": "Bottled water",
             "fr": "Bouteille d'eau"
           },
+          "photo": {
+            "file": "bottled_water.jpg",
+            "credit": "charlesdeluvio on Unsplash"
+          },
           "base_price_cents": 149,
           "stock": 100,
           "aliases": {
@@ -1118,6 +1178,10 @@
           "name": {
             "en": "Milkshake",
             "fr": "Lait frappé"
+          },
+          "photo": {
+            "file": "milkshake.jpg",
+            "credit": "Jonathan Borba on Unsplash"
           },
           "base_price_cents": 399,
           "stock": 100,
@@ -1214,6 +1278,10 @@
             "en": "Apple pie",
             "fr": "Tarte aux pommes"
           },
+          "photo": {
+            "file": "apple_pie.jpg",
+            "credit": "Hugo Aitken on Unsplash"
+          },
           "base_price_cents": 199,
           "stock": 100,
           "aliases": {
@@ -1245,6 +1313,10 @@
           "name": {
             "en": "Sundae",
             "fr": "Sundae"
+          },
+          "photo": {
+            "file": "sundae.jpg",
+            "credit": "jesus arango on Unsplash"
           },
           "base_price_cents": 299,
           "stock": 100,
@@ -1313,6 +1385,10 @@
             "en": "Chocolate chip cookie",
             "fr": "Biscuit aux pépites de chocolat"
           },
+          "photo": {
+            "file": "cookie.jpg",
+            "credit": "Jennifer Pallian on Unsplash"
+          },
           "base_price_cents": 149,
           "stock": 100,
           "aliases": {
@@ -1345,6 +1421,10 @@
           "name": {
             "en": "Soft-serve cone",
             "fr": "Cornet de crème glacée molle"
+          },
+          "photo": {
+            "file": "soft_serve_cone.jpg",
+            "credit": "Annie Hatuanh on Unsplash"
           },
           "base_price_cents": 179,
           "stock": 100,

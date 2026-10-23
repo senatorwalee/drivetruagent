@@ -27,6 +27,11 @@ export type HandoffStep = Schemas['Step']
 export type HeldStock = Schemas['HeldStock']
 export type HandoffOutcome = Schemas['HandoffOutcome']
 export type UnmetRequest = Schemas['UnmetRequest']
+export type AdminMenu = Schemas['AdminMenuView']
+export type AdminItem = Schemas['AdminItemView']
+export type AdminCategory = Schemas['AdminCategoryView']
+export type NewItem = Schemas['NewItem']
+export type ItemChanges = Schemas['ItemChanges']
 
 const BASE = '/api'
 
@@ -74,6 +79,10 @@ function post<T>(path: string, body?: unknown): Promise<T> {
   })
 }
 
+function patch<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, { method: 'PATCH', body: JSON.stringify(body) })
+}
+
 export const api = {
   agentInfo: () => request<AgentInfo>('/agent'),
   menu: (language: Language) => request<Menu>(`/menu?language=${language}`),
@@ -117,4 +126,23 @@ export const api = {
 
   /** What guests asked for that the menu couldn't fill, most asked first. */
   unmetRequests: (days: number) => request<UnmetRequest[]>(`/insights/unmet-requests?days=${days}`),
+
+  /** Every item, those taken off the menu too, for the menu page. */
+  adminMenu: () => request<AdminMenu>('/admin/menu'),
+  createItem: (item: NewItem) => post<AdminItem>('/admin/menu/items', item),
+  /** Only the fields given change. `is_active: false` takes it off the menu. */
+  updateItem: (itemCode: string, changes: ItemChanges) => patch<AdminItem>(`/admin/menu/items/${itemCode}`, changes),
+  /** The image itself is the body: JPEG, PNG or WebP. */
+  setPhoto: async (itemCode: string, photo: Blob): Promise<AdminItem> => {
+    const response = await fetch(`${BASE}/admin/menu/items/${itemCode}/photo`, {
+      method: 'PUT',
+      headers: { 'Content-Type': photo.type || 'application/octet-stream' },
+      body: photo,
+    })
+    if (!response.ok) throw await toApiError(response)
+    return (await response.json()) as AdminItem
+  },
+  removePhoto: (itemCode: string) => request<AdminItem>(`/admin/menu/items/${itemCode}/photo`, { method: 'DELETE' }),
+  /** Where an item's photo is. The version makes a new photo a new URL. */
+  photoUrl: (itemCode: string, version: string) => `${BASE}/menu/items/${itemCode}/photo?v=${version}`,
 }

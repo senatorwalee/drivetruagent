@@ -155,6 +155,236 @@
         "title": "AddLineRequest",
         "type": "object"
       },
+      "AdminCategoryView": {
+        "properties": {
+          "category_code": {
+            "title": "Category Code",
+            "type": "string"
+          },
+          "category_name": {
+            "title": "Category Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category_code",
+          "category_name"
+        ],
+        "title": "AdminCategoryView",
+        "type": "object"
+      },
+      "AdminChoiceGroup": {
+        "description": "One choice the item offers. Shown, not edited, on the menu page.",
+        "properties": {
+          "group_name": {
+            "title": "Group Name",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/AdminChoiceOption"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "required": {
+            "title": "Required",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "group_name",
+          "required",
+          "options"
+        ],
+        "title": "AdminChoiceGroup",
+        "type": "object"
+      },
+      "AdminChoiceOption": {
+        "properties": {
+          "option_name": {
+            "title": "Option Name",
+            "type": "string"
+          },
+          "price_delta_cents": {
+            "title": "Price Delta Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "option_name",
+          "price_delta_cents"
+        ],
+        "title": "AdminChoiceOption",
+        "type": "object"
+      },
+      "AdminItemView": {
+        "properties": {
+          "allergens_reviewed_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allergens Reviewed On"
+          },
+          "base_price_cents": {
+            "title": "Base Price Cents",
+            "type": "integer"
+          },
+          "category_code": {
+            "title": "Category Code",
+            "type": "string"
+          },
+          "choices": {
+            "items": {
+              "$ref": "#/components/schemas/AdminChoiceGroup"
+            },
+            "title": "Choices",
+            "type": "array"
+          },
+          "description_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description En"
+          },
+          "description_fr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description Fr"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "item_code": {
+            "title": "Item Code",
+            "type": "string"
+          },
+          "name_en": {
+            "title": "Name En",
+            "type": "string"
+          },
+          "name_fr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Fr"
+          },
+          "photo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdminPhotoView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sold_out": {
+            "title": "Sold Out",
+            "type": "boolean"
+          },
+          "stock": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock"
+          }
+        },
+        "required": [
+          "item_code",
+          "category_code",
+          "name_en",
+          "name_fr",
+          "description_en",
+          "description_fr",
+          "base_price_cents",
+          "is_active",
+          "stock",
+          "sold_out",
+          "photo",
+          "allergens_reviewed_on",
+          "choices"
+        ],
+        "title": "AdminItemView",
+        "type": "object"
+      },
+      "AdminMenuView": {
+        "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/AdminCategoryView"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminItemView"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "categories",
+          "items"
+        ],
+        "title": "AdminMenuView",
+        "type": "object"
+      },
+      "AdminPhotoView": {
+        "properties": {
+          "credit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credit"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "credit"
+        ],
+        "title": "AdminPhotoView",
+        "type": "object"
+      },
       "AgentEventKind": {
         "description": "What one row of the agent's event log records.",
         "enum": [
@@ -1099,6 +1329,111 @@
         "title": "HeldStock",
         "type": "object"
       },
+      "ItemChanges": {
+        "additionalProperties": false,
+        "description": "Only the fields that are sent are changed. `stock: null` stops\ntracking stock; leaving `stock` out leaves it as it is.",
+        "properties": {
+          "base_price_cents": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Price Cents"
+          },
+          "category_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Code"
+          },
+          "description_en": {
+            "anyOf": [
+              {
+                "maxLength": 240,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description En"
+          },
+          "description_fr": {
+            "anyOf": [
+              {
+                "maxLength": 240,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description Fr"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "name_en": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name En"
+          },
+          "name_fr": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Fr"
+          },
+          "stock": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock"
+          }
+        },
+        "title": "ItemChanges",
+        "type": "object"
+      },
       "ItemDetails": {
         "properties": {
           "available": {
@@ -1399,6 +1734,83 @@
           "tools_used"
         ],
         "title": "MessageResponse",
+        "type": "object"
+      },
+      "NewItem": {
+        "additionalProperties": false,
+        "properties": {
+          "base_price_cents": {
+            "maximum": 100000.0,
+            "minimum": 0.0,
+            "title": "Base Price Cents",
+            "type": "integer"
+          },
+          "category_code": {
+            "title": "Category Code",
+            "type": "string"
+          },
+          "description_en": {
+            "anyOf": [
+              {
+                "maxLength": 240,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description En"
+          },
+          "description_fr": {
+            "anyOf": [
+              {
+                "maxLength": 240,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description Fr"
+          },
+          "name_en": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name En",
+            "type": "string"
+          },
+          "name_fr": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Fr"
+          },
+          "stock": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock"
+          }
+        },
+        "required": [
+          "name_en",
+          "category_code",
+          "base_price_cents"
+        ],
+        "title": "NewItem",
         "type": "object"
       },
       "OfferedElsewhere": {
@@ -2311,6 +2723,280 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/admin/menu": {
+      "get": {
+        "description": "Items taken off the menu are included, marked `is_active: false`.",
+        "operationId": "read_admin_menu_admin_menu_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminMenuView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Every item, for editing",
+        "tags": [
+          "menu admin"
+        ]
+      }
+    },
+    "/admin/menu/items": {
+      "post": {
+        "description": "Added at the end of its category. Its code is made from the English\nname. Its allergens start unreviewed, so the agent will not discuss them.",
+        "operationId": "create_item_admin_menu_items_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewItem"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminItemView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "summary": "Add an item",
+        "tags": [
+          "menu admin"
+        ]
+      }
+    },
+    "/admin/menu/items/{item_code}": {
+      "patch": {
+        "description": "Only the fields sent are changed. `is_active: false` takes the item\noff the menu; past orders keep it, and `true` puts it back.",
+        "operationId": "update_item_admin_menu_items__item_code__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_code",
+            "required": true,
+            "schema": {
+              "title": "Item Code",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItemChanges"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminItemView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "summary": "Change an item, or take it off the menu",
+        "tags": [
+          "menu admin"
+        ]
+      }
+    },
+    "/admin/menu/items/{item_code}/photo": {
+      "delete": {
+        "description": "The page then shows a placeholder for the item's category.",
+        "operationId": "remove_photo_admin_menu_items__item_code__photo_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_code",
+            "required": true,
+            "schema": {
+              "title": "Item Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminItemView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove an item's photo",
+        "tags": [
+          "menu admin"
+        ]
+      },
+      "put": {
+        "description": "The body is the image itself: JPEG, PNG or WebP, at most 5 MB. Its type\nis read from its bytes, whatever Content-Type says.",
+        "operationId": "set_photo_admin_menu_items__item_code__photo_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_code",
+            "required": true,
+            "schema": {
+              "title": "Item Code",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "image/jpeg": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            },
+            "image/png": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminItemView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "summary": "Set or replace an item's photo",
+        "tags": [
+          "menu admin"
+        ]
+      }
+    },
     "/agent": {
       "get": {
         "operationId": "read_agent_info_agent_get",
@@ -3039,6 +3725,71 @@
           }
         },
         "summary": "One item's allergens",
+        "tags": [
+          "menu"
+        ]
+      }
+    },
+    "/menu/items/{item_code}/photo": {
+      "get": {
+        "description": "The image itself. Asked for with `v`, the version the menu page was\ngiven, it can be cached for good: a new photo comes with a new version.",
+        "operationId": "read_item_photo_menu_items__item_code__photo_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_code",
+            "required": true,
+            "schema": {
+              "title": "Item Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "v",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "V"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/jpeg": {}
+            },
+            "description": "The photo"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "One item's photo",
         "tags": [
           "menu"
         ]
