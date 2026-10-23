@@ -9,7 +9,7 @@ import { installFakeBackend } from '../test/fakeBackend'
 let backend: ReturnType<typeof installFakeBackend>
 
 beforeEach(() => {
-  window.history.replaceState(null, '', '/')
+  window.history.replaceState(null, '', '/live')
   backend = installFakeBackend()
 })
 
@@ -71,7 +71,7 @@ describe('the live session page', () => {
   })
 
   it('opens in the view named in the address', async () => {
-    window.history.replaceState(null, '', '/?view=control-room')
+    window.history.replaceState(null, '', '/live?view=control-room')
 
     render(<App />)
 

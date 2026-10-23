@@ -12,7 +12,7 @@ down:
 # plays the scripted demo.
 demo:
 	docker compose --profile app up --build -d --wait
-	@echo "Open http://localhost:8080 (staff screen: http://localhost:8080/staff)"
+	@echo "Open http://localhost:8080 for Frontdesk (live lane: http://localhost:8080/live)"
 
 # Arize Phoenix on http://localhost:6006. Set TRACING_ENDPOINT to send it traces.
 phoenix:

@@ -4,10 +4,11 @@
  */
 import { useSyncExternalStore } from 'react'
 
+export const HOME_PATH = '/'
 export const STAFF_PATH = '/staff'
 export const INSIGHTS_PATH = '/insights'
 export const MENU_PATH = '/menu'
-export const LIVE_PATH = '/'
+export const LIVE_PATH = '/live'
 
 function subscribe(onChange: () => void): () => void {
   window.addEventListener('popstate', onChange)

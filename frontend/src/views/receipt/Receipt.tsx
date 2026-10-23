@@ -1,3 +1,4 @@
+import { HomeLink } from '../../app/HomeLink'
 import { INSIGHTS_PATH, MENU_PATH, STAFF_PATH } from '../../app/navigation'
 import { PageLink } from '../../app/PageLink'
 import { clock, progressSteps } from '../../session/presentation'
@@ -12,12 +13,13 @@ import { Ledger } from './Ledger'
 import styles from './Receipt.module.css'
 import { ReceiptTape } from './ReceiptTape'
 
-/** A light, printed look: the order is a receipt and the log is a ledger. */
+/** A printed look: the order is a receipt and the log is a ledger. */
 export function Receipt({ live, view, onViewChange }: LiveSessionViewProps) {
   return (
     <div className={styles.screen}>
       <header className={styles.topBar}>
-        <span className={styles.brandName}>{live.agent?.restaurant_name ?? 'Drive-through'}</span>
+        <HomeLink />
+        <span className={styles.brandName}>{live.agent?.restaurant_name ?? 'Restaurant'}</span>
         <span className={styles.meta}>
           {live.cart?.language ?? 'en'} / {clock(live.elapsedSeconds)}
           {live.timerNote && ` / ${live.timerNote}`}
