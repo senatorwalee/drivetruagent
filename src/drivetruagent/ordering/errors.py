@@ -232,3 +232,61 @@ class EmptyCart(OrderingError):
 
     def __init__(self) -> None:
         super().__init__("The cart is empty, so there is nothing to submit.")
+
+
+# --- Editing the menu -------------------------------------------------------
+
+
+class UnknownCategory(OrderingError):
+    code = "unknown_category"
+
+    def __init__(self, category_code: str) -> None:
+        super().__init__(
+            f"There is no menu category with code '{category_code}'.",
+            category_code=category_code,
+        )
+
+
+class DuplicateItemName(OrderingError):
+    """Another item on the menu already has this English name. Two items the
+    customer cannot tell apart by name would leave the agent guessing."""
+
+    code = "duplicate_item_name"
+
+    def __init__(self, name: str, other_item_code: str) -> None:
+        super().__init__(
+            f"'{other_item_code}' is already called '{name}'.",
+            name=name,
+            other_item_code=other_item_code,
+        )
+
+
+class PriceBelowSpecial(OrderingError):
+    """A price no larger than a special's discount would make the item free."""
+
+    code = "price_below_special"
+
+    def __init__(self, item_code: str, special_code: str, discount_cents: int) -> None:
+        super().__init__(
+            f"'{special_code}' takes {discount_cents} cents off '{item_code}', "
+            "so its price must be higher than that.",
+            item_code=item_code,
+            special_code=special_code,
+            discount_cents=discount_cents,
+        )
+
+
+class PhotoNotAccepted(OrderingError):
+    """`reason`: empty, too_large or unsupported_type."""
+
+    code = "photo_not_accepted"
+
+    def __init__(self, reason: str, message: str) -> None:
+        super().__init__(message, reason=reason)
+
+
+class NoPhoto(OrderingError):
+    code = "no_photo"
+
+    def __init__(self, item_code: str) -> None:
+        super().__init__(f"'{item_code}' has no photo.", item_code=item_code)

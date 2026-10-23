@@ -1,16 +1,16 @@
-"""Menu endpoints. Read only."""
+"""Menu endpoints. Read only; changes go through api/menu_admin.py."""
 
 from typing import Annotated
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, Response, status
 from fastapi.responses import JSONResponse
 
 from drivetruagent.api.deps import SessionDep
 from drivetruagent.api.errors import NOT_FOUND, error_response
 from drivetruagent.enums import Language
-from drivetruagent.ordering import allergen_matrix, menu
+from drivetruagent.ordering import allergen_matrix, menu, menu_admin
 from drivetruagent.ordering.allergen_matrix import AllergenReport
-from drivetruagent.ordering.errors import UnknownItem
+from drivetruagent.ordering.errors import NoPhoto, UnknownItem
 from drivetruagent.ordering.views import ItemDetails, MenuMatch, MenuView
 
 router = APIRouter(prefix="/menu", tags=["menu"])
@@ -77,3 +77,34 @@ async def read_item_allergens(
         return await allergen_matrix.item_allergens(db, item_code, None, None, language)
     except UnknownItem as error:
         return error_response(error, status.HTTP_404_NOT_FOUND)
+
+
+@router.get(
+    "/items/{item_code}/photo",
+    responses={
+        **NOT_FOUND,
+        status.HTTP_200_OK: {"content": {"image/jpeg": {}}, "description": "The photo"},
+    },
+    response_class=Response,
+    summary="One item's photo",
+)
+async def read_item_photo(
+    item_code: str, db: SessionDep, v: str | None = None
+) -> Response:
+    """The image itself. Asked for with `v`, the version the menu page was
+    given, it can be cached for good: a new photo comes with a new version."""
+    try:
+        photo = await menu_admin.read_photo(db, item_code)
+    except (UnknownItem, NoPhoto) as error:
+        return error_response(error, status.HTTP_404_NOT_FOUND)
+    fresh = v is not None and photo.sha256.startswith(v)
+    return Response(
+        content=photo.data,
+        media_type=photo.content_type,
+        headers={
+            "Cache-Control": "public, max-age=31536000, immutable"
+            if fresh
+            else "no-cache",
+            "ETag": f'"{photo.sha256}"',
+        },
+    )

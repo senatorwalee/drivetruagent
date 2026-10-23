@@ -4,6 +4,93 @@
  */
 
 export interface paths {
+    "/admin/menu": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every item, for editing
+         * @description Items taken off the menu are included, marked `is_active: false`.
+         */
+        get: operations["read_admin_menu_admin_menu_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/menu/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add an item
+         * @description Added at the end of its category. Its code is made from the English
+         *     name. Its allergens start unreviewed, so the agent will not discuss them.
+         */
+        post: operations["create_item_admin_menu_items_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/menu/items/{item_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change an item, or take it off the menu
+         * @description Only the fields sent are changed. `is_active: false` takes the item
+         *     off the menu; past orders keep it, and `true` puts it back.
+         */
+        patch: operations["update_item_admin_menu_items__item_code__patch"];
+        trace?: never;
+    };
+    "/admin/menu/items/{item_code}/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set or replace an item's photo
+         * @description The body is the image itself: JPEG, PNG or WebP, at most 5 MB. Its type
+         *     is read from its bytes, whatever Content-Type says.
+         */
+        put: operations["set_photo_admin_menu_items__item_code__photo_put"];
+        post?: never;
+        /**
+         * Remove an item's photo
+         * @description The page then shows a placeholder for the item's category.
+         */
+        delete: operations["remove_photo_admin_menu_items__item_code__photo_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/agent": {
         parameters: {
             query?: never;
@@ -287,6 +374,27 @@ export interface paths {
          *     lists say nothing.
          */
         get: operations["read_item_allergens_menu_items__item_code__allergens_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/menu/items/{item_code}/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One item's photo
+         * @description The image itself. Asked for with `v`, the version the menu page was
+         *     given, it can be cached for good: a new photo comes with a new version.
+         */
+        get: operations["read_item_photo_menu_items__item_code__photo_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -773,6 +881,74 @@ export interface components {
                 [key: string]: string[];
             };
         };
+        /** AdminCategoryView */
+        AdminCategoryView: {
+            /** Category Code */
+            category_code: string;
+            /** Category Name */
+            category_name: string;
+        };
+        /**
+         * AdminChoiceGroup
+         * @description One choice the item offers. Shown, not edited, on the menu page.
+         */
+        AdminChoiceGroup: {
+            /** Group Name */
+            group_name: string;
+            /** Options */
+            options: components["schemas"]["AdminChoiceOption"][];
+            /** Required */
+            required: boolean;
+        };
+        /** AdminChoiceOption */
+        AdminChoiceOption: {
+            /** Option Name */
+            option_name: string;
+            /** Price Delta Cents */
+            price_delta_cents: number;
+        };
+        /** AdminItemView */
+        AdminItemView: {
+            /** Allergens Reviewed On */
+            allergens_reviewed_on: string | null;
+            /** Base Price Cents */
+            base_price_cents: number;
+            /** Category Code */
+            category_code: string;
+            /** Choices */
+            choices: components["schemas"]["AdminChoiceGroup"][];
+            /** Description En */
+            description_en: string | null;
+            /** Description Fr */
+            description_fr: string | null;
+            /** Is Active */
+            is_active: boolean;
+            /** Item Code */
+            item_code: string;
+            /** Name En */
+            name_en: string;
+            /** Name Fr */
+            name_fr: string | null;
+            photo: components["schemas"]["AdminPhotoView"] | null;
+            /** Sold Out */
+            sold_out: boolean;
+            /** Stock */
+            stock: number | null;
+        };
+        /** AdminMenuView */
+        AdminMenuView: {
+            /** Categories */
+            categories: components["schemas"]["AdminCategoryView"][];
+            /** Items */
+            items: components["schemas"]["AdminItemView"][];
+        };
+        /** AdminPhotoView */
+        AdminPhotoView: {
+            /** Credit */
+            credit: string | null;
+            /** Version */
+            version: string;
+        };
         /**
          * AgentEventKind
          * @description What one row of the agent's event log records.
@@ -1134,6 +1310,29 @@ export interface components {
             quantity: number;
             status: components["schemas"]["ReservationStatus"];
         };
+        /**
+         * ItemChanges
+         * @description Only the fields that are sent are changed. `stock: null` stops
+         *     tracking stock; leaving `stock` out leaves it as it is.
+         */
+        ItemChanges: {
+            /** Base Price Cents */
+            base_price_cents?: number | null;
+            /** Category Code */
+            category_code?: string | null;
+            /** Description En */
+            description_en?: string | null;
+            /** Description Fr */
+            description_fr?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /** Name En */
+            name_en?: string | null;
+            /** Name Fr */
+            name_fr?: string | null;
+            /** Stock */
+            stock?: number | null;
+        };
         /** ItemDetails */
         ItemDetails: {
             /** Available */
@@ -1249,6 +1448,23 @@ export interface components {
             reply: string;
             /** Tools Used */
             tools_used: string[];
+        };
+        /** NewItem */
+        NewItem: {
+            /** Base Price Cents */
+            base_price_cents: number;
+            /** Category Code */
+            category_code: string;
+            /** Description En */
+            description_en?: string | null;
+            /** Description Fr */
+            description_fr?: string | null;
+            /** Name En */
+            name_en: string;
+            /** Name Fr */
+            name_fr?: string | null;
+            /** Stock */
+            stock?: number | null;
         };
         /**
          * OfferedElsewhere
@@ -1626,6 +1842,207 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    read_admin_menu_admin_menu_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminMenuView"];
+                };
+            };
+        };
+    };
+    create_item_admin_menu_items_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewItem"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminItemView"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_item_admin_menu_items__item_code__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ItemChanges"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminItemView"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    set_photo_admin_menu_items__item_code__photo_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "image/jpeg": string;
+                "image/png": string;
+                "image/webp": string;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminItemView"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    remove_photo_admin_menu_items__item_code__photo_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminItemView"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     read_agent_info_agent_get: {
         parameters: {
             query?: never;
@@ -2100,6 +2517,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AllergenReport"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_item_photo_menu_items__item_code__photo_get: {
+        parameters: {
+            query?: {
+                v?: string | null;
+            };
+            header?: never;
+            path: {
+                item_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The photo */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": unknown;
                 };
             };
             /** @description Not Found */

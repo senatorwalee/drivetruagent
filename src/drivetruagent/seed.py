@@ -8,19 +8,26 @@ Running it again is safe: rows are matched by their codes and updated.
 
 The database is made to match the file. Items, options and combos that are no
 longer in the file are deactivated, not deleted, because past orders refer to
-them.
+them. That includes undoing changes made on the menu page: seeding is a reset.
+
+    uv run python -m drivetruagent.seed --if-empty
+
+loads the menu only into a database that has none, and otherwise leaves it
+alone. The app's container starts that way, so edits survive a restart.
+
+Photos are read from `photos/` next to the menu file.
 """
 
+import argparse
 import asyncio
 import json
-import sys
 import uuid
 from datetime import date
 from pathlib import Path
 from typing import Annotated, Any, Self, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-from sqlalchemy import Table, delete, func, update
+from sqlalchemy import Table, delete, exists, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +40,7 @@ from drivetruagent.db.models import (
     MenuCategory,
     MenuItem,
     MenuItemAlias,
+    MenuItemPhoto,
     Option,
     OptionGroup,
     Special,
@@ -40,6 +48,8 @@ from drivetruagent.db.models import (
 from drivetruagent.db.session import create_engine, create_session_factory
 from drivetruagent.enums import Allergen, AllergenLevel, Language
 from drivetruagent.ordering.inventory import set_on_hand
+from drivetruagent.ordering.menu_admin import store_photo
+from drivetruagent.ordering.photos import check_photo
 
 DEFAULT_MENU_PATH = Path("data/menu.json")
 
@@ -101,6 +111,13 @@ class ItemAllergensSeed(AllergensSeed):
     reviewed_on: date
 
 
+class PhotoSeed(SeedModel):
+    # A file in the photos folder next to the menu file.
+    file: Annotated[str, Field(pattern=r"^[a-z0-9_]+\.(jpg|png|webp)$")]
+    # Who took it: "Jane Doe on Unsplash".
+    credit: NonEmptyText | None = None
+
+
 class OptionSeed(SeedModel):
     code: Code
     name: LocalizedTextSeed
@@ -139,6 +156,8 @@ class MenuItemSeed(SeedModel):
     code: Code
     name: LocalizedTextSeed
     description: LocalizedTextSeed | None = None
+    # Leave it out for no photo: the menu page shows a placeholder.
+    photo: PhotoSeed | None = None
     base_price_cents: int = Field(ge=0)
     # Units on hand. Leave it out for an item whose stock is not tracked.
     stock: int | None = Field(default=None, ge=0)
@@ -326,8 +345,14 @@ async def _upsert(
     return (await session.execute(statement)).scalar_one()
 
 
-async def seed_menu(session: AsyncSession, menu: MenuSeed) -> SeedSummary:
-    """Make the catalog tables match `menu`. The caller owns the transaction."""
+async def seed_menu(
+    session: AsyncSession, menu: MenuSeed, photos_dir: Path | None = None
+) -> SeedSummary:
+    """Make the catalog tables match `menu`. The caller owns the transaction.
+
+    With `photos_dir`, items' photos are made to match too. Without it they
+    are left as they are, which keeps tests from loading 20 images each.
+    """
     item_ids: list[uuid.UUID] = []
     item_ids_by_code: dict[str, uuid.UUID] = {}
     category_ids: dict[str, uuid.UUID] = {}
@@ -392,6 +417,8 @@ async def seed_menu(session: AsyncSession, menu: MenuSeed) -> SeedSummary:
             if item.stock is not None:
                 # Sets the count to the file's value, which also restocks.
                 await set_on_hand(session, item.code, item.stock)
+            if photos_dir is not None:
+                await _seed_photo(session, item_id, item.photo, photos_dir)
 
     await session.execute(
         update(MenuItem)
@@ -577,6 +604,21 @@ async def _replace_allergens(
     return len(rows)
 
 
+async def _seed_photo(
+    session: AsyncSession,
+    item_id: uuid.UUID,
+    photo: PhotoSeed | None,
+    photos_dir: Path,
+) -> None:
+    if photo is None:
+        await session.execute(
+            delete(MenuItemPhoto).where(MenuItemPhoto.item_id == item_id)
+        )
+        return
+    checked = check_photo((photos_dir / photo.file).read_bytes())
+    await store_photo(session, item_id, checked, photo.credit)
+
+
 async def _replace_aliases(
     session: AsyncSession, item_id: uuid.UUID, aliases: dict[Language, list[str]]
 ) -> int:
@@ -591,21 +633,41 @@ async def _replace_aliases(
     return len(rows)
 
 
-async def run(path: Path) -> SeedSummary:
-    """Validate the file, then load it in a single transaction."""
+def photos_dir_for(path: Path) -> Path:
+    return path.parent / "photos"
+
+
+async def run(path: Path, *, if_empty: bool = False) -> SeedSummary | None:
+    """Validate the file, then load it in a single transaction.
+
+    With `if_empty`, do nothing (and return None) if there is a menu already.
+    """
     menu = load_menu(path)
     engine = create_engine(get_settings().database_url)
     try:
         async with create_session_factory(engine).begin() as session:
-            return await seed_menu(session, menu)
+            has_menu = await session.scalar(select(exists().select_from(MenuItem)))
+            if if_empty and has_menu:
+                return None
+            return await seed_menu(session, menu, photos_dir_for(path))
     finally:
         await engine.dispose()
 
 
 def main() -> None:
-    path = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_MENU_PATH
-    summary = asyncio.run(run(path))
-    print(f"Seeded menu from {path}: {summary.model_dump()}")
+    parser = argparse.ArgumentParser(description="Load the menu into the database.")
+    parser.add_argument("path", nargs="?", type=Path, default=DEFAULT_MENU_PATH)
+    parser.add_argument(
+        "--if-empty",
+        action="store_true",
+        help="only if the database has no menu yet; never undo edits",
+    )
+    args = parser.parse_args()
+    summary = asyncio.run(run(args.path, if_empty=args.if_empty))
+    if summary is None:
+        print("A menu is already loaded; left as it is. `make seed` resets it.")
+    else:
+        print(f"Seeded menu from {args.path}: {summary.model_dump()}")
 
 
 if __name__ == "__main__":
