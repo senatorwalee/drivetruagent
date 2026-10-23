@@ -1,3 +1,4 @@
+import { HomeLink } from '../app/HomeLink'
 import { INSIGHTS_PATH, LIVE_PATH, MENU_PATH } from '../app/navigation'
 import { PageLink } from '../app/PageLink'
 import { HandoffQueue } from './HandoffQueue'
@@ -16,9 +17,12 @@ export function StaffPage() {
   return (
     <div className={styles.screen}>
       <header className={styles.topBar}>
-        <h1 className={styles.title}>
-          Staff <span className={styles.titleSub}>Handoffs</span>
-        </h1>
+        <div className={styles.titleGroup}>
+          <HomeLink />
+          <h1 className={styles.title}>
+            Staff <span className={styles.titleSub}>Handoffs</span>
+          </h1>
+        </div>
         <nav className={styles.pageLinks} aria-label="Pages">
           <PageLink to={INSIGHTS_PATH} className={styles.button}>
             Insights

@@ -3,6 +3,7 @@ import { useCallback, useRef, useState } from 'react'
 
 import { api } from '../api/client'
 import type { AdminItem, AdminMenu } from '../api/client'
+import { HomeLink } from '../app/HomeLink'
 import { INSIGHTS_PATH, LIVE_PATH, STAFF_PATH } from '../app/navigation'
 import { PageLink } from '../app/PageLink'
 import { money } from '../session/presentation'
@@ -77,9 +78,12 @@ export function MenuPage() {
   return (
     <div className={staff.screen}>
       <header className={staff.topBar}>
-        <h1 className={staff.title}>
-          Menu <span className={staff.titleSub}>Items and photos</span>
-        </h1>
+        <div className={staff.titleGroup}>
+          <HomeLink />
+          <h1 className={staff.title}>
+            Menu <span className={staff.titleSub}>Items and photos</span>
+          </h1>
+        </div>
         <nav className={staff.pageLinks} aria-label="Pages">
           <PageLink to={STAFF_PATH} className={staff.button}>
             Staff

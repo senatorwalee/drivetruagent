@@ -1,3 +1,4 @@
+import { HomeLink } from '../../app/HomeLink'
 import { INSIGHTS_PATH, MENU_PATH, STAFF_PATH } from '../../app/navigation'
 import { PageLink } from '../../app/PageLink'
 import { clock, progressSteps } from '../../session/presentation'
@@ -13,13 +14,14 @@ import { DecisionStrip } from './DecisionStrip'
 import styles from './MenuBoard.module.css'
 import { OrderPanel } from './OrderPanel'
 
-/** A warm, dark screen like a drive-through sign at night: orb and order first. */
+/** A calm screen like a drive-through sign at night: orb and order first. */
 export function MenuBoard({ live, view, onViewChange }: LiveSessionViewProps) {
   return (
     <div className={styles.screen}>
       <header className={styles.topBar}>
+        <HomeLink />
         <div className={styles.brand}>
-          <span className={styles.brandName}>{live.agent?.restaurant_name ?? 'Drive-through'}</span>
+          <span className={styles.brandName}>{live.agent?.restaurant_name ?? 'Restaurant'}</span>
           <span className={styles.meta}>
             {(live.cart?.language ?? 'en').toUpperCase()} · {clock(live.elapsedSeconds)}
             {live.timerNote && ` · ${live.timerNote}`}

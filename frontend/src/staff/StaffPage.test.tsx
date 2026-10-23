@@ -192,7 +192,7 @@ describe('moving between the two screens', () => {
 
     await userEvent.click(await screen.findByRole('link', { name: 'Live session' }))
 
-    expect(window.location.pathname).toBe('/')
+    expect(window.location.pathname).toBe('/live')
     expect(screen.queryByRole('heading', { name: /Staff/ })).not.toBeInTheDocument()
   })
 

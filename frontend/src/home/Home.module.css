@@ -1,0 +1,234 @@
+/* The home page. Colours and fonts come from theme.css. */
+
+.screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-size: 15px;
+  line-height: 1.45;
+  /* A faint cyan glow behind the headline; the only decoration on the page. */
+  background:
+    radial-gradient(60rem 28rem at 12% -8%, color-mix(in oklch, var(--accent) 12%, transparent), transparent 70%),
+    var(--ground);
+}
+
+.topBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.restaurant {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.banner {
+  margin: 0;
+  padding: 12px 24px;
+  background: var(--raised);
+  border-bottom: 1px solid var(--reject);
+  color: var(--reject);
+}
+
+.main {
+  flex: 1;
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 56px 24px 64px;
+  display: grid;
+  gap: 48px;
+  align-content: start;
+}
+
+/* --- Hero ---------------------------------------------------------------- */
+
+.hero {
+  display: grid;
+  gap: 20px;
+  justify-items: start;
+  max-width: 760px;
+}
+
+.heroMark {
+  width: 48px;
+  height: 48px;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(30px, 5vw, 48px);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.lede {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--muted);
+  font-size: 17px;
+  text-wrap: pretty;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin-top: 4px;
+}
+
+.primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.primary:hover span {
+  translate: 3px 0;
+}
+
+.primary span {
+  transition: translate 0.15s ease;
+}
+
+.note {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+/* --- Cards --------------------------------------------------------------- */
+
+.cards {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 16px;
+}
+
+.cards li {
+  display: flex;
+}
+
+.card {
+  flex: 1;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid var(--hairline);
+  background: var(--panel);
+  color: var(--text);
+  text-decoration: none;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.card:hover {
+  border-color: var(--muted);
+  background: var(--raised);
+}
+
+.cardAccent {
+  border-color: color-mix(in oklch, var(--accent) 55%, var(--hairline));
+}
+
+.card:focus-visible,
+.primary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.cardHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.cardName {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cardAccent .cardName,
+.cardArrow {
+  color: var(--accent);
+}
+
+.cardArrow {
+  transition: translate 0.15s ease;
+}
+
+.card:hover .cardArrow {
+  translate: 3px 0;
+}
+
+.stat {
+  display: grid;
+  gap: 2px;
+}
+
+.figure {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.caption {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.description {
+  align-self: end;
+  color: var(--faint);
+  font-size: 14px;
+}
+
+@media (max-width: 560px) {
+  .main {
+    padding: 32px 16px 48px;
+    gap: 32px;
+  }
+
+  .topBar {
+    padding: 8px 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .cardArrow,
+  .primary span {
+    transition: none;
+  }
+}
