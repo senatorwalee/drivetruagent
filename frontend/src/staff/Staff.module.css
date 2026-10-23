@@ -1,28 +1,14 @@
-/* The staff screen. It shares the control room's cool, dense look: this is a
-   working tool for an employee, not something a customer sees. */
+/* The staff screen: a working tool for an employee, not something a customer
+   sees. Colours and fonts come from theme.css. */
 
 .screen {
-  --ground: oklch(0.16 0.02 255);
-  --panel: oklch(0.2 0.022 255);
-  --raised: oklch(0.245 0.024 255);
-  --hairline: oklch(0.32 0.025 255);
-  --text: oklch(0.94 0.01 250);
-  --muted: oklch(0.74 0.025 250);
-  --faint: oklch(0.62 0.03 250);
-  --accent: oklch(0.82 0.12 200);
-  --on-accent: oklch(0.18 0.03 220);
-  --allow: oklch(0.82 0.12 165);
-  --confirm: oklch(0.82 0.12 85);
-  --reject: oklch(0.76 0.14 25);
-  --escalate: oklch(0.78 0.12 300);
-  --mono: 'IBM Plex Mono', ui-monospace, monospace;
-
+  /* Colours and fonts: theme.css. */
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   background: var(--ground);
   color: var(--text);
-  font-family: 'Sora Variable', 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--font);
   font-size: 15px;
   line-height: 1.45;
 }

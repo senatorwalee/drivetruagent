@@ -1,7 +1,3 @@
-import '@fontsource-variable/sora'
-import '@fontsource/ibm-plex-mono/400.css'
-import '@fontsource/ibm-plex-mono/500.css'
-
 import { INSIGHTS_PATH, LIVE_PATH, MENU_PATH } from '../app/navigation'
 import { PageLink } from '../app/PageLink'
 import { HandoffQueue } from './HandoffQueue'

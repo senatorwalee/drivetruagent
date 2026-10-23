@@ -1,7 +1,3 @@
-import '@fontsource-variable/archivo'
-import '@fontsource/space-mono/400.css'
-import '@fontsource/space-mono/700.css'
-
 import { INSIGHTS_PATH, MENU_PATH, STAFF_PATH } from '../../app/navigation'
 import { PageLink } from '../../app/PageLink'
 import { clock, progressSteps } from '../../session/presentation'

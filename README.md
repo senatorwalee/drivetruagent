@@ -405,8 +405,12 @@ How it is put together:
 - **API types are generated, and checked.** `make gen-api` writes TypeScript
   types from the backend's API description. A backend test fails if that
   description is out of date, so the two cannot drift apart unnoticed.
-- **One test suite covers all three views.** They look different but must
-  show the same things and offer the same controls.
+- **One test suite covers all three views.** They are laid out differently but
+  must show the same things and offer the same controls.
+- **One look for the whole app.** Colours and fonts (Sora, IBM Plex Mono, a
+  cool dark palette with a cyan accent) live in `frontend/src/theme.css`, loaded
+  once. Every page and view draws with its tokens, so a change there reaches
+  everything.
 
 ## Evals
 

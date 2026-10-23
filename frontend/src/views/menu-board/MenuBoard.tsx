@@ -1,7 +1,3 @@
-import '@fontsource-variable/bricolage-grotesque'
-import '@fontsource-variable/figtree'
-import '@fontsource-variable/jetbrains-mono'
-
 import { INSIGHTS_PATH, MENU_PATH, STAFF_PATH } from '../../app/navigation'
 import { PageLink } from '../../app/PageLink'
 import { clock, progressSteps } from '../../session/presentation'

@@ -1,22 +1,23 @@
-/* Receipt: paper, black ink and one signal colour, like a printed ticket. */
+/* Receipt: rules, dashes and one signal colour, like a printed ticket.
+   Colours and fonts come from theme.css. */
 
 .screen {
-  --ground: oklch(0.955 0.004 90);
-  --paper: oklch(0.99 0.003 90);
-  --ink: oklch(0.18 0.005 90);
-  --muted: oklch(0.42 0.006 90);
-  --rule: oklch(0.82 0.005 90);
-  --dash: oklch(0.6 0.005 90);
-  --accent: oklch(0.5 0.19 30);
-  --listening: oklch(0.45 0.16 255);
-  --mono: 'Space Mono', ui-monospace, monospace;
+  /* The receipt's own names for the theme's colours (theme.css). */
+  --paper: var(--panel);
+  --ink: var(--text);
+  --rule: var(--hairline);
+  --dash: var(--faint);
+  /* Strong rules and outlines; printed solid, a control is filled in cyan. */
+  --stroke: var(--muted);
+  --fill: var(--accent);
+  --on-fill: var(--on-accent);
 
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   background: var(--ground);
   color: var(--ink);
-  font-family: 'Archivo Variable', 'Helvetica Neue', sans-serif;
+  font-family: var(--font);
   font-size: 16px;
   line-height: 1.45;
 }
@@ -37,7 +38,7 @@
   align-items: center;
   gap: 12px 20px;
   padding: 14px 32px;
-  border-bottom: 3px solid var(--ink);
+  border-bottom: 3px solid var(--stroke);
 }
 
 .brandName {
@@ -59,7 +60,7 @@
   padding: 0;
   display: flex;
   flex-wrap: wrap;
-  border: 1px solid var(--ink);
+  border: 1px solid var(--stroke);
   font-family: var(--mono);
   font-size: 13px;
 }
@@ -70,7 +71,7 @@
 }
 
 .step + .step {
-  border-left: 1px solid var(--ink);
+  border-left: 1px solid var(--stroke);
 }
 
 .step[data-status='done'] {
@@ -78,8 +79,8 @@
 }
 
 .step[data-status='current'] {
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--fill);
+  color: var(--on-fill);
   font-weight: 700;
 }
 
@@ -95,7 +96,7 @@
 .switcherOption {
   min-height: 44px;
   padding: 0 12px;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--stroke);
   background: transparent;
   color: var(--ink);
   font: inherit;
@@ -108,8 +109,8 @@
 
 .buttonSolid,
 .switcherSelected {
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--fill);
+  color: var(--on-fill);
 }
 
 .switcher {
@@ -124,7 +125,7 @@
   margin: 0;
   padding: 12px 32px;
   background: var(--accent);
-  color: var(--paper);
+  color: var(--on-accent);
   font-family: var(--mono);
   font-size: 14px;
 }
@@ -286,14 +287,14 @@
 .hint {
   margin: 0;
   padding: 16px 0;
-  border-top: 1px solid var(--ink);
+  border-top: 1px solid var(--stroke);
   color: var(--muted);
 }
 
 .script {
   display: flex;
   flex-direction: column;
-  border-top: 1px solid var(--ink);
+  border-top: 1px solid var(--stroke);
 }
 
 .scriptLine {
@@ -321,7 +322,7 @@
 
 .scriptLine[data-latest='true'] {
   color: var(--ink);
-  border-bottom-color: var(--ink);
+  border-bottom-color: var(--fill);
 }
 
 .scriptLine[data-latest='true'][data-speaker='agent'] {
@@ -359,7 +360,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 12px;
-  border: 1px dashed var(--ink);
+  border: 1px dashed var(--stroke);
   background: transparent;
   color: var(--ink);
   font-family: var(--mono);
@@ -382,7 +383,7 @@
 .composer {
   display: flex;
   align-items: stretch;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--stroke);
   background: var(--paper);
 }
 
@@ -394,7 +395,7 @@
   align-items: center;
   justify-content: center;
   border: 0;
-  border-right: 2px solid var(--ink);
+  border-right: 2px solid var(--stroke);
   background: transparent;
   color: var(--ink);
 }
@@ -419,8 +420,8 @@
   flex: none;
   padding: 0 24px;
   border: 0;
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--fill);
+  color: var(--on-fill);
   font: inherit;
   font-weight: 700;
   font-size: 13px;
@@ -453,7 +454,7 @@
   background: var(--paper);
   border-top: 2px dashed var(--dash);
   border-bottom: 2px dashed var(--dash);
-  box-shadow: 0 18px 40px -24px oklch(0.18 0.005 90 / 0.35);
+  box-shadow: 0 18px 40px -24px oklch(0 0 0 / 0.6);
   font-family: var(--mono);
   font-size: 14px;
 }
@@ -468,7 +469,7 @@
 
 .tapeTitle {
   margin: 0;
-  font-family: 'Archivo Variable', 'Helvetica Neue', sans-serif;
+  font-family: var(--font);
   font-weight: 800;
   font-size: 20px;
   letter-spacing: -0.01em;
@@ -592,7 +593,7 @@
 .totals .totalLabel,
 .totals .totalValue {
   padding-top: 10px;
-  font-family: 'Archivo Variable', 'Helvetica Neue', sans-serif;
+  font-family: var(--font);
   font-weight: 800;
 }
 
@@ -625,7 +626,7 @@
 
 .ledgerScroll {
   overflow-x: auto;
-  border-top: 2px solid var(--ink);
+  border-top: 2px solid var(--stroke);
 }
 
 .table {
@@ -659,7 +660,7 @@
 }
 
 .table tbody tr:last-child td {
-  border-bottom: 2px solid var(--ink);
+  border-bottom: 2px solid var(--stroke);
 }
 
 .ledgerEmpty,
@@ -686,7 +687,7 @@
 .verdict[data-kind='escalate'] {
   padding: 2px 8px;
   background: var(--accent);
-  color: var(--paper);
+  color: var(--on-accent);
 }
 
 /* --- Motion -------------------------------------------------------------- */
@@ -755,8 +756,8 @@ a.button {
 
 /* On a call: the button is printed solid, and pressing it again hangs up. */
 .mic[aria-pressed='true'] {
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--fill);
+  color: var(--on-fill);
 }
 
 .mic[data-status='connecting'] {

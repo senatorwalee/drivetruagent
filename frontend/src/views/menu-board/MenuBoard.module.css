@@ -1,34 +1,14 @@
-/* Menu board: a warm, dark screen like a drive-through sign at night. */
+/* Menu board: a big, calm screen like a drive-through sign at night, built
+   around the agent's orb. Colours and fonts come from theme.css. */
 
 .screen {
-  /* Surfaces */
-  --ground: oklch(0.17 0.012 60);
-  --panel: oklch(0.215 0.013 60);
-  --raised: oklch(0.26 0.014 60);
-  --hairline: oklch(0.33 0.014 60);
-  /* Text */
-  --text: oklch(0.95 0.012 85);
-  --muted: oklch(0.76 0.02 75);
-  --faint: oklch(0.64 0.02 70);
-  /* Accents */
-  --accent: oklch(0.78 0.15 60);
-  --on-accent: oklch(0.2 0.03 60);
-  --listening: oklch(0.8 0.1 205);
-  /* Decisions: same lightness and strength, different hue */
-  --allow: oklch(0.8 0.13 165);
-  --confirm: oklch(0.84 0.14 90);
-  --reject: oklch(0.76 0.15 25);
-  --escalate: oklch(0.78 0.13 300);
-  /* Type */
-  --display: 'Bricolage Grotesque Variable', 'Trebuchet MS', sans-serif;
-  --mono: 'JetBrains Mono Variable', ui-monospace, monospace;
-
+  /* Colours and fonts: theme.css. */
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   background: var(--ground);
   color: var(--text);
-  font-family: 'Figtree Variable', 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--font);
   font-size: 16px;
   line-height: 1.45;
 }
@@ -59,7 +39,7 @@
 }
 
 .brandName {
-  font-family: var(--display);
+  font-family: var(--font);
   font-weight: 700;
   font-size: 24px;
   letter-spacing: -0.01em;
@@ -294,13 +274,13 @@
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: oklch(0.97 0.03 85);
+  background: var(--text);
   opacity: 0.9;
 }
 
 .stateLabel {
   margin: 0;
-  font-family: var(--display);
+  font-family: var(--font);
   font-weight: 500;
   font-size: 26px;
   letter-spacing: -0.01em;
@@ -529,7 +509,7 @@
 
 .orderTitle {
   margin: 0;
-  font-family: var(--display);
+  font-family: var(--font);
   font-weight: 700;
   font-size: 26px;
   letter-spacing: -0.01em;
@@ -655,7 +635,7 @@
 .totals .totalValue {
   padding-top: 12px;
   border-top: 1px solid var(--hairline);
-  font-family: var(--display);
+  font-family: var(--font);
   font-weight: 700;
 }
 
@@ -756,7 +736,7 @@
 .badge[data-kind='confirm'] {
   --kind: var(--confirm);
   background: var(--confirm);
-  color: oklch(0.22 0.04 90);
+  color: var(--on-light);
   font-weight: 500;
 }
 
