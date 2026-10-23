@@ -40,6 +40,7 @@ built piece by piece.
 | 18 | One command: `make demo` runs the whole app in Docker, with or without a key | Done; checked in a browser |
 | 19 | Not on the menu: say so, offer what's close, never what the guest is avoiding | Done; evals pass against the real model |
 | 20 | Insights page: what guests asked for that the menu couldn't fill, at `/insights` | Done; checked in a browser with real conversations |
+| 21 | Menu page: add, edit and take off items, with a photo for each, at `/menu` | Done; checked in a browser |
 | Later | Demo polish: cost readout, French review, demo script | Planned |
 
 ## Stack
@@ -63,10 +64,12 @@ You need Docker and `make`.
 make demo
 ```
 
-Then open <http://localhost:8080> (staff screen: <http://localhost:8080/staff>).
+Then open <http://localhost:8080> (staff screen: <http://localhost:8080/staff>,
+menu page: <http://localhost:8080/menu>).
 That builds and starts Postgres, the API and the web app; the API migrates the
-database and loads the menu and the knowledge documents on every start, and
-nginx serves the web app and forwards `/api` to the API.
+database, loads the menu the first time (so edits made on the menu page survive
+a restart) and the knowledge documents on every start, and nginx serves the web
+app and forwards `/api` to the API.
 
 - **No key needed.** Without an `OPENAI_API_KEY` it plays the scripted demo
   conversation (type the suggested lines), and knowledge search uses the local
@@ -106,7 +109,7 @@ collide with a Postgres installed directly on your machine.
 | `make phoenix` | Start Arize Phoenix on <http://localhost:6006> for tracing |
 | `make dev` | Run the API with auto-reload |
 | `make migrate` | Apply all database migrations |
-| `make seed` | Load `data/menu.json` into the database; safe to run repeatedly |
+| `make seed` | Load `data/menu.json` and its photos into the database; resets edits made on the menu page |
 | `make ingest` | Load `knowledge/` into the database and embed it; only changes are re-embedded |
 | `make chat` | Talk to the agent in the terminal (needs an OpenAI or Gemini key) |
 | `make eval` | Run the evals against the real model (needs an OpenAI or Gemini key) |
@@ -150,6 +153,35 @@ The file is validated in full before anything is written, and the load runs in
 one transaction. The database is made to match the file: items and options
 dropped from the file are deactivated, not deleted, because past orders refer
 to them.
+
+### The menu page
+
+After the first load, the database is the menu, and a manager changes it at
+<http://localhost:5174/menu> (or the Menu link on any screen). `make seed`
+puts it back to the file, on purpose; the Docker container seeds only an empty
+database (`seed --if-empty`), so a restart keeps every edit.
+
+- **Every item has a photo.** The 20 seed items come with Unsplash photos in
+  `data/photos/` (credits in `data/photos/CREDITS.md`). An item with no photo
+  shows a placeholder drawn for its category, and a "No photo" flag.
+- **Add, edit, take off, put back.** Names and descriptions in both languages,
+  category, price and stock are edited here. Choices, aliases and allergens
+  stay in `data/menu.json` and are shown read-only.
+- **Taking an item off never deletes it.** Past orders point at it. It
+  disappears for guests, the agent and the specials, and can be put back.
+- **Codes never change.** A new item's code is made from its English name
+  (`spicy_chicken_wrap`); renaming it later keeps the code.
+- **A new item's allergens are unreviewed**, so the agent will not discuss
+  them and hands the question to a person. The page says so.
+- **The backend refuses what would confuse the agent or the till:** a second
+  item with the same English name, or a price a running special would make free.
+- **Photos are stored in Postgres**, in their own table so reading the menu
+  never loads them. The type is checked from the file's first bytes, not what
+  the browser claims; the browser shrinks a photo to 1200 px before sending it;
+  at most 5 MB. A photo's URL carries its hash, so it is cached for good and a
+  new photo is a new URL.
+- Changes reach the agent from the next session, whose instructions are built
+  from the menu when it starts.
 
 ## Carts store choices; orders store frozen prices
 
@@ -999,6 +1031,12 @@ Run `make dev` and open <http://127.0.0.1:8000/docs> to try these.
 | `GET /menu/search?q=` | Find items matching what a customer said |
 | `GET /menu/items/{code}` | One item with its choices |
 | `GET /menu/items/{code}/allergens` | One item's allergens, and which choices add more |
+| `GET /menu/items/{code}/photo` | The item's photo; `?v=` (its version) makes it cacheable for good |
+| `GET /admin/menu` | Every item for the menu page, those taken off too |
+| `POST /admin/menu/items` | Add an item |
+| `PATCH /admin/menu/items/{code}` | Change an item; `is_active: false` takes it off the menu |
+| `PUT /admin/menu/items/{code}/photo` | Set or replace its photo (the image is the body) |
+| `DELETE /admin/menu/items/{code}/photo` | Remove its photo |
 | `GET /insights/unmet-requests?days=7` | What guests asked for that the menu couldn't fill, most asked first |
 | `GET /handoffs` | The handoff queue, longest waiting first; `?status=`, `?session_id=` |
 | `GET /handoffs/{id}` | One handoff's package |
