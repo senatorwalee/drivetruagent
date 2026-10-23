@@ -2,7 +2,7 @@ import '@fontsource-variable/sora'
 import '@fontsource/ibm-plex-mono/400.css'
 import '@fontsource/ibm-plex-mono/500.css'
 
-import { INSIGHTS_PATH, LIVE_PATH } from '../app/navigation'
+import { INSIGHTS_PATH, LIVE_PATH, MENU_PATH } from '../app/navigation'
 import { PageLink } from '../app/PageLink'
 import { HandoffQueue } from './HandoffQueue'
 import { PackageView } from './PackageView'
@@ -26,6 +26,9 @@ export function StaffPage() {
         <nav className={styles.pageLinks} aria-label="Pages">
           <PageLink to={INSIGHTS_PATH} className={styles.button}>
             Insights
+          </PageLink>
+          <PageLink to={MENU_PATH} className={styles.button}>
+            Menu
           </PageLink>
           <PageLink to={LIVE_PATH} className={styles.button}>
             Live session

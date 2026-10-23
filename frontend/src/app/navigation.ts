@@ -1,11 +1,12 @@
 /**
- * Just enough routing for three pages: which path is showing, and a way to
+ * Just enough routing for a few pages: which path is showing, and a way to
  * change it without reloading. A router library would be more than this needs.
  */
 import { useSyncExternalStore } from 'react'
 
 export const STAFF_PATH = '/staff'
 export const INSIGHTS_PATH = '/insights'
+export const MENU_PATH = '/menu'
 export const LIVE_PATH = '/'
 
 function subscribe(onChange: () => void): () => void {

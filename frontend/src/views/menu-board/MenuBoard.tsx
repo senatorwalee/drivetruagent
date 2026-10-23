@@ -2,7 +2,7 @@ import '@fontsource-variable/bricolage-grotesque'
 import '@fontsource-variable/figtree'
 import '@fontsource-variable/jetbrains-mono'
 
-import { INSIGHTS_PATH, STAFF_PATH } from '../../app/navigation'
+import { INSIGHTS_PATH, MENU_PATH, STAFF_PATH } from '../../app/navigation'
 import { PageLink } from '../../app/PageLink'
 import { clock, progressSteps } from '../../session/presentation'
 import type { LiveSession } from '../../session/useLiveSession'
@@ -41,6 +41,9 @@ export function MenuBoard({ live, view, onViewChange }: LiveSessionViewProps) {
           </PageLink>
           <PageLink to={INSIGHTS_PATH} className={styles.button}>
             Insights
+          </PageLink>
+          <PageLink to={MENU_PATH} className={styles.button}>
+            Menu
           </PageLink>
           <button type="button" className={styles.button} aria-pressed={live.paused} onClick={live.togglePause}>
             {live.paused ? <PlayIcon /> : <PauseIcon />}

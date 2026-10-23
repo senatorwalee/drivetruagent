@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { api } from '../api/client'
-import { LIVE_PATH, STAFF_PATH } from '../app/navigation'
+import { LIVE_PATH, MENU_PATH, STAFF_PATH } from '../app/navigation'
 import { PageLink } from '../app/PageLink'
 import { useNow } from '../session/useNow'
 import staff from '../staff/Staff.module.css'
@@ -49,6 +49,9 @@ export function InsightsPage() {
         <nav className={styles.links} aria-label="Pages">
           <PageLink to={STAFF_PATH} className={staff.button}>
             Staff
+          </PageLink>
+          <PageLink to={MENU_PATH} className={staff.button}>
+            Menu
           </PageLink>
           <PageLink to={LIVE_PATH} className={staff.button}>
             Live session
