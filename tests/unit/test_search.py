@@ -251,6 +251,25 @@ def test_choices_counts_and_filler_are_never_not_offered() -> None:
     assert not_offered(leftover, offered={"large", "small"}) == ("oat",)
 
 
+@pytest.mark.parametrize(
+    ("said", "choice"),
+    [
+        ("grande", "grand"),
+        ("grandes", "grand"),
+        ("petite", "petit"),
+        ("moyenne", "moyen"),
+        ("épicée", "épicé"),
+        ("epicee", "épicé"),
+    ],
+)
+def test_a_french_choice_is_offered_in_either_gender(said: str, choice: str) -> None:
+    assert not_offered((said,), offered={choice}) == ()
+
+
+def test_gender_folding_does_not_let_other_words_through() -> None:
+    assert not_offered(("grande", "glacee"), offered={"petit", "grand"}) == ("glacee",)
+
+
 def test_a_phrase_counts_only_as_whole_words_in_order() -> None:
     assert contains_phrase(("medium", "fry", "cheeseburger"), ("cheeseburger",))
     assert not contains_phrase(("iced", "coffee"), ("iced", "tea"))

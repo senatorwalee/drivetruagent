@@ -119,12 +119,32 @@ def not_offered(leftover: Sequence[str], offered: Collection[str]) -> tuple[str,
     `offered` holds every word that is fine to have left over: the item's own
     choices ("large", "vanilla") and words of other items the customer also
     named ("fries and a cheeseburger"). Counts and filler are always fine.
+    French choices match in either gender: "une grande frite" is size Grand.
     """
+    folded = {_gender_folded(word) for word in offered}
     return tuple(
         word
         for word in leftover
-        if word not in offered and word not in _COUNT_AND_FILLER and not word.isdigit()
+        if word not in offered
+        and _gender_folded(word) not in folded
+        and word not in _COUNT_AND_FILLER
+        and not word.isdigit()
     )
+
+
+def _gender_folded(word: str) -> str:
+    """A French adjective without its feminine or plural ending: grande and
+    grandes are grand, petite is petit, moyenne is moyen, épicée is épicé.
+    Applied to both sides of a comparison, so an English word that loses a
+    final e still matches itself."""
+    folded = _singular(_without_accents(word))
+    if folded.endswith("ee"):
+        folded = folded[:-1]
+    if folded.endswith("nne"):
+        folded = folded[:-2]
+    if len(folded) > 3 and folded.endswith("e"):
+        folded = folded[:-1]
+    return folded
 
 
 def contains_phrase(words: Sequence[str], phrase: Sequence[str]) -> bool:
