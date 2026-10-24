@@ -29,7 +29,7 @@ async def test_stock_levels_list_every_tracked_item(client: httpx.AsyncClient) -
 
     assert response.status_code == 200
     levels = response.json()
-    assert len(levels) == 20
+    assert len(levels) == 21
     assert [level["item_code"] for level in levels] == sorted(
         level["item_code"] for level in levels
     )

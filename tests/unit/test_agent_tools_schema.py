@@ -11,6 +11,8 @@ EXPECTED_TOOLS = {
     "get_item_details",
     "get_todays_specials",
     "check_allergens",
+    "check_diet",
+    "replace_item",
     "search_knowledge",
     "add_item",
     "update_item",

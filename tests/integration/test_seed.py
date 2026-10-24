@@ -102,7 +102,7 @@ async def test_real_menu_file_loads(db_session: AsyncSession) -> None:
     summary = await seed_menu(db_session, load_menu(MENU_PATH))
 
     assert summary.categories == 4
-    assert summary.items == 20
+    assert summary.items == 21
     assert await row_counts(db_session) == {
         "menu_categories": summary.categories,
         "menu_items": summary.items,

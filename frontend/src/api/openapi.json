@@ -2010,6 +2010,54 @@
         "title": "RemoveLine",
         "type": "object"
       },
+      "ReplaceLine": {
+        "additionalProperties": false,
+        "description": "Swap a line for another item in one step: \"the fish burger instead\".\nIf the new item can't be added, the line stays as it was.",
+        "properties": {
+          "item_code": {
+            "minLength": 1,
+            "title": "Item Code",
+            "type": "string"
+          },
+          "line_no": {
+            "title": "Line No",
+            "type": "integer"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "selections": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Selections",
+            "type": "object"
+          },
+          "type": {
+            "const": "replace_line",
+            "default": "replace_line",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "line_no",
+          "item_code"
+        ],
+        "title": "ReplaceLine",
+        "type": "object"
+      },
       "RequestConfirmation": {
         "additionalProperties": false,
         "description": "The agent is about to read the order back and ask if it is right.",
@@ -4149,6 +4197,7 @@
                   "mapping": {
                     "add_item": "#/components/schemas/AddItem",
                     "remove_line": "#/components/schemas/RemoveLine",
+                    "replace_line": "#/components/schemas/ReplaceLine",
                     "request_confirmation": "#/components/schemas/RequestConfirmation",
                     "submit_order": "#/components/schemas/SubmitOrder",
                     "update_line": "#/components/schemas/UpdateLine"
@@ -4164,6 +4213,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/RemoveLine"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ReplaceLine"
                   },
                   {
                     "$ref": "#/components/schemas/RequestConfirmation"

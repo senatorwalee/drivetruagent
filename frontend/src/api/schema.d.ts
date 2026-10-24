@@ -1557,6 +1557,28 @@ export interface components {
             type: "remove_line";
         };
         /**
+         * ReplaceLine
+         * @description Swap a line for another item in one step: "the fish burger instead".
+         *     If the new item can't be added, the line stays as it was.
+         */
+        ReplaceLine: {
+            /** Item Code */
+            item_code: string;
+            /** Line No */
+            line_no: number;
+            /** Quantity */
+            quantity?: number | null;
+            /** Selections */
+            selections?: {
+                [key: string]: string[];
+            };
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "replace_line";
+        };
+        /**
          * RequestConfirmation
          * @description The agent is about to read the order back and ask if it is right.
          */
@@ -2804,7 +2826,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AddItem"] | components["schemas"]["UpdateLine"] | components["schemas"]["RemoveLine"] | components["schemas"]["RequestConfirmation"] | components["schemas"]["SubmitOrder"];
+                "application/json": components["schemas"]["AddItem"] | components["schemas"]["UpdateLine"] | components["schemas"]["RemoveLine"] | components["schemas"]["ReplaceLine"] | components["schemas"]["RequestConfirmation"] | components["schemas"]["SubmitOrder"];
             };
         };
         responses: {

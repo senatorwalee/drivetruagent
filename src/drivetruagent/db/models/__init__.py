@@ -6,6 +6,7 @@ which tables exist, so a model that is not imported here is invisible to it.
 
 from drivetruagent.db.models.catalog import (
     AllergenDeclaration,
+    DietSuitability,
     MenuCategory,
     MenuItem,
     MenuItemAlias,
@@ -54,6 +55,7 @@ __all__ = [
     "ComboRule",
     "ComboRuleSlot",
     "CustomerSession",
+    "DietSuitability",
     "Handoff",
     "IdempotencyRecord",
     "Inventory",

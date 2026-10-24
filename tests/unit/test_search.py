@@ -168,7 +168,7 @@ def test_mixed_languages_still_match() -> None:
 
 
 def test_a_vague_word_returns_every_candidate_with_the_same_score() -> None:
-    """ "Burger" could be any of five; the agent has to ask which."""
+    """ "Burger" could be any of six; the agent has to ask which."""
     result = scores("burger")
 
     assert set(result) == {
@@ -177,6 +177,7 @@ def test_a_vague_word_returns_every_candidate_with_the_same_score() -> None:
         "double_cheeseburger",
         "chicken_burger",
         "veggie_burger",
+        "fish_burger",
     }
     assert set(result.values()) == {100}
 

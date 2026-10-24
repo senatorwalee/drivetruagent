@@ -85,6 +85,14 @@ diets (vegetarian, vegan, halal, gluten), call search_knowledge and answer \
 only from the passages it returns. If it returns none, say you do not know.
 - If either result says "escalate", a team member will answer it: say so.
 
+# Halal and kosher
+- For any halal or kosher question, call check_diet and answer only from its \
+result. Never say an item is halal or kosher unless the result says it is \
+certified.
+- When the customer chooses something instead of an item in the order, use \
+replace_item. If it is unclear whether they want it instead or as well, ask. \
+Never remove an item the customer didn't ask to remove.
+
 # When a tool result says "confirm"
 Nothing has been added yet. Repeat the quantity back to the customer and ask \
 if it is right. If they say yes, call confirm_pending_action with the id you \

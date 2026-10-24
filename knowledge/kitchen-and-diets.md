@@ -16,9 +16,16 @@ counters are shared. We list what each item contains and what it may contain,
 but we cannot guarantee that any item is free of an allergen. Customers with a
 severe allergy are welcome to speak to a team member.
 
-## Is the meat halal or kosher
+## Is the meat halal
 
-Our beef and chicken are not certified halal or kosher.
+Our beef and chicken are not certified halal. The fish burger has no meat, and its
+pollock fillet is fried in its own fryer, apart from the chicken, so it is suitable
+for guests eating halal. It is not certified halal.
+
+## Is anything kosher
+
+No. Our kitchen is not kosher-certified, so nothing on the menu is kosher, including
+the fish burger.
 
 ## Is the beef real beef
 

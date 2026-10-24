@@ -37,6 +37,7 @@ from drivetruagent.db.models import (
     AllergenDeclaration,
     ComboRule,
     ComboRuleSlot,
+    DietSuitability,
     MenuCategory,
     MenuItem,
     MenuItemAlias,
@@ -46,7 +47,7 @@ from drivetruagent.db.models import (
     Special,
 )
 from drivetruagent.db.session import create_engine, create_session_factory
-from drivetruagent.enums import Allergen, AllergenLevel, Language
+from drivetruagent.enums import Allergen, AllergenLevel, Diet, DietStatus, Language
 from drivetruagent.ordering.inventory import set_on_hand
 from drivetruagent.ordering.menu_admin import store_photo
 from drivetruagent.ordering.photos import check_photo
@@ -152,6 +153,14 @@ class OptionGroupSeed(SeedModel):
         return self
 
 
+class DietSeed(SeedModel):
+    """An item reviewed for a diet: certified, or suitable but not certified,
+    and why, in words a guest can hear."""
+
+    status: DietStatus
+    note: LocalizedTextSeed
+
+
 class MenuItemSeed(SeedModel):
     code: Code
     name: LocalizedTextSeed
@@ -166,6 +175,9 @@ class MenuItemSeed(SeedModel):
     # Leave it out for an item whose allergens have not been reviewed: the
     # agent then says nothing about them and hands the question to a person.
     allergens: ItemAllergensSeed | None = None
+    # Diets the item has been reviewed for. Leave a diet out and the item is
+    # not listed as suitable for it.
+    diets: dict[Diet, DietSeed] = Field(default_factory=dict)
 
     @field_validator("aliases")
     @classmethod
@@ -310,6 +322,7 @@ class SeedSummary(BaseModel):
     combos: int
     specials: int
     allergen_declarations: int
+    diet_entries: int = 0
 
 
 def _require_unique(values: list[str], what: str) -> None:
@@ -356,7 +369,7 @@ async def seed_menu(
     item_ids: list[uuid.UUID] = []
     item_ids_by_code: dict[str, uuid.UUID] = {}
     category_ids: dict[str, uuid.UUID] = {}
-    group_count = option_count = alias_count = allergen_count = 0
+    group_count = option_count = alias_count = allergen_count = diet_count = 0
 
     for category_position, category in enumerate(menu.categories):
         category_id = category_ids[category.code] = await _upsert(
@@ -414,6 +427,7 @@ async def seed_menu(
                 item,
                 [option_ids for _, option_ids in seeded_groups],
             )
+            diet_count += await _replace_diets(session, item_id, item)
             if item.stock is not None:
                 # Sets the count to the file's value, which also restocks.
                 await set_on_hand(session, item.code, item.stock)
@@ -437,6 +451,7 @@ async def seed_menu(
         combos=len(menu.combos),
         specials=len(menu.specials),
         allergen_declarations=allergen_count,
+        diet_entries=diet_count,
     )
 
 
@@ -566,6 +581,27 @@ async def _seed_group(
         .values(is_active=False, updated_at=func.now())
     )
     return group_id, option_ids
+
+
+async def _replace_diets(
+    session: AsyncSession, item_id: uuid.UUID, item: MenuItemSeed
+) -> int:
+    """Make the item's diet entries match the file."""
+    rows = [
+        {
+            "item_id": item_id,
+            "diet": diet,
+            "status": entry.status,
+            "note_i18n": entry.note.model_dump(),
+        }
+        for diet, entry in item.diets.items()
+    ]
+    await session.execute(
+        delete(DietSuitability).where(DietSuitability.item_id == item_id)
+    )
+    if rows:
+        await session.execute(insert(DietSuitability), rows)
+    return len(rows)
 
 
 async def _replace_allergens(

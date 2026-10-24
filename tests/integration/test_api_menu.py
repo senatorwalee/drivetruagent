@@ -26,7 +26,7 @@ async def test_menu_lists_every_item_by_category_in_display_order(
         "drinks",
         "desserts",
     ]
-    assert sum(len(category["items"]) for category in categories) == 20
+    assert sum(len(category["items"]) for category in categories) == 21
     assert [item["item_code"] for item in categories[1]["items"]] == [
         "fries",
         "onion_rings",
@@ -69,7 +69,7 @@ async def test_inactive_item_is_left_out_of_the_menu(
 
     codes = {item["item_code"] for c in categories for item in c["items"]}
     assert "cookie" not in codes
-    assert len(codes) == 19
+    assert len(codes) == 20
 
 
 async def test_unsupported_language_is_rejected(client: httpx.AsyncClient) -> None:

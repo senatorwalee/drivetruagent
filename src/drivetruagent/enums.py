@@ -134,6 +134,21 @@ class AllergenLevel(StrEnum):
     MAY_CONTAIN = "may_contain"
 
 
+class Diet(StrEnum):
+    """Religious dietary rules a guest may ask about."""
+
+    HALAL = "halal"
+    KOSHER = "kosher"
+
+
+class DietStatus(StrEnum):
+    # Holds a certificate from a recognised body.
+    CERTIFIED = "certified"
+    # Nothing the diet forbids, and prepared apart, but not certified. The
+    # agent says exactly that, never just "halal".
+    SUITABLE = "suitable"
+
+
 class KnowledgeAudience(StrEnum):
     """Who a knowledge document may be shown to."""
 
