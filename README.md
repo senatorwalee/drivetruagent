@@ -16,7 +16,7 @@ built piece by piece.
 | Piece | What it covers | State |
 |---|---|---|
 | 00 | Project setup, database connection, health endpoints, tests, CI | Done |
-| 01a | Menu tables and the seed menu (20 items, English and Canadian French) | Done |
+| 01a | Menu tables and the seed menu (21 items, English and Canadian French) | Done |
 | 01b | Session, cart and order tables | Done |
 | 02 | Cart logic, pricing and order submission | Done |
 | 03 | Ordering API and menu search | Done |
@@ -41,6 +41,7 @@ built piece by piece.
 | 19 | Not on the menu: say so, offer what's close, never what the guest is avoiding | Done; evals pass against the real model |
 | 20 | Insights page: what guests asked for that the menu couldn't fill, at `/insights` | Done; checked in a browser with real conversations |
 | 21 | Menu page: add, edit and take off items, with a photo for each, at `/menu` | Done; checked in a browser |
+| 22 | Halal and kosher from a reviewed list, a fish burger, and swapping a line in one step | Done; evals pass against the real model |
 | Later | Demo polish: cost readout, French review, demo script | Planned |
 
 ## Stack
@@ -208,6 +209,7 @@ these functions:
 | `add_item` | Adds a line; refuses if a required choice is missing |
 | `update_line` | Changes a quantity, the options, or both |
 | `remove_line` | Removes a line; its number is never reused |
+| `replace_line` | Swaps a line for another item in one step; keeps its number |
 | `get_cart` | Returns the cart, priced |
 | `submit_order` | Freezes the cart into an order and ends the session |
 
@@ -266,7 +268,8 @@ Design points:
 |---|---|
 | `search_menu`, `get_item_details`, `get_cart` | Read-only lookups |
 | `get_todays_specials` | Today's specials and the combo deals, read through a cache |
-| `add_item`, `update_item`, `remove_item` | The policy gateway |
+| `check_allergens`, `check_diet` | The allergen matrix; the halal and kosher list |
+| `add_item`, `update_item`, `remove_item`, `replace_item` | The policy gateway |
 | `request_confirmation`, `submit_order` | The policy gateway |
 | `confirm_pending_action`, `cancel_pending_action` | The customer's answer to a held action |
 | `set_language` | Sets the session language |
@@ -966,6 +969,49 @@ for, and the code decides what may be offered:
 
 Against the real model: *"Sorry, we don't have an oat milkshake. We do have
 cola, lemon-lime soda, or iced tea, none listed as containing milk."*
+
+## Halal and kosher: a reviewed list, and a swap in one step
+
+"Is your chicken halal?" sounds like general knowledge, and that is the trap. Fish
+is generally halal, but a fish fillet fried beside non-halal chicken may not be
+acceptable, and nothing from a kitchen without kosher supervision is kosher, fish
+included. Only the restaurant knows its fryers and certificates, so the answer is
+**data someone reviewed**, like the allergen matrix, not the model's judgement.
+
+Each item can carry a `diets` entry in the menu file, with one of two levels and
+a note the agent reads out:
+
+| Level | Means | The agent may say |
+|---|---|---|
+| `certified` | The restaurant holds a certificate | "It's halal" |
+| `suitable` | No prohibited ingredients, prepared apart, no certificate | "Suitable for guests eating halal, but not certified", plus the note |
+| *(nothing)* | Not listed | That it isn't certified |
+
+In the demo menu nothing is certified, and only the new **fish burger** is listed,
+as halal-suitable ("fried in its own fryer, apart from the chicken"). The veggie
+burger is not: it shares the grill with the beef. Nothing is kosher.
+
+The `check_diet` tool answers for one item or for every line in the order. It
+names the lines that aren't listed and offers in-stock suitable items (from the
+same part of the menu first: a burger for a burger). Its instruction to the agent
+forbids calling anything halal unless it is certified. A halal question sent to
+knowledge search instead comes back pointing at `check_diet`.
+
+**Mid-order swaps never drop an item silently.** "The fish burger *instead*" is
+the guest's say-so, so `replace_item` swaps the line in one step: the line keeps
+its number and quantity, and the combo is recalculated. "I'll have the fish burger"
+alone is ambiguous, so the agent asks "instead, or as well?". The new item's stock
+is held before the old one is released, inside the gateway's savepoint, so a sold-out
+fish burger leaves the cheeseburger where it was.
+
+Against the real model: *"The cheeseburger isn't listed as halal-certified. The
+fish burger is suitable for guests eating halal, though it isn't certified; would
+you like to swap it for the cheeseburger?"* / "Okay, the fish burger instead." /
+*"I've swapped the cheeseburger for the fish burger."*
+
+The table is `diet_suitability` (item, diet, status, note), made to match the file
+on every seed; the words are recognised in `ordering/diet_words.py` and the reads
+are in `ordering/diet.py`.
 
 ## Policy engine
 
