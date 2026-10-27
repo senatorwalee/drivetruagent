@@ -1,6 +1,7 @@
 """Answering a phone call: open the session, accept the call, say the notice.
 
     caller -> phone number -> SIP trunk -> OpenAI -> webhook -> answer_call
+    caller -> /call page   -> WebRTC offer -> backend -> answer_web_call
 
 Everything after the call is answered is the same as a browser voice call
 (agent/voice.py): the same bridge, tools, timers and log. What is particular
@@ -8,9 +9,13 @@ to the phone is here: the caller's number, the fixed opening notice, and
 where a call goes when a person is needed.
 """
 
+import asyncio
+import contextlib
 import uuid
+from collections.abc import Coroutine
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,7 +32,10 @@ from drivetruagent.agent.voice import (
     VoiceBridge,
     VoiceSettings,
     accept_call,
+    create_call,
+    refusal_config,
     run_call,
+    say_and_hang_up,
     session_config,
     turn_away,
 )
@@ -55,6 +63,9 @@ _GREETING_WITHHELD = (
     "assistant, and this call is recorded. Pour le service en français, "
     "parlez-moi en français. What can I get you?"
 )
+# How long a web call waits for the browser to say its audio is connected
+# before speaking anyway.
+CONNECT_WAIT_SECONDS = 10.0
 # When a person is needed and there is no number to put the caller through to.
 CALL_YOU_BACK = "A team member will call you back on this number shortly. Goodbye."
 CALL_US_BACK = "Please call back in a few minutes and ask for a team member. Goodbye."
@@ -180,6 +191,97 @@ async def open_phone_session(
     return customer_session.id, instructions
 
 
+@dataclass(frozen=True)
+class WebCallOutcome:
+    # OpenAI's SDP answer, for the browser.
+    answer_sdp: str
+    # What the call is held under in LiveCalls: the session, or a key of its
+    # own for a call that was turned away.
+    call_key: uuid.UUID
+    session_id: uuid.UUID | None = None
+    turned_away: caller_rules.TurnAway | None = None
+
+
+async def answer_web_call(
+    db: AsyncSession,
+    offer: str,
+    caller_phone: str | None,
+    *,
+    connected: asyncio.Event,
+    client: RealtimeClient,
+    calls: LiveCalls,
+    scope: SessionScope,
+    config: AgentConfig,
+    voice: VoiceSettings,
+    business_date: date,
+    caller_limits: CallerLimits,
+) -> WebCallOutcome:
+    """A call from the web phone page: a phone call in all but how it
+    arrives. The browser's WebRTC offer takes the place of the SIP trunk, and
+    the caller's number is the server's to say, never the browser's.
+
+    Nothing is said until `connected` is set (the browser's audio is up), or
+    CONNECT_WAIT_SECONDS have passed: before that, the notice would be lost.
+    There is no line to put a caller through on, so a call that needs a
+    person ends with the call-back sentence. Raises ModelUnavailable if
+    OpenAI would not take the call; the session is then closed.
+    """
+    refusal = await screen_caller(db, caller_phone, caller_limits)
+    if refusal is not None:
+        call_id, answer = await create_call(client, offer, refusal_config(voice))
+        key = uuid.uuid4()
+        calls.start(
+            key,
+            call_id,
+            _once_connected(
+                connected,
+                say_and_hang_up(client, call_id, TURN_AWAY_SENTENCES[refusal]),
+            ),
+        )
+        return WebCallOutcome(answer, key, turned_away=refusal)
+
+    session_id, instructions = await open_phone_session(
+        db, caller_phone, business_date=business_date, config=config
+    )
+    try:
+        call_id, answer = await create_call(
+            client, offer, session_config(instructions, TOOL_DEFINITIONS, voice)
+        )
+    except ModelUnavailable:
+        await end_session(db, session_id, SessionState.ABANDONED, "call_not_answered")
+        await db.commit()
+        raise
+
+    handle_phone_call(
+        session_id,
+        call_id,
+        caller_phone,
+        client=client,
+        calls=calls,
+        scope=scope,
+        config=config,
+        voice=voice,
+        transfer_to=None,
+        connected=connected,
+    )
+    return WebCallOutcome(answer, session_id, session_id=session_id)
+
+
+async def _once_connected(
+    connected: asyncio.Event | None, handling: Coroutine[Any, Any, None]
+) -> None:
+    if connected is not None:
+        try:
+            with contextlib.suppress(TimeoutError):
+                async with asyncio.timeout(CONNECT_WAIT_SECONDS):
+                    await connected.wait()
+        except asyncio.CancelledError:
+            # Hung up before the audio was up: the call was never joined.
+            handling.close()
+            raise
+    await handling
+
+
 def handle_phone_call(
     session_id: uuid.UUID,
     call_id: str,
@@ -191,10 +293,12 @@ def handle_phone_call(
     config: AgentConfig,
     voice: VoiceSettings,
     transfer_to: str | None,
+    connected: asyncio.Event | None = None,
 ) -> None:
     """Handle an answered call in the background, from the opening notice
     on. `transfer_to`: where the call goes when a person is needed; None
-    and the caller is told someone will call back."""
+    and the caller is told someone will call back. `connected`: wait for
+    this (a web call's audio) before joining."""
     number_known = caller_phone is not None
 
     def bridge_for(call: CallControl) -> VoiceBridge:
@@ -211,10 +315,13 @@ def handle_phone_call(
     calls.start(
         session_id,
         call_id,
-        run_call(
-            client,
-            call_id,
-            bridge_for,
-            greeting=greeting(config.restaurant_name, number_known=number_known),
+        _once_connected(
+            connected,
+            run_call(
+                client,
+                call_id,
+                bridge_for,
+                greeting=greeting(config.restaurant_name, number_known=number_known),
+            ),
         ),
     )
