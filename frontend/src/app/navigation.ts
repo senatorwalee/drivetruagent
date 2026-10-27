@@ -10,6 +10,8 @@ export const STAFF_PATH = '/staff'
 export const PICKUPS_PATH = '/pickups'
 /** Phone numbers that have called, and blocking them. */
 export const CALLERS_PATH = '/callers'
+/** What happened in each conversation, in a note written after it. */
+export const CONVERSATIONS_PATH = '/conversations'
 export const INSIGHTS_PATH = '/insights'
 export const MENU_PATH = '/menu'
 export const LIVE_PATH = '/live'

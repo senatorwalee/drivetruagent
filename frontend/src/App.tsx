@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 
-import { CALL_PATH, CALLERS_PATH, CALLS_PATH, INSIGHTS_PATH, LIVE_PATH, MENU_PATH, PICKUPS_PATH, STAFF_PATH, usePath } from './app/navigation'
+import { CALL_PATH, CALLERS_PATH, CALLS_PATH, CONVERSATIONS_PATH, INSIGHTS_PATH, LIVE_PATH, MENU_PATH, PICKUPS_PATH, STAFF_PATH, usePath } from './app/navigation'
 import { CallersPage } from './callers/CallersPage'
 import { PickupsPage } from './callers/PickupsPage'
+import { ConversationsPage } from './conversations/ConversationsPage'
 import { HomePage } from './home/HomePage'
 import { InsightsPage } from './insights/InsightsPage'
 import { MenuPage } from './menu-admin/MenuPage'
@@ -36,6 +37,8 @@ export function App() {
         <PickupsPage />
       ) : path === CALLERS_PATH ? (
         <CallersPage />
+      ) : path === CONVERSATIONS_PATH ? (
+        <ConversationsPage />
       ) : path === INSIGHTS_PATH ? (
         <InsightsPage />
       ) : path === MENU_PATH ? (

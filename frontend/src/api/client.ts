@@ -40,6 +40,10 @@ export type CallerStatus = Schemas['CallerStatus']
 export type Standing = Schemas['Standing']
 export type WebPhoneInfo = Schemas['WebPhoneInfo']
 export type WebCall = Schemas['WebCall']
+export type ConversationSummary = Schemas['SummaryView']
+export type SummaryDetail = Schemas['SummaryDetail']
+export type SessionFacts = Schemas['SessionFacts']
+export type Mood = Schemas['Mood']
 
 const BASE = '/api'
 
@@ -179,6 +183,12 @@ export const api = {
     const response = await fetch(`${BASE}/callers/${callerId}`, { method: 'DELETE' })
     if (!response.ok) throw await toApiError(response)
   },
+
+  /** The note written about each session after it ended, newest first. */
+  summaries: (outcome?: SessionState) => request<ConversationSummary[]>(outcome ? `/summaries?outcome=${outcome}` : '/summaries'),
+  summary: (sessionId: string) => request<SummaryDetail>(`/sessions/${sessionId}/summary`),
+  /** Writes the note again: the model's words if they pass the checks. */
+  rewriteSummary: (sessionId: string) => post<SummaryDetail>(`/sessions/${sessionId}/summary`),
 
   /** What guests asked for that the menu couldn't fill, most asked first. */
   unmetRequests: (days: number) => request<UnmetRequest[]>(`/insights/unmet-requests?days=${days}`),

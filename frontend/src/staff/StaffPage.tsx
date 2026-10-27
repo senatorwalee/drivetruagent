@@ -1,5 +1,5 @@
 import { HomeLink } from '../app/HomeLink'
-import { CALLERS_PATH, CALLS_PATH, INSIGHTS_PATH, LIVE_PATH, MENU_PATH, PICKUPS_PATH } from '../app/navigation'
+import { CALLERS_PATH, CALLS_PATH, CONVERSATIONS_PATH, INSIGHTS_PATH, LIVE_PATH, MENU_PATH, PICKUPS_PATH } from '../app/navigation'
 import { PageLink } from '../app/PageLink'
 import { HandoffQueue } from './HandoffQueue'
 import { PackageView } from './PackageView'
@@ -29,6 +29,9 @@ export function StaffPage() {
           </PageLink>
           <PageLink to={CALLERS_PATH} className={styles.button}>
             Callers
+          </PageLink>
+          <PageLink to={CONVERSATIONS_PATH} className={styles.button}>
+            Conversations
           </PageLink>
           <PageLink to={INSIGHTS_PATH} className={styles.button}>
             Insights

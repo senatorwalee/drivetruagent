@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { agentInfo, week } from '../test/fixtures'
-import { agentNote, insightsStat, liveStat, menuStat, staffStat } from './words'
+import type { ConversationSummary } from '../api/client'
+import { agentNote, conversationsStat, insightsStat, liveStat, menuStat, staffStat } from './words'
 
 describe('what the home page cards say', () => {
   it('names the model when a real one answers', () => {
@@ -30,5 +31,13 @@ describe('what the home page cards say', () => {
 
   it('says when every item has a photo', () => {
     expect(menuStat([]).caption).toBe('items on the menu, all with photos')
+  })
+
+  it('counts the notes to follow up, or the notes', () => {
+    const note = (followUp: string | null) => ({ follow_up: followUp }) as ConversationSummary
+
+    expect(conversationsStat([note('Call back'), note('Check stock'), note(null)])).toEqual({ figure: '2', caption: 'notes to follow up' })
+    expect(conversationsStat([note(null)])).toEqual({ figure: '1', caption: 'recent conversation, nothing to follow up' })
+    expect(conversationsStat([])).toEqual({ figure: 'None yet', caption: 'a note follows each conversation' })
   })
 })

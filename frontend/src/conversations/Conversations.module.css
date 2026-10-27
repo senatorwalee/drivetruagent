@@ -1,0 +1,141 @@
+/* The conversations page. It shares the staff screen's top bar and buttons
+   (Staff.module.css) and the pickups and callers pages' list (Callers.module.css);
+   this file adds the filters, the note and its details. */
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.filter[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--raised);
+  color: var(--text);
+}
+
+.filter:focus-visible,
+.toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.outcome[data-outcome='submitted'] {
+  color: var(--allow);
+}
+
+.outcome[data-outcome='handed_off'] {
+  color: var(--escalate);
+}
+
+.outcome[data-outcome='terminated'] {
+  color: var(--reject);
+}
+
+.when {
+  margin-left: auto;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.gist {
+  margin: 0;
+  max-width: 70ch;
+  overflow-wrap: anywhere;
+}
+
+.followUp {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--confirm);
+  border-radius: 4px;
+  background: var(--raised);
+  overflow-wrap: anywhere;
+}
+
+.followUp strong {
+  color: var(--confirm);
+  font-weight: 600;
+}
+
+.rowFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.toggle {
+  min-height: 32px;
+  padding: 0 8px;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.details {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--ground);
+}
+
+.order {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.facts {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.fact {
+  display: grid;
+  grid-template-columns: minmax(0, 14em) minmax(0, 1fr);
+  gap: 12px;
+  font-size: 14px;
+}
+
+.fact dt {
+  color: var(--muted);
+}
+
+.fact dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 520px) {
+  .fact {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .when {
+    margin-left: 0;
+  }
+}

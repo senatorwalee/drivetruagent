@@ -2,7 +2,7 @@
  * What the home page's cards say, worked out from what the backend returns.
  * Plain functions, so they are tested without drawing anything.
  */
-import type { AdminItem, AgentInfo, HandoffSummary, UnmetRequest, WeekOfSpecials } from '../api/client'
+import type { AdminItem, AgentInfo, ConversationSummary, HandoffSummary, UnmetRequest, WeekOfSpecials } from '../api/client'
 import { money } from '../session/presentation'
 
 export interface Stat {
@@ -40,6 +40,14 @@ export function staffStat(handoffs: HandoffSummary[]): Stat {
   return waiting === 0
     ? { figure: '0', caption: 'handoffs waiting. All clear.' }
     : { figure: String(waiting), caption: `${waiting === 1 ? 'handoff' : 'handoffs'} waiting for a person` }
+}
+
+/** Notes with something for staff to do, or how many there are. */
+export function conversationsStat(summaries: ConversationSummary[]): Stat {
+  const toFollowUp = summaries.filter((summary) => summary.follow_up).length
+  if (toFollowUp > 0) return { figure: String(toFollowUp), caption: `${toFollowUp === 1 ? 'note' : 'notes'} to follow up` }
+  if (summaries.length === 0) return { figure: 'None yet', caption: 'a note follows each conversation' }
+  return { figure: String(summaries.length), caption: `recent ${summaries.length === 1 ? 'conversation' : 'conversations'}, nothing to follow up` }
 }
 
 export function insightsStat(requests: UnmetRequest[]): Stat {

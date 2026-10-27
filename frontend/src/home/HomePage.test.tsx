@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { App } from '../App'
-import type { AdminItem, HandoffSummary, UnmetRequest } from '../api/client'
+import type { AdminItem, ConversationSummary, HandoffSummary, UnmetRequest } from '../api/client'
 import { agentInfo, week } from '../test/fixtures'
 
 const handoff = (status: HandoffSummary['status']): HandoffSummary => ({
@@ -22,6 +22,8 @@ const handoff = (status: HandoffSummary['status']): HandoffSummary => ({
 
 const requests: UnmetRequest[] = [{ request: 'oat milk shake', times: 41, match: 'close', last_asked: new Date().toISOString() }]
 
+const note = (followUp: string | null) => ({ session_id: `s-${followUp ?? 'none'}`, follow_up: followUp }) as ConversationSummary
+
 const menuItem = (code: string, hasPhoto: boolean, active = true) =>
   ({ item_code: code, is_active: active, photo: hasPhoto ? { version: 'v', credit: null } : null }) as AdminItem
 
@@ -31,6 +33,7 @@ function installBackend(reachable = true) {
     '/specials/week': week,
     '/handoffs': [handoff('open'), handoff('acknowledged'), handoff('resolved')],
     '/insights/unmet-requests': requests,
+    '/summaries': [note('Call back about the sesame question.'), note(null)],
     '/admin/menu': { categories: [], items: [menuItem('fries', true), menuItem('cola', false), menuItem('pie', false, false)] },
   }
   vi.stubGlobal(
@@ -83,6 +86,9 @@ describe('the home page', () => {
     expect(await within(menu).findByText('2')).toBeInTheDocument()
     expect(menu).toHaveTextContent('1 without a photo')
     expect(menu).toHaveAttribute('href', '/menu')
+    const conversations = within(cards).getByRole('link', { name: /Conversations/ })
+    expect(await within(conversations).findByText('1')).toBeInTheDocument()
+    expect(conversations).toHaveTextContent('note to follow up')
   })
 
   it('opens the live lane, which now lives at /live', async () => {
@@ -116,7 +122,7 @@ describe('the home page', () => {
     open()
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/Cannot reach the backend/)
-    expect(screen.getAllByText('not available').length).toBe(4)
+    expect(screen.getAllByText('not available').length).toBe(5)
     expect(screen.getByRole('link', { name: /Staff/ })).toHaveAttribute('href', '/staff')
   })
 })
