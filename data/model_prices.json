@@ -1,0 +1,30 @@
+{
+  "checked_on": "2026-10-27",
+  "source": "https://developers.openai.com/api/docs/pricing",
+  "note": "US dollars per million tokens, standard tier, short context. A model not listed here is shown as unpriced, never guessed.",
+  "models": {
+    "gpt-6-luna": {
+      "text": { "input": "0.10", "cached_input": "0.01", "output": "0.50" }
+    },
+    "gpt-6-sol": {
+      "text": { "input": "2.00", "cached_input": "0.20", "output": "10.00" }
+    },
+    "gpt-6-astra": {
+      "text": { "input": "10.00", "cached_input": "1.00", "output": "50.00" }
+    },
+    "gpt-6.1-sol": {
+      "text": { "input": "2.00", "cached_input": "0.10", "output": "10.00" }
+    },
+    "gpt-6.1-terra": {
+      "text": { "input": "1.00", "cached_input": "0.05", "output": "5.00" }
+    },
+    "gpt-realtime-2.1-mini": {
+      "text": { "input": "0.60", "cached_input": "0.06", "output": "2.40" },
+      "audio": { "input": "10.00", "cached_input": "0.30", "output": "20.00" }
+    },
+    "gpt-realtime-2.1": {
+      "text": { "input": "4.00", "cached_input": "0.40", "output": "24.00" },
+      "audio": { "input": "32.00", "cached_input": "0.40", "output": "64.00" }
+    }
+  }
+}
