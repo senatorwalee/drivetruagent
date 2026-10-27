@@ -24,6 +24,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
+from drivetruagent.agent.costs import Cost, PriceList, call_cost
 from drivetruagent.agent.model import ModelClient
 from drivetruagent.agent.summary import (
     SUMMARY_INSTRUCTIONS,
@@ -97,7 +98,7 @@ async def summarize(
 
     Raises SessionNotFound, or SessionInProgress if it has not ended.
     """
-    gathered = await gather(db, session_id)
+    gathered = await gather(db, session_id, prices=settings.prices)
     # Nothing is held while the model thinks.
     await db.commit()
     written = await write(gathered, model, timeout_seconds=settings.timeout_seconds)
@@ -106,7 +107,9 @@ async def summarize(
     return stored
 
 
-async def gather(db: AsyncSession, session_id: uuid.UUID) -> Gathered:
+async def gather(
+    db: AsyncSession, session_id: uuid.UUID, *, prices: PriceList | None = None
+) -> Gathered:
     session = await db.get(CustomerSession, session_id, populate_existing=True)
     if session is None:
         raise SessionNotFound(session_id)
@@ -138,6 +141,7 @@ async def gather(db: AsyncSession, session_id: uuid.UUID) -> Gathered:
         info,
         order=await _order_fact(db, session_id),
         handoff=await _handoff_fact(db, session_id),
+        prices=prices,
     )
     names = (await db.execute(select(MenuItem.name_i18n))).scalars()
     menu_names = sorted(
@@ -313,6 +317,9 @@ class SummaryView(BaseModel):
     total_cents: int | None
     handoff_title: str | None
     written_at: datetime
+    # What the conversation's model calls cost, the note not included.
+    # None for notes written before costs were worked out.
+    cost: Cost | None
 
 
 class SummaryDetail(SummaryView):
@@ -324,6 +331,8 @@ class SummaryDetail(SummaryView):
     rejected_reason: str | None
     input_tokens: int | None
     output_tokens: int | None
+    # What writing the note cost. None without prices.
+    summary_cost: Cost | None
 
 
 async def list_summaries(
@@ -342,7 +351,9 @@ async def list_summaries(
     return [SummaryView.model_validate(_view(summary, lane)) for summary, lane in rows]
 
 
-async def get_summary(db: AsyncSession, session_id: uuid.UUID) -> SummaryDetail:
+async def get_summary(
+    db: AsyncSession, session_id: uuid.UUID, *, prices: PriceList | None = None
+) -> SummaryDetail:
     """Raises SummaryNotFound if the session has none (yet)."""
     row = (
         await db.execute(
@@ -363,8 +374,20 @@ async def get_summary(db: AsyncSession, session_id: uuid.UUID) -> SummaryDetail:
             "rejected_reason": summary.rejected_reason,
             "input_tokens": summary.input_tokens,
             "output_tokens": summary.output_tokens,
+            "summary_cost": None
+            if prices is None or summary.model is None
+            else call_cost(summary_call(summary), prices),
         }
     )
+
+
+def summary_call(summary: SessionSummary) -> dict[str, object]:
+    """Writing the note, as a model_call payload, to be priced like one."""
+    return {
+        "model": summary.model,
+        "input_tokens": summary.input_tokens,
+        "output_tokens": summary.output_tokens,
+    }
 
 
 def _view(summary: SessionSummary, lane: str) -> dict[str, object]:
@@ -385,6 +408,7 @@ def _view(summary: SessionSummary, lane: str) -> dict[str, object]:
         "total_cents": facts.order.total_cents if facts.order else None,
         "handoff_title": facts.handoff.title if facts.handoff else None,
         "written_at": summary.updated_at,
+        "cost": facts.cost,
     }
 
 

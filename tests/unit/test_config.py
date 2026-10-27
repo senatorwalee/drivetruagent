@@ -1,4 +1,5 @@
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -86,6 +87,20 @@ def test_the_timers_default_to_what_the_brief_asks_for() -> None:
     assert timers.close_after == timedelta(seconds=20)
     assert timers.max_duration == timedelta(minutes=3)
     assert make_settings().timekeeper_interval_seconds == 1.0
+
+
+def test_model_prices_come_from_the_shipped_list_and_reach_the_summaries() -> None:
+    settings = make_settings()
+
+    assert settings.model_prices is not None
+    assert settings.summary_settings.prices is settings.model_prices
+
+
+def test_a_missing_price_list_leaves_costs_out(tmp_path: Path) -> None:
+    settings = make_settings(model_prices_path=tmp_path / "none.json")
+
+    assert settings.model_prices is None
+    assert settings.summary_settings.prices is None
 
 
 def test_summaries_are_written_every_few_seconds_for_the_last_day() -> None:

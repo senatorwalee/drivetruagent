@@ -41,6 +41,7 @@ const note = (overrides: Partial<ConversationSummary>): ConversationSummary => (
   total_cents: 1354,
   handoff_title: null,
   written_at: FACTS.ended_at,
+  cost: null,
   ...overrides,
 })
 

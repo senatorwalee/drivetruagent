@@ -10,14 +10,18 @@ rounded until the very end.
 """
 
 import json
+import logging
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_PRICES_PATH = Path("data/model_prices.json")
 
@@ -57,6 +61,17 @@ class PriceList:
 
 def load_prices(path: Path = DEFAULT_PRICES_PATH) -> PriceList:
     return parse_prices(json.loads(path.read_text()))
+
+
+@lru_cache
+def prices_at(path: Path) -> PriceList | None:
+    """The price list at `path`, read once. None, with a warning, if it is
+    missing or unreadable: costs are then left out, nothing else breaks."""
+    try:
+        return load_prices(path)
+    except (OSError, ValueError, KeyError):
+        logger.warning("No model prices at %s; costs will not be shown", path)
+        return None
 
 
 def parse_prices(data: Mapping[str, Any]) -> PriceList:

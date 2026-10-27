@@ -24,6 +24,7 @@ const ORDERED: ConversationSummary = {
   total_cents: 1607,
   handoff_title: null,
   written_at: minutesAgo(5),
+  cost: { micro_usd: 1834, calls: 6, unpriced_calls: 0, estimated_calls: 0 },
 }
 
 const HANDED_OFF: ConversationSummary = {
@@ -76,6 +77,7 @@ const DETAIL: SummaryDetail = {
   rejected_reason: null,
   input_tokens: 900,
   output_tokens: 40,
+  summary_cost: { micro_usd: 110, calls: 1, unpriced_calls: 0, estimated_calls: 0 },
 }
 
 interface Sent {

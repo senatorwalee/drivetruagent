@@ -101,10 +101,10 @@ async def test_one_session_that_fails_does_not_stop_the_others(
     fine = await ended_session(committing_sessions, "lane-2", None)
     real_gather = summarizer.gather
 
-    async def gather(db: AsyncSession, session_id: uuid.UUID) -> Any:
+    async def gather(db: AsyncSession, session_id: uuid.UUID, **options: Any) -> Any:
         if session_id == broken:
             raise RuntimeError("bad row")
-        return await real_gather(db, session_id)
+        return await real_gather(db, session_id, **options)
 
     monkeypatch.setattr(summarizer, "gather", gather)
 

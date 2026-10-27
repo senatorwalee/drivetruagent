@@ -243,6 +243,18 @@ class SummaryNotFound(OrderingError):
         super().__init__(f"Session {session_id} has no summary yet.")
 
 
+class NoPrices(OrderingError):
+    """Costs are worked out from a price list, and there is none."""
+
+    code = "no_prices"
+
+    def __init__(self, path: object) -> None:
+        super().__init__(
+            f"No model prices could be read from {path}, so costs are not "
+            "shown. Set MODEL_PRICES_PATH to a price list."
+        )
+
+
 class SessionNotHandedOff(OrderingError):
     """Only a session that was handed to a person can be finished by one."""
 
