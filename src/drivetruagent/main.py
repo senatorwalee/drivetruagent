@@ -4,7 +4,8 @@ from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 
-from drivetruagent.agent import timekeeper
+from drivetruagent.agent import summarizer, timekeeper
+from drivetruagent.agent.factory import summary_model_from_settings
 from drivetruagent.api import (
     actions,
     callers,
@@ -19,6 +20,7 @@ from drivetruagent.api import (
     phone,
     pickups,
     sessions,
+    summaries,
     voice,
     web_phone,
 )
@@ -53,14 +55,27 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 caller_retention=settings.caller_retention,
             )
         )
+    summarising: asyncio.Task[None] | None = None
+    if settings.summary_interval_seconds > 0:
+        # Writes a note for staff about each session that ends. See
+        # agent/summarizer.py.
+        summarising = asyncio.create_task(
+            summarizer.run_forever(
+                app.state.session_factory,
+                summary_model_from_settings(settings),
+                interval_seconds=settings.summary_interval_seconds,
+                settings=settings.summary_settings,
+            )
+        )
     yield
     live_calls = getattr(app.state, "live_calls", None)
     if live_calls is not None:
         await live_calls.close_all()
-    if sweeping is not None:
-        sweeping.cancel()
-        with suppress(asyncio.CancelledError):
-            await sweeping
+    for task in (sweeping, summarising):
+        if task is not None:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
     await engine.dispose()
     if tracer_provider is not None:
         # Sends whatever spans are still waiting.
@@ -85,6 +100,7 @@ def create_app() -> FastAPI:
     app.include_router(pickups.router)
     app.include_router(callers.router)
     app.include_router(insights.router)
+    app.include_router(summaries.router)
     register_error_handlers(app)
     return app
 

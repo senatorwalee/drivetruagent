@@ -88,6 +88,17 @@ def test_the_timers_default_to_what_the_brief_asks_for() -> None:
     assert make_settings().timekeeper_interval_seconds == 1.0
 
 
+def test_summaries_are_written_every_few_seconds_for_the_last_day() -> None:
+    settings = make_settings()
+
+    assert settings.summary_interval_seconds == 5.0
+    assert settings.summary_uses_model
+    assert settings.summary_settings.lookback == timedelta(hours=24)
+    assert make_settings(summary_lookback_hours=2).summary_settings.lookback == (
+        timedelta(hours=2)
+    )
+
+
 def test_the_timers_can_be_changed_from_the_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from drivetruagent.agent.summary import SummarySettings
 from drivetruagent.agent.voice import VoiceSettings
 from drivetruagent.ordering.phone_numbers import normalize_phone
 from drivetruagent.ordering.timers import TimerSettings
@@ -50,6 +51,15 @@ class Settings(BaseSettings):
     # How often the background task checks the timers. 0 turns it off; the
     # length limit is then still checked whenever the customer speaks.
     timekeeper_interval_seconds: float = Field(default=1.0, ge=0)
+    # Session summaries: a note for staff after each session ends. How often
+    # the background task looks for sessions to summarise; 0 turns it off.
+    summary_interval_seconds: float = Field(default=5.0, ge=0)
+    # Only sessions that ended within this many hours are summarised, so
+    # turning summaries on does not send old conversations to the model.
+    summary_lookback_hours: int = Field(default=24, ge=1)
+    # Ask the model for each summary's words. False: code's own wording from
+    # the facts, at no cost.
+    summary_uses_model: bool = True
 
     # The agent. Without a key the ordering API still works; only the
     # conversation endpoint is unavailable.
@@ -223,6 +233,10 @@ class Settings(BaseSettings):
     @property
     def caller_retention(self) -> timedelta:
         return timedelta(days=self.caller_retention_days)
+
+    @property
+    def summary_settings(self) -> SummarySettings:
+        return SummarySettings(lookback=timedelta(hours=self.summary_lookback_hours))
 
 
 @lru_cache

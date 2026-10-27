@@ -13,6 +13,7 @@ from drivetruagent.agent.factory import (
     ingest_embedders,
     knowledge_from_settings,
     model_from_settings,
+    summary_model_from_settings,
 )
 from drivetruagent.agent.gemini_model import GeminiModel
 from drivetruagent.agent.model import ModelUnavailable
@@ -142,6 +143,29 @@ def test_the_strike_limits_come_from_the_settings() -> None:
     )
 
     assert guard.limits == StrikeLimits(abuse=2, confusion=5)
+
+
+# --- Session summaries ------------------------------------------------------
+
+
+def test_summaries_ask_the_agent_s_model_without_reasoning() -> None:
+    model = summary_model_from_settings(settings(**WITH_OPENAI))
+
+    assert isinstance(model, OpenAIModel)
+    assert model._reasoning_effort == "none"  # pyright: ignore[reportPrivateUsage]
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        {"agent_model": "demo"},
+        {**WITH_OPENAI, "summary_uses_model": False},
+        {"agent_model": "gemini"},  # no key: the model is unavailable
+        {},  # no key at all
+    ],
+)
+def test_otherwise_code_writes_the_summaries(values: dict[str, Any]) -> None:
+    assert summary_model_from_settings(settings(**values)) is None
 
 
 # --- Knowledge search -------------------------------------------------------

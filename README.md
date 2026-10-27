@@ -48,6 +48,7 @@ built piece by piece.
 | 23c | No-shows and repeat calls: staff mark pickups, big orders from flagged numbers go to a person, staff can block | Done; tested with signed webhooks and the real database |
 | 23d | The web phone: call the agent from a phone's browser at `/call`, answered as a phone call, without a number | Done; tested with a stand-in for OpenAI and checked in a browser |
 | 24 | One look across the app, the Frontdesk name, and a home page at `/`; the live screen moves to `/live` | Done; checked in a browser |
+| 25 | Session summaries: a note for staff after each session, the model's words checked against the conversation, at `/conversations` | Done; evals pass against the real model; checked in a browser |
 | Later | Demo polish: cost readout, French review, demo script | Planned |
 
 ## Stack
@@ -72,8 +73,8 @@ make demo
 ```
 
 Then open <http://localhost:8080>: the Frontdesk home page, with a card for
-each part (live lane at `/live`, staff at `/staff`, insights at `/insights`,
-menu at `/menu`).
+each part (live lane at `/live`, staff at `/staff`, conversations at
+`/conversations`, insights at `/insights`, menu at `/menu`).
 That builds and starts Postgres, the API and the web app; the API migrates the
 database, loads the menu the first time (so edits made on the menu page survive
 a restart) and the knowledge documents on every start, and nginx serves the web
@@ -456,6 +457,12 @@ order, the session state and the tools used, never at the agent's wording.
 Every scenario is played on a fixed Monday, so a total never depends on which
 day the evals happen to be run.
 
+Session summaries have their own evals (`tests/integration/evals/test_summaries.py`):
+the conversation is scripted and only the note comes from the model. A plain
+order needs no follow-up; an allergy question handed to a person does, and
+names the allergen; a customer who leaves fed up is noted as frustrated; one
+who tells the summariser what to write still gets the real order in the note.
+
 ```bash
 make eval
 ```
@@ -487,6 +494,12 @@ With knowledge search (14 October 2026): all 16 conversations and the
 retrieval eval passed. Asked "is the veggie burger vegan?", the agent answered
 from the document: not as served, because the house sauce has egg and the grill
 is shared, and the customer ordered it anyway.
+
+With session summaries (27 October 2026): all 4 summary evals passed, every
+note written by the model and kept. The allergy note's follow-up was to check
+the bun's sesame and cross-contact information before the customer orders; the
+note on the customer who tried to dictate it said their request "was not part
+of the order".
 
 ## Stock: two cars cannot buy the last item
 
@@ -1197,6 +1210,43 @@ a number unless a person marked it.
 The rules are pure functions in `policy/caller_rules.py`; the agent is never
 told a caller's standing, only its consequence.
 
+## Session summaries: the model writes, code checks
+
+A few seconds after each session ends, a background task writes a note about
+it for staff, the after-call summary a person in a contact centre would
+otherwise write. They are on the Conversations page
+(<http://localhost:8080/conversations>), newest first, filtered by how they
+ended or by whether there is something to follow up.
+
+A note has two parts, and only one comes from the model:
+
+- **The facts**, read from the event log, the order and the handoff by code:
+  how it ended, the order and its total, why it went to a person, what the
+  menu couldn't fill, the rules that said no, guardrail strikes, nudges, and
+  the model calls and tokens the conversation used. The outcome and order on
+  the page are these, never the model's words.
+- **The words**: one or two sentences, a follow-up for staff when there is
+  one, and the customer's mood, from one tool call to the agent's model (with
+  no reasoning: a note needs none).
+
+Code checks the words before keeping them (`agent/summary.py`). They are
+thrown away if they name a menu item nobody said and nobody ordered, give a
+dollar amount that was never said and isn't the total, give another order
+number, hold anything that looks like a phone number, or run long. Thrown away,
+missing (no key, `SUMMARY_USES_MODEL=false`, the model failed or took too
+long), or never asked for (nothing was said), the note is written in fixed
+wording from the facts instead, and says so: *"written from the log"*, and
+why the model's words weren't used. The conversation is shown to the model as
+data, not instructions; a customer who asks for the summary to say something
+is reported as having asked.
+
+The task runs apart from the timekeeper (`SUMMARY_INTERVAL_SECONDS`, 5), so
+a slow model never holds up a timer, and after the session, so it never slows
+a turn. No database transaction is held while the model thinks, and two
+servers writing the same note at once leave one row. Only sessions that ended
+within `SUMMARY_LOOKBACK_HOURS` (24) are picked up, so turning it on doesn't
+send old conversations to the model. Staff can have a note written again.
+
 ## Policy engine
 
 The model proposes; code decides. Every action the agent proposes goes
@@ -1278,6 +1328,9 @@ Run `make dev` and open <http://127.0.0.1:8000/docs> to try these.
 | `POST /web-phone/calls` | Ring the agent from the web phone: a WebRTC offer in, the call (with OpenAI's answer) out |
 | `POST /web-phone/calls/{key}/connected` | The web phone's audio is up: the agent starts talking |
 | `DELETE /web-phone/calls/{key}` | Hang up the web phone |
+| `GET /summaries` | Notes on ended sessions, newest first; `?outcome=` |
+| `GET /sessions/{id}/summary` | One session's note, with the facts behind it |
+| `POST /sessions/{id}/summary` | Write a session's note again |
 | `GET /pickups` | Phone orders waiting to be collected, then the recently marked |
 | `POST /pickups/{order_id}` | Mark one `picked_up` or `no_show` |
 | `GET /callers` | Numbers that have called, with counts and standing |

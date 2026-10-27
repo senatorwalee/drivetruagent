@@ -3,10 +3,10 @@ import type { ReactNode } from 'react'
 
 import { api } from '../api/client'
 import { FrontdeskMark, HomeLink } from '../app/HomeLink'
-import { INSIGHTS_PATH, LIVE_PATH, MENU_PATH, STAFF_PATH } from '../app/navigation'
+import { CONVERSATIONS_PATH, INSIGHTS_PATH, LIVE_PATH, MENU_PATH, STAFF_PATH } from '../app/navigation'
 import { PageLink } from '../app/PageLink'
 import styles from './Home.module.css'
-import { agentNote, insightsStat, liveStat, menuStat, staffStat } from './words'
+import { agentNote, conversationsStat, insightsStat, liveStat, menuStat, staffStat } from './words'
 import type { Stat } from './words'
 
 // Handoffs and requests arrive while the page is open.
@@ -27,6 +27,12 @@ export function HomePage() {
     retry: false,
   })
   const menu = useQuery({ queryKey: ['admin-menu'], queryFn: api.adminMenu, retry: false })
+  const conversations = useQuery({
+    queryKey: ['summaries', 'all'],
+    queryFn: () => api.summaries(),
+    refetchInterval: REFRESH_MS,
+    retry: false,
+  })
 
   const restaurant = agent.data?.restaurant_name
 
@@ -76,6 +82,14 @@ export function HomePage() {
           </Card>
           <Card to={STAFF_PATH} name="Staff" stat={handoffs.data && staffStat(handoffs.data)} failed={handoffs.isError}>
             Orders the agent handed to a person, with the cart, the stock it holds and what to do next.
+          </Card>
+          <Card
+            to={CONVERSATIONS_PATH}
+            name="Conversations"
+            stat={conversations.data && conversationsStat(conversations.data)}
+            failed={conversations.isError}
+          >
+            A note on each conversation once it ends: what was wanted, how it went, and anything to follow up.
           </Card>
           <Card to={INSIGHTS_PATH} name="Insights" stat={requests.data && insightsStat(requests.data)} failed={requests.isError}>
             What guests asked for that the menu couldn't fill: what to add, and what to say isn't there.

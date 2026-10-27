@@ -879,6 +879,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One session's summary
+         * @description 404 until it has been written, a few seconds after the session ends.
+         */
+        get: operations["read_summary_sessions__session_id__summary_get"];
+        put?: never;
+        /**
+         * Write a session's summary again
+         * @description Replaces the summary with a fresh one, or writes it if there was none.
+         *     409 while the session is still going.
+         */
+        post: operations["rewrite_summary_sessions__session_id__summary_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sessions/{session_id}/voice": {
         parameters: {
             query?: never;
@@ -962,6 +987,26 @@ export interface paths {
          * @description For staff. Takes effect on the next read and the next cart change.
          */
         put: operations["set_special_specials__code__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/summaries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The latest session summaries
+         * @description Newest session first; `outcome` keeps only sessions that ended that way.
+         */
+        get: operations["read_summaries_summaries_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -1467,6 +1512,13 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** HandoffFact */
+        HandoffFact: {
+            /** Reason */
+            reason: string;
+            /** Title */
+            title: string;
+        };
         /**
          * HandoffOutcome
          * @description How a handed-off session was finished.
@@ -1760,6 +1812,12 @@ export interface components {
             /** Tools Used */
             tools_used: string[];
         };
+        /**
+         * Mood
+         * @description How the customer came across, as the model judged it.
+         * @enum {string}
+         */
+        Mood: "pleased" | "neutral" | "frustrated";
         /** NewItem */
         NewItem: {
             /** Base Price Cents */
@@ -1811,6 +1869,22 @@ export interface components {
             option_code: string;
             /** Option Name */
             option_name: string;
+        };
+        /** OrderFact */
+        OrderFact: {
+            /** Lines */
+            lines: components["schemas"]["OrderLineFact"][];
+            /** Order Number */
+            order_number: number;
+            /** Total Cents */
+            total_cents: number;
+        };
+        /** OrderLineFact */
+        OrderLineFact: {
+            /** Item Name */
+            item_name: string;
+            /** Quantity */
+            quantity: number;
         };
         /** OrderView */
         OrderView: {
@@ -1966,6 +2040,51 @@ export interface components {
             price_delta_cents: number;
         };
         /**
+         * SessionFacts
+         * @description What happened in a session, as the backend recorded it.
+         */
+        SessionFacts: {
+            /** Abuse Strikes */
+            abuse_strikes: number;
+            channel: components["schemas"]["Channel"];
+            /** Confusion Strikes */
+            confusion_strikes: number;
+            /** Customer Turns */
+            customer_turns: number;
+            /** Duration Seconds */
+            duration_seconds: number;
+            /** End Reason */
+            end_reason: string | null;
+            /**
+             * Ended At
+             * Format: date-time
+             */
+            ended_at: string;
+            /** Flagged Messages */
+            flagged_messages: number;
+            handoff: components["schemas"]["HandoffFact"] | null;
+            /** Input Tokens */
+            input_tokens: number;
+            language: components["schemas"]["Language"] | null;
+            /** Model Calls */
+            model_calls: number;
+            /** Nudges */
+            nudges: number;
+            order: components["schemas"]["OrderFact"] | null;
+            outcome: components["schemas"]["SessionState"];
+            /** Output Tokens */
+            output_tokens: number;
+            /** Refused */
+            refused: string[];
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Unmet Requests */
+            unmet_requests: string[];
+        };
+        /**
          * SessionState
          * @description Where one customer's visit to the speaker has got to.
          * @enum {string}
@@ -2117,6 +2236,107 @@ export interface components {
             name: string;
             /** Saves Cents */
             saves_cents: number;
+        };
+        /**
+         * SummaryAuthor
+         * @description Who wrote a session summary's words. The facts are always code's.
+         * @enum {string}
+         */
+        SummaryAuthor: "model" | "template";
+        /**
+         * SummaryDetail
+         * @description A summary with everything behind it.
+         */
+        SummaryDetail: {
+            channel: components["schemas"]["Channel"];
+            /**
+             * Ended At
+             * Format: date-time
+             */
+            ended_at: string;
+            facts: components["schemas"]["SessionFacts"];
+            /** Follow Up */
+            follow_up: string | null;
+            /** Gist */
+            gist: string;
+            /** Handoff Title */
+            handoff_title: string | null;
+            /** Input Tokens */
+            input_tokens: number | null;
+            /** Lane */
+            lane: string;
+            language: components["schemas"]["Language"] | null;
+            /** Model */
+            model: string | null;
+            mood: components["schemas"]["Mood"] | null;
+            /** Order Number */
+            order_number: number | null;
+            outcome: components["schemas"]["SessionState"];
+            /** Output Tokens */
+            output_tokens: number | null;
+            /** Rejected Reason */
+            rejected_reason: string | null;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Total Cents */
+            total_cents: number | null;
+            /**
+             * Written At
+             * Format: date-time
+             */
+            written_at: string;
+            written_by: components["schemas"]["SummaryAuthor"];
+        };
+        /**
+         * SummaryView
+         * @description One row of the conversations list.
+         */
+        SummaryView: {
+            channel: components["schemas"]["Channel"];
+            /**
+             * Ended At
+             * Format: date-time
+             */
+            ended_at: string;
+            /** Follow Up */
+            follow_up: string | null;
+            /** Gist */
+            gist: string;
+            /** Handoff Title */
+            handoff_title: string | null;
+            /** Lane */
+            lane: string;
+            language: components["schemas"]["Language"] | null;
+            mood: components["schemas"]["Mood"] | null;
+            /** Order Number */
+            order_number: number | null;
+            outcome: components["schemas"]["SessionState"];
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Total Cents */
+            total_cents: number | null;
+            /**
+             * Written At
+             * Format: date-time
+             */
+            written_at: string;
+            written_by: components["schemas"]["SummaryAuthor"];
         };
         /**
          * TimersView
@@ -4031,6 +4251,95 @@ export interface operations {
             };
         };
     };
+    read_summary_sessions__session_id__summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SummaryDetail"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rewrite_summary_sessions__session_id__summary_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SummaryDetail"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     start_call_sessions__session_id__voice_post: {
         parameters: {
             query?: never;
@@ -4229,6 +4538,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_summaries_summaries_get: {
+        parameters: {
+            query?: {
+                outcome?: components["schemas"]["SessionState"] | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SummaryView"][];
                 };
             };
             /** @description Validation Error */
