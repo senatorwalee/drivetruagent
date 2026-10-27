@@ -22,6 +22,7 @@ _NOT_FOUND = {
     "handoff_not_found",
     "no_voice_call",
     "no_photo",
+    "caller_not_found",
 }
 # Turned off on this server.
 _FORBIDDEN = {"typed_caller_id_off"}
@@ -37,6 +38,7 @@ _CONFLICT = {
     "session_not_handed_off",
     "voice_call_in_progress",
     "duplicate_item_name",
+    "not_a_pickup_order",
 }
 
 

@@ -108,6 +108,69 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/callers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Phone numbers that have called
+         * @description The latest call first, with no-shows in the window, calls without an
+         *     order in the repeat-call window, and each number's standing.
+         */
+        get: operations["read_callers_callers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/callers/{caller_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Forget a number
+         * @description Deletes the number and everything known about it, including its
+         *     no-shows and status history. Its orders stay, linked to no one.
+         */
+        delete: operations["delete_caller_callers__caller_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/callers/{caller_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Flag, block or clear a number
+         * @description Recorded with who did it and why. Setting the status a number already
+         *     has changes nothing and records nothing.
+         */
+        post: operations["set_status_callers__caller_id__status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/combos": {
         parameters: {
             query?: never;
@@ -479,6 +542,48 @@ export interface paths {
          *     the opening notice, and the backend handles the call from then on.
          */
         post: operations["incoming_call_phone_incoming_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pickups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Phone orders to be collected
+         * @description Every phone order still waiting, oldest first; then those marked in
+         *     the last twelve hours, so a wrong mark can be put right.
+         */
+        get: operations["read_pickups_pickups_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pickups/{order_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark a phone order picked up, or a no-show
+         * @description Only staff mark no-shows; two within 90 days flag the number, and big
+         *     orders from it then go to a person. A mark can be changed.
+         */
+        post: operations["mark_pickup_pickups__order_id__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1063,6 +1168,51 @@ export interface components {
         CallAnswered: {
             /** Session Id */
             session_id: string | null;
+            turned_away?: components["schemas"]["TurnAway"] | null;
+        };
+        /**
+         * CallerStatus
+         * @description What staff have decided about a phone number. Only staff change it.
+         * @enum {string}
+         */
+        CallerStatus: "normal" | "flagged" | "blocked";
+        /** CallerView */
+        CallerView: {
+            /** Call Count */
+            call_count: number;
+            /**
+             * Caller Id
+             * Format: uuid
+             */
+            caller_id: string;
+            /**
+             * First Call At
+             * Format: date-time
+             */
+            first_call_at: string;
+            /** History Opted Out */
+            history_opted_out: boolean;
+            /**
+             * Last Call At
+             * Format: date-time
+             */
+            last_call_at: string;
+            /** Order Count */
+            order_count: number;
+            /** Phone E164 */
+            phone_e164: string;
+            /** Recent Calls Without Order */
+            recent_calls_without_order: number;
+            /** Recent No Shows */
+            recent_no_shows: number;
+            standing: components["schemas"]["Standing"];
+            status: components["schemas"]["CallerStatus"];
+            /** Status Changed At */
+            status_changed_at: string | null;
+            /** Status Changed By */
+            status_changed_by: string | null;
+            /** Status Reason */
+            status_reason: string | null;
         };
         /** CartSnapshot */
         CartSnapshot: {
@@ -1447,6 +1597,19 @@ export interface components {
             /** Unit Price Cents */
             unit_price_cents: number;
         };
+        /** MarkPickupRequest */
+        MarkPickupRequest: {
+            /**
+             * By
+             * @default staff
+             */
+            by: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "picked_up" | "no_show";
+        };
         /** MayContainView */
         MayContainView: {
             allergen: components["schemas"]["Allergen"];
@@ -1615,6 +1778,45 @@ export interface components {
             /** Message */
             message: string;
         };
+        /** Pickup */
+        Pickup: {
+            /** Caller Last Four */
+            caller_last_four: string | null;
+            /** Lines */
+            lines: components["schemas"]["PickupLine"][];
+            /** Marked At */
+            marked_at: string | null;
+            /** Marked By */
+            marked_by: string | null;
+            /**
+             * Order Id
+             * Format: uuid
+             */
+            order_id: string;
+            /** Order Number */
+            order_number: number;
+            status: components["schemas"]["PickupStatus"];
+            /**
+             * Submitted At
+             * Format: date-time
+             */
+            submitted_at: string;
+            /** Total Cents */
+            total_cents: number;
+        };
+        /** PickupLine */
+        PickupLine: {
+            /** Item Name */
+            item_name: string;
+            /** Quantity */
+            quantity: number;
+        };
+        /**
+         * PickupStatus
+         * @description Whether a phone order was collected. Only staff mark it.
+         * @enum {string}
+         */
+        PickupStatus: "waiting" | "picked_up" | "no_show";
         /** RemoveLine */
         RemoveLine: {
             /** Line No */
@@ -1722,6 +1924,17 @@ export interface components {
             /** Is Active */
             is_active: boolean;
         };
+        /** SetStatusRequest */
+        SetStatusRequest: {
+            /**
+             * By
+             * @default staff
+             */
+            by: string;
+            /** Reason */
+            reason: string;
+            status: components["schemas"]["CallerStatus"];
+        };
         /** SetStockRequest */
         SetStockRequest: {
             /** On Hand */
@@ -1759,6 +1972,12 @@ export interface components {
             /** Special Price Cents */
             special_price_cents: number;
         };
+        /**
+         * Standing
+         * @description How much a call can be trusted with.
+         * @enum {string}
+         */
+        Standing: "normal" | "flagged" | "blocked" | "unknown";
         /**
          * Step
          * @description One thing the agent asked the backend to do, or a timer firing.
@@ -1856,6 +2075,12 @@ export interface components {
             /** Text */
             text: string;
         };
+        /**
+         * TurnAway
+         * @description Why a call is not taken.
+         * @enum {string}
+         */
+        TurnAway: "blocked" | "too_many_calls";
         /** UnmetRequest */
         UnmetRequest: {
             /**
@@ -2151,6 +2376,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentInfoResponse"];
+                };
+            };
+        };
+    };
+    read_callers_callers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CallerView"][];
+                };
+            };
+        };
+    };
+    delete_caller_callers__caller_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caller_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_status_callers__caller_id__status_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caller_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CallerView"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -2801,6 +3128,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_pickups_pickups_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Pickup"][];
+                };
+            };
+        };
+    };
+    mark_pickup_pickups__order_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkPickupRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Pickup"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -4,6 +4,8 @@ Limits used here: more than 10 on a line is unusual, more than 25 is extreme,
 and more than 50 items in the cart is extreme.
 """
 
+from datetime import timedelta
+
 import pytest
 from pydantic import ValidationError
 
@@ -23,6 +25,7 @@ from drivetruagent.policy.actions import (
     SubmitOrder,
     UpdateLine,
 )
+from drivetruagent.policy.caller_rules import CallerLimits, Standing
 from drivetruagent.policy.decisions import (
     Decision,
     PolicyContext,
@@ -268,6 +271,58 @@ def test_a_swap_of_a_missing_line_is_left_to_the_ordering_rules() -> None:
     assert decide(action).decision is Decision.ALLOW
 
 
+# --- Big phone orders from untrusted numbers --------------------------------
+
+
+def phone_order(caller: Standing | None, total_cents: int) -> PolicyContext:
+    return PolicyContext(
+        state=SessionState.CONFIRMING,
+        cart_item_count=1,
+        line_quantities={1: 1},
+        cart_total_cents=total_cents,
+        caller_standing=caller,
+    )
+
+
+@pytest.mark.parametrize("action", [RequestConfirmation(), SubmitOrder()])
+@pytest.mark.parametrize("caller", [Standing.FLAGGED, Standing.UNKNOWN])
+def test_a_big_order_from_an_untrusted_number_goes_to_a_person(
+    action: Action, caller: Standing
+) -> None:
+    result = decide(action, phone_order(caller, 4500))
+
+    assert (result.decision, result.rule) == (Decision.ESCALATE, "large_order_check")
+    assert result.details == {
+        "total_cents": 4500,
+        "limit_cents": 4000,
+        "standing": caller.value,
+    }
+    # The caller hears only that it is about the size.
+    assert "order this size" in result.message
+    assert "no-show" not in result.message
+
+
+@pytest.mark.parametrize(
+    "ctx",
+    [
+        pytest.param(phone_order(Standing.FLAGGED, 3900), id="small_order"),
+        pytest.param(phone_order(Standing.NORMAL, 25000), id="trusted_number"),
+        pytest.param(phone_order(None, 25000), id="drive_through"),
+    ],
+)
+def test_other_orders_are_read_back_and_placed_as_usual(ctx: PolicyContext) -> None:
+    assert decide(RequestConfirmation(), ctx).decision is Decision.ALLOW
+    assert decide(SubmitOrder(), ctx).decision is Decision.ALLOW
+
+
+def test_building_a_big_order_is_not_stopped_part_way() -> None:
+    """Only reading it back and placing it are checked, so the caller is
+    passed on once, with the whole order."""
+    result = decide(AddItem(item_code="cookie"), phone_order(Standing.FLAGGED, 9000))
+
+    assert result.decision is Decision.ALLOW
+
+
 # --- Rule order -------------------------------------------------------------
 
 
@@ -356,6 +411,24 @@ def test_limits_can_be_changed_in_settings() -> None:
 
     assert limits.line_quantity_confirm_above == 5
     assert limits.line_quantity_escalate_above == 12
+
+
+def test_caller_limits_come_from_settings() -> None:
+    limits = settings(
+        flag_after_no_shows=3,
+        no_show_window_days=30,
+        flagged_order_cap_cents=2500,
+        repeat_call_limit=8,
+        repeat_call_window_minutes=15,
+    ).policy_limits.callers
+
+    assert limits == CallerLimits(
+        flag_after_no_shows=3,
+        no_show_window=timedelta(days=30),
+        large_order_cents=2500,
+        repeat_call_limit=8,
+        repeat_call_window=timedelta(minutes=15),
+    )
 
 
 def test_escalation_limit_must_be_above_the_confirmation_limit() -> None:

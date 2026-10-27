@@ -39,6 +39,7 @@ PURE_MODULES = [
     "policy/actions.py",
     "policy/handoff_package.py",
     "policy/guardrails.py",
+    "policy/caller_rules.py",
     "agent/messages.py",
     "agent/model.py",
     "evals/scenario.py",

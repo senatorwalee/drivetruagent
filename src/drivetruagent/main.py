@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from drivetruagent.agent import timekeeper
 from drivetruagent.api import (
     actions,
+    callers,
     conversation,
     handoffs,
     health,
@@ -16,6 +17,7 @@ from drivetruagent.api import (
     menu_admin,
     offers,
     phone,
+    pickups,
     sessions,
     voice,
 )
@@ -38,14 +40,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     sweeping: asyncio.Task[None] | None = None
     if settings.timekeeper_interval_seconds > 0:
-        # Nudges silent customers, ends sessions that have timed out, and
-        # tidies up expired stock holds. See agent/timekeeper.py.
+        # Nudges silent customers, ends sessions that have timed out, tidies
+        # up expired stock holds, and forgets old callers. See
+        # agent/timekeeper.py.
         sweeping = asyncio.create_task(
             timekeeper.run_forever(
                 app.state.session_factory,
                 interval_seconds=settings.timekeeper_interval_seconds,
                 timers=settings.session_timers,
                 tax_rate=settings.tax_rate,
+                caller_retention=settings.caller_retention,
             )
         )
     yield
@@ -76,6 +80,8 @@ def create_app() -> FastAPI:
     app.include_router(handoffs.router)
     app.include_router(voice.router)
     app.include_router(phone.router)
+    app.include_router(pickups.router)
+    app.include_router(callers.router)
     app.include_router(insights.router)
     register_error_handlers(app)
     return app

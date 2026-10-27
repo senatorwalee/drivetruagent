@@ -10,6 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from drivetruagent.agent.voice import VoiceSettings
 from drivetruagent.ordering.phone_numbers import normalize_phone
 from drivetruagent.ordering.timers import TimerSettings
+from drivetruagent.policy.caller_rules import CallerLimits
 from drivetruagent.policy.decisions import PolicyLimits
 
 
@@ -114,6 +115,19 @@ class Settings(BaseSettings):
     staff_phone_number: str | None = None
     # How long a phone order takes to be ready, as the agent tells the caller.
     pickup_ready_minutes: int = Field(default=15, ge=1, le=240)
+    # Problem numbers. Only staff mark a no-show; this many within the
+    # window flags a number, and then an order over the cap from it goes to
+    # a person. A withheld number is held to the same cap.
+    flag_after_no_shows: int = Field(default=2, ge=1)
+    no_show_window_days: int = Field(default=90, ge=1)
+    flagged_order_cap_cents: int = Field(default=4000, ge=0)
+    # This many calls from one number within the window, none ending in an
+    # order, and its next call is turned away.
+    repeat_call_limit: int = Field(default=5, ge=1)
+    repeat_call_window_minutes: int = Field(default=60, ge=1)
+    # A number not heard from in this long is deleted, with what is known
+    # about it. Its orders stay, linked to no one.
+    caller_retention_days: int = Field(default=365, ge=1)
 
     # Policy limits. More than this many of one item on a line is unusual,
     # and the customer is asked to confirm it.
@@ -186,7 +200,22 @@ class Settings(BaseSettings):
             line_quantity_confirm_above=self.line_quantity_confirm_above,
             line_quantity_escalate_above=self.line_quantity_escalate_above,
             cart_items_escalate_above=self.cart_items_escalate_above,
+            callers=self.caller_limits,
         )
+
+    @property
+    def caller_limits(self) -> CallerLimits:
+        return CallerLimits(
+            flag_after_no_shows=self.flag_after_no_shows,
+            no_show_window=timedelta(days=self.no_show_window_days),
+            large_order_cents=self.flagged_order_cap_cents,
+            repeat_call_limit=self.repeat_call_limit,
+            repeat_call_window=timedelta(minutes=self.repeat_call_window_minutes),
+        )
+
+    @property
+    def caller_retention(self) -> timedelta:
+        return timedelta(days=self.caller_retention_days)
 
 
 @lru_cache

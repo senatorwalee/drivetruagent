@@ -9,7 +9,8 @@ where a call goes when a person is needed.
 """
 
 import uuid
-from datetime import date
+from dataclasses import dataclass
+from datetime import UTC, date, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,9 +29,14 @@ from drivetruagent.agent.voice import (
     accept_call,
     run_call,
     session_config,
+    turn_away,
 )
 from drivetruagent.enums import Channel, SessionState
+from drivetruagent.ordering.callers import record_call
 from drivetruagent.ordering.sessions import end_session, open_session
+from drivetruagent.policy import caller_rules
+from drivetruagent.policy.caller_rules import TURN_AWAY_SENTENCES, CallerLimits
+from drivetruagent.policy.callers import counts_for
 
 # Said by code, word for word, before the model says anything. It tells the
 # caller they are talking to an automated assistant, that the call is
@@ -59,6 +65,14 @@ def greeting(restaurant: str, *, number_known: bool) -> str:
     return template.format(restaurant=restaurant)
 
 
+@dataclass(frozen=True)
+class CallOutcome:
+    # The session the call is being handled in, if it was taken.
+    session_id: uuid.UUID | None = None
+    # Why it was not, if it was turned away.
+    turned_away: caller_rules.TurnAway | None = None
+
+
 async def answer_call(
     db: AsyncSession,
     incoming: IncomingCall,
@@ -70,15 +84,38 @@ async def answer_call(
     voice: VoiceSettings,
     business_date: date,
     staff_phone: str | None,
-) -> uuid.UUID | None:
+    caller_limits: CallerLimits,
+) -> CallOutcome:
     """Answer a ringing call and handle it in the background.
 
-    Returns the new session's id, or None if this call is already being
-    answered (the webhook was delivered twice). Raises ModelUnavailable if
-    OpenAI would not take the call; the session is then closed.
+    A blocked number, or one that keeps calling without ordering, is told
+    so in a fixed sentence and never reaches the agent. Nothing is returned
+    if this call is already being answered (the webhook was delivered
+    twice). Raises ModelUnavailable if OpenAI would not take the call; the
+    session is then closed.
     """
     if not calls.claim(incoming.call_id):
-        return None
+        return CallOutcome()
+    if incoming.caller_phone is not None:
+        counts = await counts_for(
+            db, caller_limits, now=datetime.now(UTC), phone_e164=incoming.caller_phone
+        )
+        refusal = caller_rules.turn_away(counts, caller_limits)
+        if refusal is not None:
+            # Still a call from this number: it counts, and keeps the
+            # number from being forgotten while it goes on calling.
+            await record_call(db, incoming.caller_phone)
+            await db.commit()
+            calls.start(
+                # Not a session; the key only has to be unique.
+                uuid.uuid4(),
+                incoming.call_id,
+                turn_away(
+                    client, incoming.call_id, TURN_AWAY_SENTENCES[refusal], voice
+                ),
+            )
+            return CallOutcome(turned_away=refusal)
+
     customer_session = await open_session(
         db,
         business_date=business_date,
@@ -128,4 +165,4 @@ async def answer_call(
             greeting=greeting(config.restaurant_name, number_known=number_known),
         ),
     )
-    return session_id
+    return CallOutcome(session_id=session_id)

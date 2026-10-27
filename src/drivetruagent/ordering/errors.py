@@ -64,6 +64,13 @@ class InvalidPhoneNumber(OrderingError):
         super().__init__("That is not a phone number that can be called back.")
 
 
+class CallerNotFound(OrderingError):
+    code = "caller_not_found"
+
+    def __init__(self, caller_id: object) -> None:
+        super().__init__(f"No caller with id {caller_id}.")
+
+
 class TypedCallerIdOff(OrderingError):
     code = "typed_caller_id_off"
 
@@ -202,6 +209,18 @@ class OrderNotFound(OrderingError):
 
     def __init__(self, order_id: object) -> None:
         super().__init__(f"No order with id {order_id}.")
+
+
+class NotAPickupOrder(OrderingError):
+    """Only a phone order is collected later, so only it has a pickup to mark."""
+
+    code = "not_a_pickup_order"
+
+    def __init__(self, order_id: object) -> None:
+        super().__init__(
+            f"Order {order_id} was not ordered by phone, so there is no pickup "
+            "to mark.",
+        )
 
 
 class SessionNotHandedOff(OrderingError):

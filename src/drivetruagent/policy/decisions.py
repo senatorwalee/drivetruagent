@@ -6,6 +6,7 @@ from enum import StrEnum
 from typing import Any
 
 from drivetruagent.enums import SessionState
+from drivetruagent.policy.caller_rules import CallerLimits, Standing
 
 
 class Decision(StrEnum):
@@ -42,6 +43,8 @@ class PolicyLimits:
     line_quantity_escalate_above: int
     # So is a cart holding more than this many items in total.
     cart_items_escalate_above: int
+    # What a phone number's history allows. See policy/caller_rules.py.
+    callers: CallerLimits = field(default_factory=CallerLimits)
 
 
 @dataclass(frozen=True)
@@ -52,3 +55,7 @@ class PolicyContext:
     cart_item_count: int
     # Line number -> quantity, for the lines currently in the cart.
     line_quantities: Mapping[int, int]
+    # What the cart costs now, everything included.
+    cart_total_cents: int = 0
+    # A phone order's caller standing; None for a drive-through car.
+    caller_standing: Standing | None = None

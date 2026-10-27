@@ -29,6 +29,7 @@ from drivetruagent.enums import (
     AgentEventKind,
     Language,
 )
+from drivetruagent.ordering.callers import forget_inactive
 from drivetruagent.ordering.inventory import release_expired
 from drivetruagent.ordering.sessions import clock_of, lock_session
 from drivetruagent.ordering.timers import TimerAction, TimerSettings, due_action
@@ -48,6 +49,11 @@ HANDING_OFF = {
         "Un instant, s'il vous plaît."
     ),
 }
+
+
+# How often numbers past their retention are looked for. Nothing depends on
+# it being sooner: a year's retention is not out by an hour.
+FORGET_CALLERS_EVERY = timedelta(hours=1)
 
 
 @dataclass(frozen=True)
@@ -169,17 +175,32 @@ async def run_forever(
     interval_seconds: float,
     timers: TimerSettings,
     tax_rate: Decimal,
+    caller_retention: timedelta | None = None,
     clock: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> None:
-    """Sweep, wait, repeat, until cancelled.
+    """Sweep, wait, repeat, until cancelled. Once an hour, also delete the
+    phone numbers not heard from within `caller_retention`.
 
     A sweep that fails is logged and the next one runs as usual: a database
     blip must not stop timers for the rest of the day.
     """
+    # None: not yet done since starting, so due on the first sweep.
+    forget_callers_at: datetime | None = None
     while True:
         try:
             async with session_factory() as db:
-                await sweep(db, now=clock(), timers=timers, tax_rate=tax_rate)
+                now = clock()
+                await sweep(db, now=now, timers=timers, tax_rate=tax_rate)
+                if caller_retention is not None and (
+                    forget_callers_at is None or now >= forget_callers_at
+                ):
+                    forgotten = await forget_inactive(
+                        db, called_before=now - caller_retention
+                    )
+                    await db.commit()
+                    forget_callers_at = now + FORGET_CALLERS_EVERY
+                    if forgotten:
+                        logger.info("Deleted %d inactive callers", forgotten)
         except Exception:
             logger.exception("A timer sweep failed")
         await asyncio.sleep(interval_seconds)

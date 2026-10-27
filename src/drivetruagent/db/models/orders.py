@@ -25,13 +25,24 @@ from drivetruagent.db.base import (
     enum_check,
     text_enum,
 )
-from drivetruagent.enums import DiscountKind, Language
+from drivetruagent.enums import DiscountKind, Language, PickupStatus
 
 
 class Order(UuidPrimaryKey, Timestamps, Base):
     __tablename__ = "orders"
     __table_args__ = (
         enum_check("language", Language),
+        enum_check("pickup_status", PickupStatus),
+        # Who marked a pickup, and when, are set exactly when it was marked.
+        CheckConstraint(
+            "(pickup_marked_at IS NULL) = "
+            "(pickup_status IS NULL OR pickup_status = 'waiting')",
+            name="pickup_marked_at_matches_status",
+        ),
+        CheckConstraint(
+            "(pickup_marked_by IS NULL) = (pickup_marked_at IS NULL)",
+            name="pickup_marked_by_matches_marked_at",
+        ),
         CheckConstraint("subtotal_cents >= 0", name="subtotal_cents_non_negative"),
         CheckConstraint("tax_cents >= 0", name="tax_cents_non_negative"),
         CheckConstraint("discount_cents >= 0", name="discount_cents_non_negative"),
@@ -63,6 +74,13 @@ class Order(UuidPrimaryKey, Timestamps, Base):
     submitted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    # A phone order is collected later, and staff mark whether it was. None
+    # for a drive-through order, which is handed over at the window.
+    pickup_status: Mapped[PickupStatus | None] = mapped_column(
+        text_enum(PickupStatus), index=True
+    )
+    pickup_marked_by: Mapped[str | None]
+    pickup_marked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     lines: Mapped[list["OrderLine"]] = relationship(
         back_populates="order",
