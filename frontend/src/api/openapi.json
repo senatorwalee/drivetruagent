@@ -89,6 +89,38 @@
         "title": "ActionOutcome",
         "type": "object"
       },
+      "ActiveCall": {
+        "properties": {
+          "caller_last_four": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caller Last Four"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "started_at",
+          "caller_last_four"
+        ],
+        "title": "ActiveCall",
+        "type": "object"
+      },
       "AddItem": {
         "additionalProperties": false,
         "properties": {
@@ -563,6 +595,27 @@
           "options_that_add"
         ],
         "title": "AllergenReport",
+        "type": "object"
+      },
+      "CallAnswered": {
+        "properties": {
+          "session_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          }
+        },
+        "required": [
+          "session_id"
+        ],
+        "title": "CallAnswered",
         "type": "object"
       },
       "CartSnapshot": {
@@ -4000,6 +4053,74 @@
         "summary": "Read an order",
         "tags": [
           "ordering"
+        ]
+      }
+    },
+    "/phone/calls": {
+      "get": {
+        "description": "Newest first. The live screen follows the newest one.",
+        "operationId": "phone_calls_phone_calls_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ActiveCall"
+                  },
+                  "title": "Response Phone Calls Phone Calls Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Phone calls in progress",
+        "tags": [
+          "phone"
+        ]
+      }
+    },
+    "/phone/incoming": {
+      "post": {
+        "description": "OpenAI calls this when someone rings the restaurant's number. The call\nis answered with the agent's instructions and tools, the caller hears\nthe opening notice, and the backend handles the call from then on.",
+        "operationId": "incoming_call_phone_incoming_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallAnswered"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Answer a phone call (OpenAI's webhook)",
+        "tags": [
+          "phone"
         ]
       }
     },

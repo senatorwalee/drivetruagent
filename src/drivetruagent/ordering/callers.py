@@ -6,7 +6,7 @@ then. Nothing is copied, so there is no second record to keep in step.
 """
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel
 from sqlalchemy import func, select, update
@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from drivetruagent.db.models import Caller, CustomerSession, Order, OrderLine
+from drivetruagent.enums import ACTIVE_SESSION_STATES, Channel
 
 # How many orders a caller can be reminded of.
 PAST_ORDERS_LIMIT = 5
@@ -108,6 +109,38 @@ async def past_orders(
             ],
         )
         for order, business_date in rows
+    ]
+
+
+class ActiveCall(BaseModel):
+    session_id: uuid.UUID
+    started_at: datetime
+    # The last four digits, for telling calls apart on a screen; None if the
+    # number was withheld. The whole number is not needed there.
+    caller_last_four: str | None
+
+
+async def active_calls(db: AsyncSession, *, limit: int = 10) -> list[ActiveCall]:
+    """Phone calls in progress, newest first."""
+    rows = (
+        await db.execute(
+            select(CustomerSession.id, CustomerSession.started_at, Caller.phone_e164)
+            .outerjoin(Caller, CustomerSession.caller_id == Caller.id)
+            .where(
+                CustomerSession.channel == Channel.PHONE,
+                CustomerSession.state.in_(ACTIVE_SESSION_STATES),
+            )
+            .order_by(CustomerSession.started_at.desc())
+            .limit(limit)
+        )
+    ).all()
+    return [
+        ActiveCall(
+            session_id=session_id,
+            started_at=started_at,
+            caller_last_four=None if phone is None else phone[-4:],
+        )
+        for session_id, started_at, phone in rows
     ]
 
 

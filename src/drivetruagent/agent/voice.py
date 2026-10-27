@@ -2,6 +2,10 @@
 
     browser  --audio (WebRTC)-->  OpenAI Realtime  <--events (WebSocket)--  this backend
 
+A phone call works the same way once answered: the caller's audio reaches
+OpenAI over SIP, OpenAI tells us with a signed webhook, we accept the call
+with the same settings and join the same sideband.
+
 The audio goes straight between the browser and OpenAI, which keeps it quick
 and lets the browser handle echo and noise. Everything else stays here: the
 API key, the instructions, and every tool call. The backend joins the call
@@ -22,7 +26,7 @@ import asyncio
 import json
 import logging
 import uuid
-from collections.abc import AsyncIterator, Callable, Coroutine, Sequence
+from collections.abc import AsyncIterator, Callable, Coroutine, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -49,9 +53,10 @@ from drivetruagent.agent.messages import (
 from drivetruagent.agent.model import ModelUnavailable, ToolDefinition
 from drivetruagent.agent.tools import ToolContext, run_tool
 from drivetruagent.db.models import AgentEvent
-from drivetruagent.enums import FINAL_SESSION_STATES, AgentEventKind
+from drivetruagent.enums import FINAL_SESSION_STATES, AgentEventKind, SessionState
 from drivetruagent.ordering.errors import OrderingError
 from drivetruagent.ordering.offers import close_suggestions
+from drivetruagent.ordering.phone_numbers import normalize_phone
 from drivetruagent.ordering.sessions import (
     begin_turn,
     end_turn,
@@ -126,6 +131,10 @@ class CallControl(Protocol):
 
     async def hang_up(self) -> None: ...
 
+    async def transfer(self, target_uri: str) -> None:
+        """Pass a phone call to another number, such as tel:+14165550100."""
+        ...
+
 
 def speaking_seconds(text: str) -> float:
     """Roughly how long a sentence takes to say, so a goodbye is not cut off."""
@@ -150,6 +159,8 @@ class VoiceBridge:
         model_name: str,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
         sleep: Callable[[float], Any] = asyncio.sleep,
+        transfer_to: str | None = None,
+        callback_sentence: str | None = None,
     ) -> None:
         self.session_id = session_id
         self._scope = scope
@@ -165,7 +176,21 @@ class VoiceBridge:
         # Responses the backend asked for to say a timer's sentence.
         self._timer_responses: set[str] = set()
         self._last_timer_seq = 0
+        # On a phone call, where a handoff goes: a tel: URI to transfer to, or
+        # failing that a sentence said before hanging up ("we'll call you back").
+        self._transfer_to = transfer_to
+        self._callback_sentence = callback_sentence
         self.ended = False
+
+    async def greet(self, sentence: str) -> None:
+        """Say the opening sentence: fixed words, written to the log as the
+        agent's, so the screen and the record show exactly what was said."""
+        async with self._scope() as db:
+            await events.record_message(
+                db, self.session_id, self._turn_id, AssistantMessage(sentence)
+            )
+            await db.commit()
+        await self._call.say(sentence)
 
     # --- Events from the call -------------------------------------------
 
@@ -238,7 +263,7 @@ class VoiceBridge:
         await self._call.say(outcome.reply)
         if outcome.action in (GuardAction.TERMINATE, GuardAction.HAND_OFF):
             await self._sleep(speaking_seconds(outcome.reply))
-            await self._end_call()
+            await self._end_call(handed_off=outcome.action is GuardAction.HAND_OFF)
 
     async def _model_called(
         self, response_id: str, call_id: str, name: str, raw_arguments: str
@@ -292,14 +317,12 @@ class VoiceBridge:
         async with self._scope() as db:
             await end_turn(db, self.session_id, now=self._clock())
             await db.commit()
-            ended = (
-                await get_session(db, self.session_id)
-            ).state in FINAL_SESSION_STATES
-        if ended:
+            state = (await get_session(db, self.session_id)).state
+        if state in FINAL_SESSION_STATES:
             # The order was placed or a person is taking over. Let the agent
             # finish its last sentence, then end the call.
             await self._sleep(speaking_seconds(_spoken_text(response)))
-            await self._end_call()
+            await self._end_call(handed_off=state is SessionState.HANDED_OFF)
 
     async def _record_model_call(self, response: Any) -> None:
         usage = response.usage
@@ -373,12 +396,21 @@ class VoiceBridge:
                 await self._call.say(sentence)
                 if action == "hand_off":
                     await self._sleep(speaking_seconds(sentence))
-                    await self._end_call()
+                    await self._end_call(handed_off=True)
 
-    async def _end_call(self) -> None:
-        if not self.ended:
-            self.ended = True
-            await self._call.hang_up()
+    async def _end_call(self, *, handed_off: bool = False) -> None:
+        """Hang up; or, when a person is taking over a phone call, put the
+        caller through to them, or tell them they'll be called back."""
+        if self.ended:
+            return
+        self.ended = True
+        if handed_off and self._transfer_to is not None:
+            await self._call.transfer(self._transfer_to)
+            return
+        if handed_off and self._callback_sentence is not None:
+            await self._call.say(self._callback_sentence)
+            await self._sleep(speaking_seconds(self._callback_sentence))
+        await self._call.hang_up()
 
 
 def _sentence_after(logged: list[AgentEvent], index: int) -> str | None:
@@ -439,6 +471,54 @@ async def create_call(
     return call_id, created.text
 
 
+@dataclass(frozen=True)
+class IncomingCall:
+    """A phone call ringing at OpenAI, waiting to be accepted."""
+
+    call_id: str
+    # The caller's number in E.164, or None if it was withheld.
+    caller_phone: str | None
+
+
+class InvalidWebhook(Exception):
+    """The request did not come from OpenAI, or came too late to trust."""
+
+
+def read_incoming_call(
+    client: RealtimeClient, body: bytes, headers: Mapping[str, str], secret: str
+) -> IncomingCall | None:
+    """Check a webhook's signature and read the call from it.
+
+    Returns None for any other kind of event. Raises InvalidWebhook if the
+    signature is wrong or the delivery is more than five minutes old, so a
+    recorded request cannot be replayed later.
+    """
+    try:
+        event = client.webhooks.unwrap(body, dict(headers), secret=secret)
+    except (openai.InvalidWebhookSignatureError, ValueError) as error:
+        # ValueError: a signature header is missing altogether.
+        raise InvalidWebhook(str(error)) from error
+    if event.type != "realtime.call.incoming":
+        return None
+    sender = next(
+        (h.value for h in event.data.sip_headers if h.name.lower() == "from"), None
+    )
+    return IncomingCall(event.data.call_id, normalize_phone(sender))
+
+
+async def accept_call(
+    client: RealtimeClient, call_id: str, config: RealtimeSessionCreateRequestParam
+) -> None:
+    """Answer a ringing phone call with these settings.
+
+    Raises ModelUnavailable if OpenAI does not accept it.
+    """
+    try:
+        await client.realtime.calls.accept(call_id, **config)
+    except openai.OpenAIError as error:
+        raise ModelUnavailable(f"OpenAI did not answer the call: {error}") from error
+
+
 class OpenAICall:
     """CallControl over the sideband connection to a live call."""
 
@@ -471,20 +551,28 @@ class OpenAICall:
     async def hang_up(self) -> None:
         await self._client.realtime.calls.hangup(self._call_id)
 
+    async def transfer(self, target_uri: str) -> None:
+        await self._client.realtime.calls.refer(self._call_id, target_uri=target_uri)
+
 
 async def run_call(
     client: AsyncOpenAI,
     call_id: str,
     bridge_for: Callable[[CallControl], VoiceBridge],
+    *,
+    greeting: str | None = None,
 ) -> None:
     """Join a live call and handle it until it ends.
 
     Two things run side by side: reading the call's events, and checking
-    once a second for anything a timer has done.
+    once a second for anything a timer has done. `greeting`: said first, for
+    a phone call, where the caller is waiting to hear something.
     """
     async with client.realtime.connect(call_id=call_id) as connection:
         bridge = bridge_for(OpenAICall(client, call_id, connection))
         await bridge.start_watching_timers()
+        if greeting is not None:
+            await bridge.greet(greeting)
         watching = asyncio.create_task(_watch_timers(bridge))
         try:
             async for event in _events(connection):
@@ -542,6 +630,16 @@ class LiveCalls:
 
     def __init__(self) -> None:
         self._calls: dict[uuid.UUID, LiveCall] = {}
+        # Phone calls already being answered, by OpenAI's call id. A webhook
+        # can be delivered more than once; the call is answered once.
+        self._claimed: set[str] = set()
+
+    def claim(self, call_id: str) -> bool:
+        """True the first time a call id is seen; False on a repeat."""
+        if call_id in self._claimed:
+            return False
+        self._claimed.add(call_id)
+        return True
 
     def is_live(self, session_id: uuid.UUID) -> bool:
         call = self._calls.get(session_id)
@@ -590,6 +688,13 @@ class LiveCalls:
             await client.realtime.calls.hangup(call.call_id)
         finally:
             call.task.cancel()
+
+    async def wait(self) -> None:
+        """Wait for every call being handled to finish."""
+        await asyncio.gather(
+            *(call.task for call in list(self._calls.values())),
+            return_exceptions=True,
+        )
 
     async def close_all(self) -> None:
         """At shutdown: stop handling every call."""

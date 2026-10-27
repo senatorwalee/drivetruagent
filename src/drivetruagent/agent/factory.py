@@ -94,6 +94,7 @@ def agent_config(
         guard=guard_from_settings(settings),
         guard_first=settings.guardrail_check_first,
         knowledge=knowledge_from_settings(settings),
+        pickup_minutes=settings.pickup_ready_minutes,
     )
 
 

@@ -15,6 +15,7 @@ from drivetruagent.api import (
     menu,
     menu_admin,
     offers,
+    phone,
     sessions,
     voice,
 )
@@ -74,6 +75,7 @@ def create_app() -> FastAPI:
     app.include_router(offers.router)
     app.include_router(handoffs.router)
     app.include_router(voice.router)
+    app.include_router(phone.router)
     app.include_router(insights.router)
     register_error_handlers(app)
     return app
