@@ -1,5 +1,6 @@
 """The web phone: ring the agent from a phone's browser, without a number.
 
+    GET    /web-phone/line                   who answers; also checks the key
     POST   /web-phone/calls                  the browser's SDP offer in, the call out
     POST   /web-phone/calls/{key}/connected  the browser's audio is up
     DELETE /web-phone/calls/{key}            hang up
@@ -97,6 +98,23 @@ def require_key(
 
 LineDep = Annotated[WebPhoneLine, Depends(get_web_phone_line)]
 Keyed = [Depends(require_key)]
+
+
+class WebPhoneInfo(BaseModel):
+    # Who the call goes to, for the page to show before it rings.
+    restaurant_name: str
+
+
+@router.get(
+    "/web-phone/line",
+    dependencies=Keyed,
+    responses=FORBIDDEN | UNAVAILABLE,
+    summary="Who the web phone calls",
+)
+async def web_phone_line(settings: SettingsDep) -> WebPhoneInfo:
+    """Lets the page show who it calls, and find out a wrong key before
+    anyone taps Call."""
+    return WebPhoneInfo(restaurant_name=settings.restaurant_name)
 
 
 class WebCall(BaseModel):

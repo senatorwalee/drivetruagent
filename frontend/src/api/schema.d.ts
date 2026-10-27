@@ -1028,6 +1028,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/web-phone/line": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who the web phone calls
+         * @description Lets the page show who it calls, and find out a wrong key before
+         *     anyone taps Call.
+         */
+        get: operations["web_phone_line_web_phone_line_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2208,6 +2229,11 @@ export interface components {
             /** Session Id */
             session_id: string | null;
             turned_away?: components["schemas"]["TurnAway"] | null;
+        };
+        /** WebPhoneInfo */
+        WebPhoneInfo: {
+            /** Restaurant Name */
+            restaurant_name: string;
         };
         /**
          * WeekOfSpecialsView
@@ -4351,6 +4377,55 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    web_phone_line_web_phone_line_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Web-Phone-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebPhoneInfo"];
+                };
             };
             /** @description Forbidden */
             403: {

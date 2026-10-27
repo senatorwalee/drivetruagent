@@ -1,0 +1,139 @@
+/* The web phone: laid out like a phone's call screen. Made for a phone held
+   upright; on a wider screen it stays a phone-sized column in the middle. */
+
+.page {
+  min-height: 100dvh;
+  max-width: 440px;
+  margin: 0 auto;
+  padding: max(24px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom));
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 24px;
+  text-align: center;
+}
+
+.brand {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.contact {
+  align-self: center;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+.avatar {
+  width: 112px;
+  height: 112px;
+  margin-bottom: 8px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--raised);
+  border: 1px solid var(--hairline);
+  font-size: 36px;
+  font-weight: 600;
+  color: var(--accent);
+  transition: box-shadow 200ms ease;
+}
+
+/* A soft ring while the agent talks, like a speaker's tile on a video call. */
+.avatarSpeaking {
+  box-shadow: 0 0 0 6px color-mix(in oklch, var(--accent) 25%, transparent);
+}
+
+.name {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.status {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 16px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.problem {
+  margin: 0;
+  max-width: 32ch;
+  color: var(--reject);
+  font-family: var(--font);
+  font-size: 15px;
+}
+
+.speaking {
+  margin: 0;
+  font-size: 14px;
+  color: var(--accent);
+}
+
+.controls {
+  display: flex;
+  justify-content: center;
+  gap: 48px;
+}
+
+.control {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.control:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.circle {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--raised);
+  border: 1px solid var(--hairline);
+}
+
+.label {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.call .circle {
+  background: var(--allow);
+  border-color: transparent;
+  color: var(--on-accent);
+}
+
+.end .circle {
+  background: var(--reject);
+  border-color: transparent;
+  color: var(--on-accent);
+}
+
+/* The handset tipped down, as phones draw hanging up. */
+.end svg {
+  transform: rotate(135deg);
+}
+
+.muteOn .circle {
+  background: var(--text);
+  color: var(--ground);
+}

@@ -194,6 +194,19 @@ async def test_a_call_without_the_right_key_is_refused(
     assert await sessions_in(db_session) == []
 
 
+async def test_the_page_can_check_its_key_and_learn_who_it_calls(
+    client: httpx.AsyncClient, stand_in: StandInOpenAI
+) -> None:
+    right = await client.get("/web-phone/line", headers={"X-Web-Phone-Key": KEY})
+    wrong = await client.get("/web-phone/line", headers={"X-Web-Phone-Key": "nope"})
+
+    assert (right.status_code, right.json()) == (
+        200,
+        {"restaurant_name": "Maple Lane Burgers"},
+    )
+    assert wrong.status_code == 403
+
+
 async def test_hanging_up_and_connecting_need_the_key_too(
     client: httpx.AsyncClient, stand_in: StandInOpenAI
 ) -> None:

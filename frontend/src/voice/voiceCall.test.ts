@@ -118,6 +118,17 @@ describe('starting a call', () => {
     expect(call.current.status).toBe('live')
   })
 
+  it('tells the backend once the audio is up, if asked to', async () => {
+    const connected = vi.fn(async () => {})
+    deps.connected = connected
+    await started()
+    expect(connected).not.toHaveBeenCalled()
+
+    connection.become('connected')
+
+    expect(connected).toHaveBeenCalledOnce()
+  })
+
   it("plays the agent's voice through the speaker", async () => {
     await started()
     const voice = { id: 'agent-voice' }

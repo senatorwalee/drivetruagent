@@ -3170,6 +3170,19 @@
         "title": "WebCall",
         "type": "object"
       },
+      "WebPhoneInfo": {
+        "properties": {
+          "restaurant_name": {
+            "title": "Restaurant Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "restaurant_name"
+        ],
+        "title": "WebPhoneInfo",
+        "type": "object"
+      },
       "WeekOfSpecialsView": {
         "description": "The specials for each day of this week, Monday to Sunday.",
         "properties": {
@@ -6320,6 +6333,76 @@
           }
         },
         "summary": "The web phone's audio is connected",
+        "tags": [
+          "web phone"
+        ]
+      }
+    },
+    "/web-phone/line": {
+      "get": {
+        "description": "Lets the page show who it calls, and find out a wrong key before\nanyone taps Call.",
+        "operationId": "web_phone_line_web_phone_line_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Web-Phone-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Web-Phone-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebPhoneInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Who the web phone calls",
         "tags": [
           "web phone"
         ]
