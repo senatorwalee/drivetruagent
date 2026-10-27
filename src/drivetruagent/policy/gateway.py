@@ -18,7 +18,7 @@ from decimal import Decimal
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from drivetruagent.db.models import PendingAction
+from drivetruagent.db.models import CustomerSession, PendingAction
 from drivetruagent.enums import (
     FINAL_SESSION_STATES,
     PendingActionStatus,
@@ -41,6 +41,7 @@ from drivetruagent.policy.actions import (
     SubmitOrder,
     UpdateLine,
 )
+from drivetruagent.policy.callers import session_standing
 from drivetruagent.policy.decisions import (
     Decision,
     PolicyContext,
@@ -108,9 +109,10 @@ async def _evaluate_and_apply(
 ) -> ActionOutcome:
     # The lock is held until the caller's transaction ends, so the decision
     # and its effect cannot be separated by another change to this session.
-    await lock_session(db, session_id)
+    customer_session = await lock_session(db, session_id)
     snapshot = await cart_rules.get_cart(db, session_id, tax_rate=tax_rate)
-    result = evaluate(action, _context(snapshot), limits)
+    context = await _context(db, customer_session, snapshot, limits)
+    result = evaluate(action, context, limits)
 
     if result.decision is Decision.ALLOW:
         return await _run(db, session_id, action, tax_rate, reservation_ttl)
@@ -163,7 +165,7 @@ async def _confirm(
     limits: PolicyLimits,
     reservation_ttl: timedelta,
 ) -> ActionOutcome:
-    await lock_session(db, session_id)
+    customer_session = await lock_session(db, session_id)
     pending = await _load_pending(db, session_id, pending_action_id)
     snapshot = await cart_rules.get_cart(db, session_id, tax_rate=tax_rate)
 
@@ -172,7 +174,8 @@ async def _confirm(
         return _rejected(not_usable, snapshot)
 
     action = ACTION_ADAPTER.validate_python(pending.action)
-    result = evaluate(action, _context(snapshot), limits, confirmed=True)
+    context = await _context(db, customer_session, snapshot, limits)
+    result = evaluate(action, context, limits, confirmed=True)
 
     if result.decision is Decision.ESCALATE:
         _resolve(pending, PendingActionStatus.ESCALATED)
@@ -615,9 +618,18 @@ async def _supersede_pending(db: AsyncSession, session_id: uuid.UUID) -> None:
     )
 
 
-def _context(snapshot: CartSnapshot) -> PolicyContext:
+async def _context(
+    db: AsyncSession,
+    customer_session: CustomerSession,
+    snapshot: CartSnapshot,
+    limits: PolicyLimits,
+) -> PolicyContext:
     return PolicyContext(
         state=snapshot.state,
         cart_item_count=snapshot.item_count,
         line_quantities={line.line_no: line.quantity for line in snapshot.lines},
+        cart_total_cents=snapshot.total_cents,
+        caller_standing=await session_standing(
+            db, customer_session, limits.callers, now=datetime.now(UTC)
+        ),
     )

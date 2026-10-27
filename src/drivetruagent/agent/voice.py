@@ -26,7 +26,14 @@ import asyncio
 import json
 import logging
 import uuid
-from collections.abc import AsyncIterator, Callable, Coroutine, Mapping, Sequence
+from collections.abc import (
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Coroutine,
+    Mapping,
+    Sequence,
+)
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -113,6 +120,21 @@ def session_config(
             for tool in tools
         ],
         "tool_choice": "auto",
+    }
+
+
+def refusal_config(settings: VoiceSettings) -> RealtimeSessionCreateRequestParam:
+    """For a call that is only told it can't be taken: no tools, and nothing
+    the caller says starts an answer, so only the fixed sentence is heard."""
+    return {
+        "type": "realtime",
+        "model": settings.model,
+        "instructions": "Say only the sentences you are asked to say.",
+        "output_modalities": ["audio"],
+        "audio": {
+            "input": {"turn_detection": None},
+            "output": {"voice": settings.voice},
+        },
     }
 
 
@@ -517,6 +539,26 @@ async def accept_call(
         await client.realtime.calls.accept(call_id, **config)
     except openai.OpenAIError as error:
         raise ModelUnavailable(f"OpenAI did not answer the call: {error}") from error
+
+
+async def turn_away(
+    client: RealtimeClient,
+    call_id: str,
+    sentence: str,
+    settings: VoiceSettings,
+    *,
+    sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+) -> None:
+    """Answer a phone call only to say one fixed sentence, then hang up.
+
+    Raises ModelUnavailable if OpenAI would not take the call.
+    """
+    await accept_call(client, call_id, refusal_config(settings))
+    async with client.realtime.connect(call_id=call_id) as connection:
+        call = OpenAICall(client, call_id, connection)
+        await call.say(sentence)
+        await sleep(speaking_seconds(sentence))
+        await call.hang_up()
 
 
 class OpenAICall:

@@ -12,7 +12,8 @@ import { describeProblem } from './words'
 
 /** How often to look for new handoffs and changes to the one on screen. */
 const POLL_INTERVAL_MS = 2000
-const NAME_KEY = 'drivetruagent.staffName'
+/** Where the name a person types is kept, so every staff page signs with it. */
+export const STAFF_NAME_KEY = 'drivetruagent.staffName'
 
 export type QueueTab = 'waiting' | 'closed'
 
@@ -47,7 +48,7 @@ export function useStaffDesk(): StaffDesk {
   const now = useNow()
   const [tab, setTab] = useState<QueueTab>('waiting')
   const [chosenId, setChosenId] = useState<string | null>(handoffInAddress)
-  const [staffName, setName] = useState(() => window.localStorage.getItem(NAME_KEY) ?? '')
+  const [staffName, setName] = useState(() => window.localStorage.getItem(STAFF_NAME_KEY) ?? '')
 
   // No retries: the poll is the retry, and a backend that is down should be
   // said to be down now, not after several seconds of backing off.
@@ -114,7 +115,7 @@ export function useStaffDesk(): StaffDesk {
     staffName,
     setStaffName: useCallback((name: string) => {
       setName(name)
-      window.localStorage.setItem(NAME_KEY, name)
+      window.localStorage.setItem(STAFF_NAME_KEY, name)
     }, []),
     acknowledge: useCallback(() => {
       if (selectedId) acknowledging.mutate()

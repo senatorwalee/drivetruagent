@@ -44,7 +44,7 @@ built piece by piece.
 | 22 | Halal and kosher from a reviewed list, a fish burger, and swapping a line in one step | Done; evals pass against the real model |
 | 23a | Caller memory: a phone caller's last five orders, read back and reordered | Done; evals pass against the real model |
 | 23b | A real phone line: OpenAI Realtime over SIP, with a Twilio number | Done; tested with signed webhooks and a stand-in for OpenAI; a live call needs your Twilio number |
-| 23c | No-shows and repeat calls: staff mark pickups, big orders from flagged numbers go to a person, staff can block | Planned |
+| 23c | No-shows and repeat calls: staff mark pickups, big orders from flagged numbers go to a person, staff can block | Done; tested with signed webhooks and the real database |
 | Later | Demo polish: cost readout, French review, demo script | Planned |
 
 ## Stack
@@ -1035,8 +1035,8 @@ frozen order rows.
   line since sold out or taken off the menu is refused on its own and the agent
   says so. It can only reach the caller's own recent orders.
 - **"Don't save my number"** is `forget_my_orders`: nothing is read back from
-  then on. The number itself is kept to help with pickups (no-shows come next),
-  which the opening sentence of a call will say.
+  then on. The number itself is kept to help with pickups (see "No-shows and
+  blocked numbers"), as the opening sentence of a call says.
 - **Two calls from one number at the same moment** are both counted: the caller
   row is written with one `INSERT ... ON CONFLICT DO UPDATE`, and a test fires
   five at once to prove it.
@@ -1109,9 +1109,45 @@ too; a named Cloudflare tunnel keeps one address.
 > **Privacy (not legal advice).** In Ontario, PIPEDA applies: say why a number
 > is kept when it is collected, keep only what that needs and only as long as
 > needed, and let people opt out or ask for deletion. Quebec's Law 25 is
-> stricter about profiling. The phone line's opening notice covers the first;
-> retention limits and staff deletion arrive with the no-show piece. Have the
-> wording reviewed before a real launch.
+> stricter about profiling: a no-show count may need to be off by default
+> there, with express consent. The opening notice says why a number is kept;
+> a number not heard from in a year is deleted, and staff can delete one on
+> request. Have the wording reviewed before a real launch.
+
+## No-shows and blocked numbers
+
+Phone orders are paid at pickup, so a big order that nobody collects is food
+thrown away. Nothing here is decided by the model, and nothing counts against
+a number unless a person marked it.
+
+- **Pickups** (<http://localhost:8080/pickups>): every phone order waits there
+  until staff mark it **Picked up** or **No-show**, signed with the name typed
+  on the staff screen. A wrong mark can be changed for twelve hours.
+- **Flagged** numbers have `FLAG_AFTER_NO_SHOWS` (2) no-shows on orders from
+  the last `NO_SHOW_WINDOW_DAYS` (90), or were flagged by staff. The no-show
+  part is counted whenever it's needed, never stored, so it clears itself as
+  old no-shows age out. A flagged number still gets through, and small orders
+  are placed as usual.
+- **Big orders go to a person.** As the agent reads back an order over
+  `FLAGGED_ORDER_CAP_CENTS` ($40) from a flagged number, or from a withheld
+  one (nothing to go on), the policy rule `large_order_check` hands it off:
+  the caller hears only *"For an order this size, I'll pass you to a team
+  member to confirm"* and is put through to `STAFF_PHONE_NUMBER`. The staff
+  screen says how much it was and why it was checked.
+- **Calling again and again without ordering** (`REPEAT_CALL_LIMIT`, 5 calls
+  in `REPEAT_CALL_WINDOW_MINUTES`, 60) and **blocked** numbers are stopped at
+  the webhook: the call is answered with no tools, a fixed sentence is said,
+  and it hangs up. The agent never hears them. The call still counts.
+- **Blocking is staff only** (<http://localhost:8080/callers>). Numbers show
+  only their last four digits until someone asks. Flag, block, unblock or
+  clear each need a reason, kept with who did it and when
+  (`caller_status_changes`). **Delete** forgets the number, its no-shows and
+  its history; its orders stay, linked to no one.
+- **Retention:** the timekeeper deletes numbers not heard from in
+  `CALLER_RETENTION_DAYS` (365), once an hour.
+
+The rules are pure functions in `policy/caller_rules.py`; the agent is never
+told a caller's standing, only its consequence.
 
 ## Policy engine
 
@@ -1188,6 +1224,13 @@ Run `make dev` and open <http://127.0.0.1:8000/docs> to try these.
 | `PUT /admin/menu/items/{code}/photo` | Set or replace its photo (the image is the body) |
 | `DELETE /admin/menu/items/{code}/photo` | Remove its photo |
 | `GET /insights/unmet-requests?days=7` | What guests asked for that the menu couldn't fill, most asked first |
+| `POST /phone/incoming` | OpenAI's signed webhook: answer a phone call, or turn it away |
+| `GET /phone/calls` | Phone calls in progress, newest first |
+| `GET /pickups` | Phone orders waiting to be collected, then the recently marked |
+| `POST /pickups/{order_id}` | Mark one `picked_up` or `no_show` |
+| `GET /callers` | Numbers that have called, with counts and standing |
+| `POST /callers/{id}/status` | Flag, block or clear a number, with a reason |
+| `DELETE /callers/{id}` | Forget a number |
 | `GET /handoffs` | The handoff queue, longest waiting first; `?status=`, `?session_id=` |
 | `GET /handoffs/{id}` | One handoff's package |
 | `POST /handoffs/{id}/acknowledge` | Say you have picked it up |

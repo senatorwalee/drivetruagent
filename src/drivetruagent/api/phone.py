@@ -27,14 +27,17 @@ from drivetruagent.api.deps import (
 from drivetruagent.api.errors import UNAVAILABLE, ErrorBody, ErrorResponse
 from drivetruagent.api.voice import LiveCallsDep, RealtimeDep, ScopeDep
 from drivetruagent.ordering.callers import ActiveCall, active_calls
+from drivetruagent.policy.caller_rules import TurnAway
 
 router = APIRouter(tags=["phone"])
 
 
 class CallAnswered(BaseModel):
     # The session the call is being handled in. None: nothing to answer (not
-    # a call, or a call already being answered).
+    # a call, or a call already being answered), or the call was turned away.
     session_id: uuid.UUID | None
+    # Why the call was told it can't be taken, if it was.
+    turned_away: TurnAway | None = None
 
 
 def _refusal(status_code: int, code: str, message: str) -> JSONResponse:
@@ -80,7 +83,7 @@ async def incoming_call(
     if incoming is None:
         return CallAnswered(session_id=None)
 
-    session_id = await answer_call(
+    outcome = await answer_call(
         db,
         incoming,
         client=client,
@@ -90,8 +93,9 @@ async def incoming_call(
         voice=settings.voice_settings,
         business_date=today,
         staff_phone=settings.staff_phone_number,
+        caller_limits=settings.caller_limits,
     )
-    return CallAnswered(session_id=session_id)
+    return CallAnswered(session_id=outcome.session_id, turned_away=outcome.turned_away)
 
 
 @router.get("/phone/calls", summary="Phone calls in progress")

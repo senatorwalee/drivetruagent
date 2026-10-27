@@ -6,16 +6,37 @@ then. Nothing is copied, so there is no second record to keep in step.
 """
 
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from pydantic import BaseModel
-from sqlalchemy import func, select, update
+from sqlalchemy import (
+    ColumnElement,
+    ScalarSelect,
+    delete,
+    exists,
+    func,
+    select,
+    true,
+    update,
+)
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from drivetruagent.db.models import Caller, CustomerSession, Order, OrderLine
-from drivetruagent.enums import ACTIVE_SESSION_STATES, Channel
+from drivetruagent.db.models import (
+    Caller,
+    CallerStatusChange,
+    CustomerSession,
+    Order,
+    OrderLine,
+)
+from drivetruagent.enums import (
+    ACTIVE_SESSION_STATES,
+    CallerStatus,
+    Channel,
+    PickupStatus,
+)
+from drivetruagent.ordering.errors import CallerNotFound
 
 # How many orders a caller can be reminded of.
 PAST_ORDERS_LIMIT = 5
@@ -158,6 +179,202 @@ async def forget_history(db: AsyncSession, session_id: uuid.UUID) -> bool:
         .values(history_opted_out=True, updated_at=func.now())
     )
     return True
+
+
+class CallerSummary(BaseModel):
+    """A number, what it has done, and what staff decided about it.
+
+    The counts are what the standing rules need (policy/caller_rules.py);
+    what they add up to is decided there, not here.
+    """
+
+    caller_id: uuid.UUID
+    phone_e164: str
+    first_call_at: datetime
+    last_call_at: datetime
+    call_count: int
+    history_opted_out: bool
+    order_count: int
+    # No-shows marked on orders placed within the no-show window.
+    recent_no_shows: int
+    # Calls within the repeat-call window that did not end in an order.
+    recent_calls_without_order: int
+    status: CallerStatus
+    # The latest status change: why, by whom, when. None if never changed.
+    status_reason: str | None
+    status_changed_by: str | None
+    status_changed_at: datetime | None
+
+
+async def caller_summaries(
+    db: AsyncSession,
+    *,
+    now: datetime,
+    no_show_window: timedelta,
+    repeat_call_window: timedelta,
+    caller_id: uuid.UUID | None = None,
+    phone_e164: str | None = None,
+    limit: int = 200,
+) -> list[CallerSummary]:
+    """Callers, the most recent call first: every one, or the one with this
+    id or number. Counted in one query, however many callers there are."""
+
+    def count_orders(*conditions: ColumnElement[bool]) -> ScalarSelect[int]:
+        return (
+            select(func.count(Order.id))
+            .join(CustomerSession, Order.session_id == CustomerSession.id)
+            .where(CustomerSession.caller_id == Caller.id, *conditions)
+            .scalar_subquery()
+        )
+
+    order_count = count_orders()
+    recent_no_shows = count_orders(
+        Order.pickup_status == PickupStatus.NO_SHOW,
+        Order.submitted_at > now - no_show_window,
+    )
+    calls_without_order = (
+        select(func.count())
+        .select_from(CustomerSession)
+        .where(
+            CustomerSession.caller_id == Caller.id,
+            CustomerSession.started_at > now - repeat_call_window,
+            ~exists().where(Order.session_id == CustomerSession.id),
+        )
+        .scalar_subquery()
+    )
+    latest_change = (
+        select(
+            CallerStatusChange.reason,
+            CallerStatusChange.changed_by,
+            CallerStatusChange.changed_at,
+        )
+        .where(CallerStatusChange.caller_id == Caller.id)
+        .order_by(CallerStatusChange.changed_at.desc())
+        .limit(1)
+        .lateral()
+    )
+    filters: list[ColumnElement[bool]] = []
+    if caller_id is not None:
+        filters.append(Caller.id == caller_id)
+    if phone_e164 is not None:
+        filters.append(Caller.phone_e164 == phone_e164)
+    rows = (
+        await db.execute(
+            select(
+                Caller,
+                order_count,
+                recent_no_shows,
+                calls_without_order,
+                latest_change.c.reason,
+                latest_change.c.changed_by,
+                latest_change.c.changed_at,
+            )
+            .outerjoin(latest_change, true())
+            .where(*filters)
+            .order_by(Caller.last_call_at.desc())
+            .limit(limit)
+            .execution_options(populate_existing=True)
+        )
+    ).all()
+    return [
+        CallerSummary(
+            caller_id=caller.id,
+            phone_e164=caller.phone_e164,
+            first_call_at=caller.first_call_at,
+            last_call_at=caller.last_call_at,
+            call_count=caller.call_count,
+            history_opted_out=caller.history_opted_out,
+            order_count=orders,
+            recent_no_shows=no_shows,
+            recent_calls_without_order=without_order,
+            status=caller.status,
+            status_reason=reason,
+            status_changed_by=changed_by,
+            status_changed_at=changed_at,
+        )
+        for (
+            caller,
+            orders,
+            no_shows,
+            without_order,
+            reason,
+            changed_by,
+            changed_at,
+        ) in rows
+    ]
+
+
+async def caller_id_of(db: AsyncSession, session_id: uuid.UUID) -> uuid.UUID | None:
+    """The session's caller, or None: a drive-through car or a withheld number."""
+    caller = await _caller_of(db, session_id)
+    return None if caller is None else caller.id
+
+
+async def set_status(
+    db: AsyncSession,
+    caller_id: uuid.UUID,
+    status: CallerStatus,
+    *,
+    reason: str,
+    by: str,
+    now: datetime,
+) -> bool:
+    """Flag, block or clear a number, and record who did it and why.
+
+    Returns False, writing nothing, if the number already has that status.
+    Raises CallerNotFound.
+    """
+    caller = (
+        await db.execute(
+            select(Caller)
+            .where(Caller.id == caller_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+    ).scalar_one_or_none()
+    if caller is None:
+        raise CallerNotFound(caller_id)
+    if caller.status is status:
+        return False
+    db.add(
+        CallerStatusChange(
+            caller_id=caller_id,
+            from_status=caller.status,
+            to_status=status,
+            reason=reason,
+            changed_by=by,
+            changed_at=now,
+        )
+    )
+    caller.status = status
+    await db.flush()
+    return True
+
+
+async def delete_caller(db: AsyncSession, caller_id: uuid.UUID) -> str:
+    """Forget a number entirely, as a caller may ask. Their orders stay, no
+    longer linked to anyone, so the day's takings still add up. Returns the
+    number's last four digits, for the record of who deleted what.
+
+    Raises CallerNotFound.
+    """
+    deleted = (
+        await db.execute(
+            delete(Caller).where(Caller.id == caller_id).returning(Caller.phone_e164)
+        )
+    ).scalar_one_or_none()
+    if deleted is None:
+        raise CallerNotFound(caller_id)
+    return deleted[-4:]
+
+
+async def forget_inactive(db: AsyncSession, *, called_before: datetime) -> int:
+    """Delete every caller whose last call was before this moment. Returns
+    how many were deleted."""
+    result = await db.execute(
+        delete(Caller).where(Caller.last_call_at < called_before).returning(Caller.id)
+    )
+    return len(result.all())
 
 
 async def _caller_of(db: AsyncSession, session_id: uuid.UUID) -> Caller | None:

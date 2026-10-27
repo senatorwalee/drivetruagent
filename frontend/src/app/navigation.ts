@@ -5,6 +5,10 @@
 import { useSyncExternalStore } from 'react'
 
 export const STAFF_PATH = '/staff'
+/** Phone orders waiting to be collected. */
+export const PICKUPS_PATH = '/pickups'
+/** Phone numbers that have called, and blocking them. */
+export const CALLERS_PATH = '/callers'
 export const INSIGHTS_PATH = '/insights'
 export const MENU_PATH = '/menu'
 /** The live views, following the newest phone call instead of a lane. */

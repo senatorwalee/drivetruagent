@@ -158,6 +158,26 @@ class Channel(StrEnum):
     PHONE = "phone"
 
 
+class PickupStatus(StrEnum):
+    """Whether a phone order was collected. Only staff mark it."""
+
+    # Placed, and not yet marked either way.
+    WAITING = "waiting"
+    PICKED_UP = "picked_up"
+    # Never collected. Counts against the number it was ordered from.
+    NO_SHOW = "no_show"
+
+
+class CallerStatus(StrEnum):
+    """What staff have decided about a phone number. Only staff change it."""
+
+    NORMAL = "normal"
+    # Treated as a number with no-shows: big orders go to a person.
+    FLAGGED = "flagged"
+    # Calls from it are not taken.
+    BLOCKED = "blocked"
+
+
 class KnowledgeAudience(StrEnum):
     """Who a knowledge document may be shown to."""
 

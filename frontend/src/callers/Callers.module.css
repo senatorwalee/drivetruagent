@@ -1,0 +1,192 @@
+/* The pickups and callers pages. They share the staff screen's top bar,
+   buttons and colours (imported from Staff.module.css); this file adds the
+   lists and their parts. */
+
+.main {
+  flex: 1;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px;
+  display: grid;
+  gap: 24px;
+  align-content: start;
+}
+
+.intro {
+  display: grid;
+  gap: 8px;
+}
+
+.heading {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.lede {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--muted);
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  padding: 20px;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+.row {
+  display: grid;
+  gap: 6px;
+  padding: 14px 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.row:first-child {
+  border-top: 0;
+}
+
+.rowMain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.rowTitle {
+  font-weight: 600;
+}
+
+.number {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.rowDetail {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.rowMeta {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.chip {
+  padding: 1px 8px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.chip[data-tone='waiting'],
+.chip[data-tone='flagged'],
+.chip[data-tone='unknown'] {
+  color: var(--confirm);
+}
+
+.chip[data-tone='picked_up'],
+.chip[data-tone='normal'] {
+  color: var(--allow);
+}
+
+.chip[data-tone='no_show'],
+.chip[data-tone='blocked'] {
+  color: var(--reject);
+}
+
+.reveal {
+  min-height: 32px;
+  padding: 0 8px;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.reveal:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.editor {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+  padding: 12px 16px;
+  border-left: 3px solid var(--accent);
+  background: var(--raised);
+  border-radius: 0 6px 6px 0;
+}
+
+.effect {
+  margin: 0;
+  color: var(--muted);
+}
+
+.danger {
+  border-color: var(--reject);
+  color: var(--reject);
+}
+
+.problem {
+  margin: 0;
+  padding: 12px 16px;
+  border-left: 3px solid var(--reject);
+  background: var(--raised);
+  border-radius: 0 6px 6px 0;
+  color: var(--reject);
+}
+
+.empty {
+  margin: 0;
+  color: var(--muted);
+}
+
+@media (forced-colors: active) {
+  .panel,
+  .chip {
+    border: 1px solid CanvasText;
+  }
+}
+
+@media (max-width: 560px) {
+  .main {
+    padding: 16px;
+  }
+}

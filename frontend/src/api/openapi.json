@@ -610,12 +610,133 @@
               }
             ],
             "title": "Session Id"
+          },
+          "turned_away": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TurnAway"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
           "session_id"
         ],
         "title": "CallAnswered",
+        "type": "object"
+      },
+      "CallerStatus": {
+        "description": "What staff have decided about a phone number. Only staff change it.",
+        "enum": [
+          "normal",
+          "flagged",
+          "blocked"
+        ],
+        "title": "CallerStatus",
+        "type": "string"
+      },
+      "CallerView": {
+        "properties": {
+          "call_count": {
+            "title": "Call Count",
+            "type": "integer"
+          },
+          "caller_id": {
+            "format": "uuid",
+            "title": "Caller Id",
+            "type": "string"
+          },
+          "first_call_at": {
+            "format": "date-time",
+            "title": "First Call At",
+            "type": "string"
+          },
+          "history_opted_out": {
+            "title": "History Opted Out",
+            "type": "boolean"
+          },
+          "last_call_at": {
+            "format": "date-time",
+            "title": "Last Call At",
+            "type": "string"
+          },
+          "order_count": {
+            "title": "Order Count",
+            "type": "integer"
+          },
+          "phone_e164": {
+            "title": "Phone E164",
+            "type": "string"
+          },
+          "recent_calls_without_order": {
+            "title": "Recent Calls Without Order",
+            "type": "integer"
+          },
+          "recent_no_shows": {
+            "title": "Recent No Shows",
+            "type": "integer"
+          },
+          "standing": {
+            "$ref": "#/components/schemas/Standing"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CallerStatus"
+          },
+          "status_changed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Changed At"
+          },
+          "status_changed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Changed By"
+          },
+          "status_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Reason"
+          }
+        },
+        "required": [
+          "caller_id",
+          "phone_e164",
+          "first_call_at",
+          "last_call_at",
+          "call_count",
+          "history_opted_out",
+          "order_count",
+          "recent_no_shows",
+          "recent_calls_without_order",
+          "status",
+          "status_reason",
+          "status_changed_by",
+          "status_changed_at",
+          "standing"
+        ],
+        "title": "CallerView",
         "type": "object"
       },
       "CartSnapshot": {
@@ -1616,6 +1737,31 @@
         "title": "LineView",
         "type": "object"
       },
+      "MarkPickupRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "by": {
+            "default": "staff",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "By",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "picked_up",
+              "no_show"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "MarkPickupRequest",
+        "type": "object"
+      },
       "MayContainView": {
         "properties": {
           "allergen": {
@@ -2074,6 +2220,113 @@
         "title": "OutcomeError",
         "type": "object"
       },
+      "Pickup": {
+        "properties": {
+          "caller_last_four": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caller Last Four"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/PickupLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "marked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marked At"
+          },
+          "marked_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marked By"
+          },
+          "order_id": {
+            "format": "uuid",
+            "title": "Order Id",
+            "type": "string"
+          },
+          "order_number": {
+            "title": "Order Number",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PickupStatus"
+          },
+          "submitted_at": {
+            "format": "date-time",
+            "title": "Submitted At",
+            "type": "string"
+          },
+          "total_cents": {
+            "title": "Total Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "order_id",
+          "order_number",
+          "submitted_at",
+          "total_cents",
+          "lines",
+          "caller_last_four",
+          "status",
+          "marked_by",
+          "marked_at"
+        ],
+        "title": "Pickup",
+        "type": "object"
+      },
+      "PickupLine": {
+        "properties": {
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "quantity",
+          "item_name"
+        ],
+        "title": "PickupLine",
+        "type": "object"
+      },
+      "PickupStatus": {
+        "description": "Whether a phone order was collected. Only staff mark it.",
+        "enum": [
+          "waiting",
+          "picked_up",
+          "no_show"
+        ],
+        "title": "PickupStatus",
+        "type": "string"
+      },
       "RemoveLine": {
         "additionalProperties": false,
         "properties": {
@@ -2331,6 +2584,33 @@
         "title": "SetSpecialRequest",
         "type": "object"
       },
+      "SetStatusRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "by": {
+            "default": "staff",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "By",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CallerStatus"
+          }
+        },
+        "required": [
+          "status",
+          "reason"
+        ],
+        "title": "SetStatusRequest",
+        "type": "object"
+      },
       "SetStockRequest": {
         "additionalProperties": false,
         "properties": {
@@ -2424,6 +2704,17 @@
         ],
         "title": "SpecialView",
         "type": "object"
+      },
+      "Standing": {
+        "description": "How much a call can be trusted with.",
+        "enum": [
+          "normal",
+          "flagged",
+          "blocked",
+          "unknown"
+        ],
+        "title": "Standing",
+        "type": "string"
       },
       "Step": {
         "description": "One thing the agent asked the backend to do, or a timer firing.",
@@ -2662,6 +2953,15 @@
         ],
         "title": "TranscriptLine",
         "type": "object"
+      },
+      "TurnAway": {
+        "description": "Why a call is not taken.",
+        "enum": [
+          "blocked",
+          "too_many_calls"
+        ],
+        "title": "TurnAway",
+        "type": "string"
       },
       "UnmetRequest": {
         "properties": {
@@ -3151,6 +3451,143 @@
         "summary": "Which model the agent uses",
         "tags": [
           "conversation"
+        ]
+      }
+    },
+    "/callers": {
+      "get": {
+        "description": "The latest call first, with no-shows in the window, calls without an\norder in the repeat-call window, and each number's standing.",
+        "operationId": "read_callers_callers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CallerView"
+                  },
+                  "title": "Response Read Callers Callers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Phone numbers that have called",
+        "tags": [
+          "callers"
+        ]
+      }
+    },
+    "/callers/{caller_id}": {
+      "delete": {
+        "description": "Deletes the number and everything known about it, including its\nno-shows and status history. Its orders stay, linked to no one.",
+        "operationId": "delete_caller_callers__caller_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "caller_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Caller Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Forget a number",
+        "tags": [
+          "callers"
+        ]
+      }
+    },
+    "/callers/{caller_id}/status": {
+      "post": {
+        "description": "Recorded with who did it and why. Setting the status a number already\nhas changes nothing and records nothing.",
+        "operationId": "set_status_callers__caller_id__status_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "caller_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Caller Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallerView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Flag, block or clear a number",
+        "tags": [
+          "callers"
         ]
       }
     },
@@ -4121,6 +4558,106 @@
         "summary": "Answer a phone call (OpenAI's webhook)",
         "tags": [
           "phone"
+        ]
+      }
+    },
+    "/pickups": {
+      "get": {
+        "description": "Every phone order still waiting, oldest first; then those marked in\nthe last twelve hours, so a wrong mark can be put right.",
+        "operationId": "read_pickups_pickups_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Pickup"
+                  },
+                  "title": "Response Read Pickups Pickups Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Phone orders to be collected",
+        "tags": [
+          "pickups"
+        ]
+      }
+    },
+    "/pickups/{order_id}": {
+      "post": {
+        "description": "Only staff mark no-shows; two within 90 days flag the number, and big\norders from it then go to a person. A mark can be changed.",
+        "operationId": "mark_pickup_pickups__order_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Order Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkPickupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pickup"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark a phone order picked up, or a no-show",
+        "tags": [
+          "pickups"
         ]
       }
     },

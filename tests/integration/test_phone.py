@@ -13,6 +13,7 @@ import time
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 
@@ -23,6 +24,7 @@ from fastapi import FastAPI
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from drivetruagent.agent import voice
 from drivetruagent.agent.phone import greeting
 from drivetruagent.agent.tools import TOOL_DEFINITIONS
 from drivetruagent.agent.voice import LiveCalls
@@ -34,13 +36,18 @@ from drivetruagent.api.voice import (
 )
 from drivetruagent.config import Settings, get_settings
 from drivetruagent.db.models import AgentEvent, Caller, CustomerSession
-from drivetruagent.enums import AgentEventKind, Channel, SessionState
+from drivetruagent.enums import AgentEventKind, CallerStatus, Channel, SessionState
+from drivetruagent.ordering.callers import set_status
+from drivetruagent.ordering.sessions import open_session
+from drivetruagent.policy.caller_rules import TURN_AWAY_SENTENCES, TurnAway
 from tests.integration.conftest import TEST_TAX_RATE
 
 pytestmark = pytest.mark.usefixtures("menu")
 
 SECRET = "whsec_" + base64.b64encode(b"a test signing key, 32 bytes long").decode()
 CALL_ID = "rtc_phone123"
+# The number ringing() calls from.
+REGULAR = "+14165550123"
 
 
 def signed(
@@ -88,13 +95,14 @@ class StandInOpenAI:
         self.accepted: list[tuple[str, dict[str, Any]]] = []
         self.said: list[str] = []
         self.joined: list[str] = []
+        self.hung_up: list[str] = []
         self.calls = LiveCalls()
         self._refuse = refuse
         # Signatures are checked by OpenAI's own code.
         self.webhooks = openai.AsyncOpenAI(api_key="unused").webhooks
         self.realtime = SimpleNamespace(
             calls=SimpleNamespace(
-                accept=self._accept, hangup=self._noop, refer=self._noop
+                accept=self._accept, hangup=self._hangup, refer=self._noop
             ),
             connect=self._connect,
         )
@@ -106,6 +114,9 @@ class StandInOpenAI:
 
     async def _noop(self, *args: Any, **kwargs: Any) -> None:
         return None
+
+    async def _hangup(self, call_id: str) -> None:
+        self.hung_up.append(call_id)
 
     def _connect(self, *, call_id: str) -> Any:
         self.joined.append(call_id)
@@ -254,7 +265,7 @@ async def test_a_webhook_delivered_twice_answers_the_call_once(
     again = await deliver(stand_in, client, *signed(ringing(), webhook_id="wh_2"))
 
     assert first.json()["session_id"] is not None
-    assert again.json() == {"session_id": None}
+    assert again.json() == {"session_id": None, "turned_away": None}
     assert len(stand_in.accepted) == 1
     assert len(await sessions_in(db_session)) == 1
 
@@ -266,7 +277,10 @@ async def test_other_events_are_acknowledged_and_ignored(
 
     response = await deliver(stand_in, client, *signed(event))
 
-    assert (response.status_code, response.json()) == (200, {"session_id": None})
+    assert (response.status_code, response.json()) == (
+        200,
+        {"session_id": None, "turned_away": None},
+    )
     assert await sessions_in(db_session) == []
 
 
@@ -284,6 +298,107 @@ async def test_a_call_openai_will_not_hand_over_closes_its_session(
         SessionState.ABANDONED,
         "call_not_answered",
     )
+
+
+# --- Numbers that are turned away -------------------------------------------
+
+
+@pytest.fixture
+def quick_goodbyes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Hang up straight after the sentence instead of waiting for it to be said."""
+    monkeypatch.setattr(voice, "speaking_seconds", lambda _text: 0)
+
+
+async def caller_named(db: AsyncSession, phone: str) -> Caller:
+    return (
+        await db.execute(
+            select(Caller)
+            .where(Caller.phone_e164 == phone)
+            .execution_options(populate_existing=True)
+        )
+    ).scalar_one()
+
+
+@pytest.mark.usefixtures("quick_goodbyes")
+async def test_a_blocked_number_hears_why_and_never_reaches_the_agent(
+    client: httpx.AsyncClient, stand_in: StandInOpenAI, db_session: AsyncSession
+) -> None:
+    await open_session(db_session, channel=Channel.PHONE, caller_phone=REGULAR)
+    caller = await caller_named(db_session, REGULAR)
+    await set_status(
+        db_session,
+        caller.id,
+        CallerStatus.BLOCKED,
+        reason="Abusive calls",
+        by="Manager",
+        now=datetime.now(UTC),
+    )
+    await db_session.commit()
+
+    response = await deliver(stand_in, client, *signed(ringing()))
+
+    assert response.json() == {"session_id": None, "turned_away": "blocked"}
+    ((_, session),) = stand_in.accepted
+    # No tools: nothing the caller says can reach the menu or an order.
+    assert "tools" not in session
+    assert stand_in.said == [
+        "Say exactly this, in the same language, and nothing else: "
+        + TURN_AWAY_SENTENCES[TurnAway.BLOCKED]
+    ]
+    assert stand_in.hung_up == [CALL_ID]
+    # Only the session opened above; the turned-away call opened none.
+    assert len(await sessions_in(db_session)) == 1
+    # Still counted as a call from the number.
+    assert (await caller_named(db_session, REGULAR)).call_count == 2
+
+
+@pytest.mark.usefixtures("quick_goodbyes")
+async def test_a_number_calling_again_and_again_without_ordering_is_turned_away(
+    client: httpx.AsyncClient, stand_in: StandInOpenAI, db_session: AsyncSession
+) -> None:
+    for _ in range(5):
+        await open_session(db_session, channel=Channel.PHONE, caller_phone=REGULAR)
+    await db_session.commit()
+
+    response = await deliver(stand_in, client, *signed(ringing()))
+
+    assert response.json()["turned_away"] == "too_many_calls"
+    assert stand_in.said[0].endswith(TURN_AWAY_SENTENCES[TurnAway.TOO_MANY_CALLS])
+    assert stand_in.hung_up == [CALL_ID]
+
+
+async def test_four_calls_without_ordering_still_get_through(
+    client: httpx.AsyncClient, stand_in: StandInOpenAI, db_session: AsyncSession
+) -> None:
+    for _ in range(4):
+        await open_session(db_session, channel=Channel.PHONE, caller_phone=REGULAR)
+    await db_session.commit()
+
+    response = await deliver(stand_in, client, *signed(ringing()))
+
+    assert response.json()["session_id"] is not None
+    assert response.json()["turned_away"] is None
+
+
+async def test_a_flagged_number_still_gets_through(
+    client: httpx.AsyncClient, stand_in: StandInOpenAI, db_session: AsyncSession
+) -> None:
+    """Only its big orders go to a person."""
+    await open_session(db_session, channel=Channel.PHONE, caller_phone=REGULAR)
+    caller = await caller_named(db_session, REGULAR)
+    await set_status(
+        db_session,
+        caller.id,
+        CallerStatus.FLAGGED,
+        reason="Two no-shows last month",
+        by="Manager",
+        now=datetime.now(UTC),
+    )
+    await db_session.commit()
+
+    response = await deliver(stand_in, client, *signed(ringing()))
+
+    assert response.json()["session_id"] is not None
 
 
 # --- Only OpenAI can ring the line ------------------------------------------
