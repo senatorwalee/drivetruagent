@@ -149,6 +149,15 @@ class DietStatus(StrEnum):
     SUITABLE = "suitable"
 
 
+class Channel(StrEnum):
+    """How a customer reached the agent."""
+
+    # At the speaker in a drive-through lane.
+    DRIVE_THRU = "drive_thru"
+    # On the phone, ordering for pickup.
+    PHONE = "phone"
+
+
 class KnowledgeAudience(StrEnum):
     """Who a knowledge document may be shown to."""
 

@@ -12,7 +12,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from drivetruagent.db.models import Cart, CustomerSession
-from drivetruagent.enums import FINAL_SESSION_STATES, Language, SessionState
+from drivetruagent.enums import FINAL_SESSION_STATES, Channel, Language, SessionState
+from drivetruagent.ordering.callers import record_call
 from drivetruagent.ordering.errors import LaneBusy, SessionEnded, SessionNotFound
 from drivetruagent.ordering.inventory import release_reservations
 from drivetruagent.ordering.language import detect_language
@@ -27,9 +28,19 @@ ONE_ACTIVE_SESSION_PER_LANE = "uq_sessions_one_active_per_lane"
 
 
 async def open_session(
-    db: AsyncSession, lane: str = "lane-1", *, business_date: date | None = None
+    db: AsyncSession,
+    lane: str | None = None,
+    *,
+    business_date: date | None = None,
+    channel: Channel = Channel.DRIVE_THRU,
+    caller_phone: str | None = None,
 ) -> CustomerSession:
     """Create a session and its empty cart. Raises LaneBusy if the lane is taken.
+
+    A drive-through session is at a lane, "lane-1" unless given. A phone call
+    gets a lane of its own, so calls never wait for each other.
+    `caller_phone`, in E.164, is the number that called; the call is counted
+    against it. Leave it out for a withheld number.
 
     The database's unique index decides whether the lane is free. Checking
     first and inserting second would let two cars through at the same moment.
@@ -39,12 +50,24 @@ async def open_session(
     out, it is today's date in UTC, which is good enough where specials do
     not matter.
     """
+    if caller_phone is not None and channel is not Channel.PHONE:
+        raise ValueError("Only a phone call has a caller.")
+    if lane is None:
+        lane = (
+            f"phone-{uuid.uuid4().hex[:12]}" if channel is Channel.PHONE else "lane-1"
+        )
     try:
         # A savepoint: if the insert is refused, only this block is undone and
         # the caller's transaction stays usable.
         async with db.begin_nested():
+            caller_id = (
+                None if caller_phone is None else await record_call(db, caller_phone)
+            )
             customer_session = CustomerSession(
-                lane=lane, business_date=business_date or datetime.now(UTC).date()
+                lane=lane,
+                business_date=business_date or datetime.now(UTC).date(),
+                channel=channel,
+                caller_id=caller_id,
             )
             db.add(customer_session)
             await db.flush()
@@ -183,6 +206,7 @@ def to_view(
     return SessionView(
         session_id=customer_session.id,
         lane=customer_session.lane,
+        channel=customer_session.channel,
         state=customer_session.state,
         language=customer_session.language,
         started_at=customer_session.started_at,

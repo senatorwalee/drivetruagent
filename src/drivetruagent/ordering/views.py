@@ -12,7 +12,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from drivetruagent.enums import DiscountKind, Language, SessionState
+from drivetruagent.enums import Channel, DiscountKind, Language, SessionState
 
 # Used when a session's language has not been detected yet, and as the
 # fallback when a name has no entry in the session's language.
@@ -114,6 +114,7 @@ class TimersView(BaseModel):
 class SessionView(BaseModel):
     session_id: uuid.UUID
     lane: str
+    channel: Channel
     state: SessionState
     # None until the customer's language has been detected or set.
     language: Language | None

@@ -677,6 +677,15 @@
         "title": "CategoryView",
         "type": "object"
       },
+      "Channel": {
+        "description": "How a customer reached the agent.",
+        "enum": [
+          "drive_thru",
+          "phone"
+        ],
+        "title": "Channel",
+        "type": "string"
+      },
       "ChoiceGroupView": {
         "properties": {
           "default_option_code": {
@@ -1840,12 +1849,34 @@
       "OpenSessionRequest": {
         "additionalProperties": false,
         "properties": {
+          "caller_phone": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caller Phone"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/Channel",
+            "default": "drive_thru"
+          },
           "lane": {
-            "default": "lane-1",
-            "maxLength": 50,
-            "minLength": 1,
-            "title": "Lane",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lane"
           }
         },
         "title": "OpenSessionRequest",
@@ -2161,6 +2192,9 @@
             "title": "Business Date",
             "type": "string"
           },
+          "channel": {
+            "$ref": "#/components/schemas/Channel"
+          },
           "end_reason": {
             "anyOf": [
               {
@@ -2218,6 +2252,7 @@
         "required": [
           "session_id",
           "lane",
+          "channel",
           "state",
           "language",
           "started_at",
@@ -3999,6 +4034,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "409": {
             "content": {

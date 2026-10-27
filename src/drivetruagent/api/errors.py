@@ -23,6 +23,8 @@ _NOT_FOUND = {
     "no_voice_call",
     "no_photo",
 }
+# Turned off on this server.
+_FORBIDDEN = {"typed_caller_id_off"}
 # The request is well formed, but the current state does not allow it.
 _CONFLICT = {
     "lane_busy",
@@ -56,6 +58,8 @@ def status_for(error: OrderingError) -> int:
         return status.HTTP_404_NOT_FOUND
     if error.code in _CONFLICT:
         return status.HTTP_409_CONFLICT
+    if error.code in _FORBIDDEN:
+        return status.HTTP_403_FORBIDDEN
     # Everything else asks for something the menu or the rules do not allow.
     return status.HTTP_422_UNPROCESSABLE_CONTENT
 
@@ -98,5 +102,6 @@ type Responses = dict[int | str, dict[str, Any]]
 
 NOT_FOUND: Responses = {status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}}
 CONFLICT: Responses = {status.HTTP_409_CONFLICT: {"model": ErrorResponse}}
+FORBIDDEN: Responses = {status.HTTP_403_FORBIDDEN: {"model": ErrorResponse}}
 REFUSED: Responses = {status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": ErrorResponse}}
 UNAVAILABLE: Responses = {status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ErrorResponse}}

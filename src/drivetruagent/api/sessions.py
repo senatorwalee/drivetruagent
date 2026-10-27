@@ -17,7 +17,7 @@ from drivetruagent.api.deps import (
     SessionDep,
     SettingsDep,
 )
-from drivetruagent.api.errors import CONFLICT, NOT_FOUND, REFUSED
+from drivetruagent.api.errors import CONFLICT, FORBIDDEN, NOT_FOUND, REFUSED
 from drivetruagent.api.schemas import (
     AddLineRequest,
     OpenSessionRequest,
@@ -27,7 +27,9 @@ from drivetruagent.api.schemas import (
 from drivetruagent.config import Settings
 from drivetruagent.db.models import CustomerSession
 from drivetruagent.ordering import cart, orders, sessions
+from drivetruagent.ordering.errors import InvalidPhoneNumber, TypedCallerIdOff
 from drivetruagent.ordering.idempotency import run_once
+from drivetruagent.ordering.phone_numbers import normalize_phone
 from drivetruagent.ordering.views import CartSnapshot, OrderView, SessionView
 
 router = APIRouter(tags=["ordering"])
@@ -45,7 +47,7 @@ def _view(customer_session: CustomerSession, settings: Settings) -> SessionView:
 @router.post(
     "/sessions",
     status_code=status.HTTP_201_CREATED,
-    responses=CONFLICT,
+    responses=CONFLICT | FORBIDDEN,
     summary="Open a session",
 )
 async def open_session(
@@ -59,8 +61,21 @@ async def open_session(
 
     The session keeps today's date, where the restaurant is, for as long as
     it lasts: a special heard about before midnight is still given after it."""
-    lane = (body or OpenSessionRequest()).lane
-    customer_session = await sessions.open_session(db, lane, business_date=today)
+    request = body or OpenSessionRequest()
+    caller_phone = None
+    if request.caller_phone is not None:
+        if not settings.allow_typed_caller_id:
+            raise TypedCallerIdOff()
+        caller_phone = normalize_phone(request.caller_phone)
+        if caller_phone is None:
+            raise InvalidPhoneNumber()
+    customer_session = await sessions.open_session(
+        db,
+        request.lane,
+        business_date=today,
+        channel=request.channel,
+        caller_phone=caller_phone,
+    )
     await db.commit()
     return _view(customer_session, settings)
 

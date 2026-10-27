@@ -4,6 +4,7 @@ Every model module must be imported here. Alembic imports this package to learn
 which tables exist, so a model that is not imported here is invisible to it.
 """
 
+from drivetruagent.db.models.callers import Caller
 from drivetruagent.db.models.catalog import (
     AllergenDeclaration,
     DietSuitability,
@@ -49,6 +50,7 @@ from drivetruagent.db.models.policy import PendingAction
 __all__ = [
     "AgentEvent",
     "AllergenDeclaration",
+    "Caller",
     "Cart",
     "CartLine",
     "CartLineOption",

@@ -61,6 +61,7 @@ def test_upgrade_creates_the_tables(scratch_database_url: str) -> None:
         "menu_item_photos",
         "allergen_declarations",
         "diet_suitability",
+        "callers",
         "knowledge_documents",
         "knowledge_chunks",
         "knowledge_embeddings",

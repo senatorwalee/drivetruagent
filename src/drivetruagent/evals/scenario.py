@@ -45,6 +45,11 @@ class Scenario:
     must_say_one_of: tuple[str, ...] = ()
     # The restaurant's date for the session: decides which specials run.
     business_date: date = DEFAULT_BUSINESS_DATE
+    # A phone call from this number (E.164). None: a car at the drive-through.
+    caller_phone: str | None = None
+    # Orders the caller placed before, oldest first, one day apart up to the
+    # day before the scenario.
+    past_orders: tuple[tuple[ExpectedLine, ...], ...] = ()
 
 
 @dataclass(frozen=True)
