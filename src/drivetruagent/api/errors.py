@@ -23,6 +23,7 @@ _NOT_FOUND = {
     "no_voice_call",
     "no_photo",
     "caller_not_found",
+    "summary_not_found",
 }
 # Turned off on this server.
 _FORBIDDEN = {"typed_caller_id_off", "wrong_web_phone_key"}
@@ -41,6 +42,7 @@ _CONFLICT = {
     "voice_call_in_progress",
     "duplicate_item_name",
     "not_a_pickup_order",
+    "session_in_progress",
 }
 
 

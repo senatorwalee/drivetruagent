@@ -1160,6 +1160,24 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HandoffFact": {
+        "properties": {
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "title"
+        ],
+        "title": "HandoffFact",
+        "type": "object"
+      },
       "HandoffOutcome": {
         "description": "How a handed-off session was finished.",
         "enum": [
@@ -1944,6 +1962,16 @@
         "title": "MessageResponse",
         "type": "object"
       },
+      "Mood": {
+        "description": "How the customer came across, as the model judged it.",
+        "enum": [
+          "pleased",
+          "neutral",
+          "frustrated"
+        ],
+        "title": "Mood",
+        "type": "string"
+      },
       "NewItem": {
         "additionalProperties": false,
         "properties": {
@@ -2118,6 +2146,50 @@
           "may_contain"
         ],
         "title": "OptionAddsView",
+        "type": "object"
+      },
+      "OrderFact": {
+        "properties": {
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/OrderLineFact"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "order_number": {
+            "title": "Order Number",
+            "type": "integer"
+          },
+          "total_cents": {
+            "title": "Total Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "order_number",
+          "lines",
+          "total_cents"
+        ],
+        "title": "OrderFact",
+        "type": "object"
+      },
+      "OrderLineFact": {
+        "properties": {
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "quantity",
+          "item_name"
+        ],
+        "title": "OrderLineFact",
         "type": "object"
       },
       "OrderView": {
@@ -2475,6 +2547,141 @@
           "price_delta_cents"
         ],
         "title": "SelectedOptionView",
+        "type": "object"
+      },
+      "SessionFacts": {
+        "description": "What happened in a session, as the backend recorded it.",
+        "properties": {
+          "abuse_strikes": {
+            "title": "Abuse Strikes",
+            "type": "integer"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/Channel"
+          },
+          "confusion_strikes": {
+            "title": "Confusion Strikes",
+            "type": "integer"
+          },
+          "customer_turns": {
+            "title": "Customer Turns",
+            "type": "integer"
+          },
+          "duration_seconds": {
+            "title": "Duration Seconds",
+            "type": "integer"
+          },
+          "end_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Reason"
+          },
+          "ended_at": {
+            "format": "date-time",
+            "title": "Ended At",
+            "type": "string"
+          },
+          "flagged_messages": {
+            "title": "Flagged Messages",
+            "type": "integer"
+          },
+          "handoff": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HandoffFact"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "input_tokens": {
+            "title": "Input Tokens",
+            "type": "integer"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Language"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model_calls": {
+            "title": "Model Calls",
+            "type": "integer"
+          },
+          "nudges": {
+            "title": "Nudges",
+            "type": "integer"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrderFact"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/SessionState"
+          },
+          "output_tokens": {
+            "title": "Output Tokens",
+            "type": "integer"
+          },
+          "refused": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Refused",
+            "type": "array"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "unmet_requests": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unmet Requests",
+            "type": "array"
+          }
+        },
+        "required": [
+          "outcome",
+          "end_reason",
+          "channel",
+          "language",
+          "started_at",
+          "ended_at",
+          "duration_seconds",
+          "customer_turns",
+          "order",
+          "handoff",
+          "abuse_strikes",
+          "confusion_strikes",
+          "flagged_messages",
+          "unmet_requests",
+          "refused",
+          "nudges",
+          "model_calls",
+          "input_tokens",
+          "output_tokens"
+        ],
+        "title": "SessionFacts",
         "type": "object"
       },
       "SessionState": {
@@ -2853,6 +3060,317 @@
           "saves_cents"
         ],
         "title": "SuggestionView",
+        "type": "object"
+      },
+      "SummaryAuthor": {
+        "description": "Who wrote a session summary's words. The facts are always code's.",
+        "enum": [
+          "model",
+          "template"
+        ],
+        "title": "SummaryAuthor",
+        "type": "string"
+      },
+      "SummaryDetail": {
+        "description": "A summary with everything behind it.",
+        "properties": {
+          "channel": {
+            "$ref": "#/components/schemas/Channel"
+          },
+          "ended_at": {
+            "format": "date-time",
+            "title": "Ended At",
+            "type": "string"
+          },
+          "facts": {
+            "$ref": "#/components/schemas/SessionFacts"
+          },
+          "follow_up": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Follow Up"
+          },
+          "gist": {
+            "title": "Gist",
+            "type": "string"
+          },
+          "handoff_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handoff Title"
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
+          },
+          "lane": {
+            "title": "Lane",
+            "type": "string"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Language"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "mood": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Mood"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "order_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Number"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/SessionState"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          },
+          "rejected_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejected Reason"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "total_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cents"
+          },
+          "written_at": {
+            "format": "date-time",
+            "title": "Written At",
+            "type": "string"
+          },
+          "written_by": {
+            "$ref": "#/components/schemas/SummaryAuthor"
+          }
+        },
+        "required": [
+          "session_id",
+          "lane",
+          "channel",
+          "language",
+          "outcome",
+          "started_at",
+          "ended_at",
+          "gist",
+          "follow_up",
+          "mood",
+          "written_by",
+          "order_number",
+          "total_cents",
+          "handoff_title",
+          "written_at",
+          "facts",
+          "model",
+          "rejected_reason",
+          "input_tokens",
+          "output_tokens"
+        ],
+        "title": "SummaryDetail",
+        "type": "object"
+      },
+      "SummaryView": {
+        "description": "One row of the conversations list.",
+        "properties": {
+          "channel": {
+            "$ref": "#/components/schemas/Channel"
+          },
+          "ended_at": {
+            "format": "date-time",
+            "title": "Ended At",
+            "type": "string"
+          },
+          "follow_up": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Follow Up"
+          },
+          "gist": {
+            "title": "Gist",
+            "type": "string"
+          },
+          "handoff_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handoff Title"
+          },
+          "lane": {
+            "title": "Lane",
+            "type": "string"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Language"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mood": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Mood"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "order_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Number"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/SessionState"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "total_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cents"
+          },
+          "written_at": {
+            "format": "date-time",
+            "title": "Written At",
+            "type": "string"
+          },
+          "written_by": {
+            "$ref": "#/components/schemas/SummaryAuthor"
+          }
+        },
+        "required": [
+          "session_id",
+          "lane",
+          "channel",
+          "language",
+          "outcome",
+          "started_at",
+          "ended_at",
+          "gist",
+          "follow_up",
+          "mood",
+          "written_by",
+          "order_number",
+          "total_cents",
+          "handoff_title",
+          "written_at"
+        ],
+        "title": "SummaryView",
         "type": "object"
       },
       "TimersView": {
@@ -5825,6 +6343,122 @@
         ]
       }
     },
+    "/sessions/{session_id}/summary": {
+      "get": {
+        "description": "404 until it has been written, a few seconds after the session ends.",
+        "operationId": "read_summary_sessions__session_id__summary_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SummaryDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "One session's summary",
+        "tags": [
+          "summaries"
+        ]
+      },
+      "post": {
+        "description": "Replaces the summary with a fresh one, or writes it if there was none.\n409 while the session is still going.",
+        "operationId": "rewrite_summary_sessions__session_id__summary_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SummaryDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Write a session's summary again",
+        "tags": [
+          "summaries"
+        ]
+      }
+    },
     "/sessions/{session_id}/voice": {
       "delete": {
         "operationId": "hang_up_sessions__session_id__voice_delete",
@@ -6100,6 +6734,72 @@
         "summary": "End a special early, or bring it back",
         "tags": [
           "offers"
+        ]
+      }
+    },
+    "/summaries": {
+      "get": {
+        "description": "Newest session first; `outcome` keeps only sessions that ended that way.",
+        "operationId": "read_summaries_summaries_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "outcome",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SessionState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outcome"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SummaryView"
+                  },
+                  "title": "Response Read Summaries Summaries Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "The latest session summaries",
+        "tags": [
+          "summaries"
         ]
       }
     },

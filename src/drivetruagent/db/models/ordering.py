@@ -63,6 +63,8 @@ class CustomerSession(UuidPrimaryKey, Timestamps, Base):
         CheckConstraint(
             "confusion_strikes >= 0", name="confusion_strikes_non_negative"
         ),
+        # Finding sessions that ended recently, to write their summaries.
+        Index("ix_sessions_ended_at", "ended_at"),
         # One car per lane at a time: uniqueness applies only to active sessions.
         Index(
             "uq_sessions_one_active_per_lane",

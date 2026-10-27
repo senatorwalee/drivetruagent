@@ -15,7 +15,7 @@ price that wasn't there is thrown away.
 import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from pydantic import BaseModel
 
@@ -31,6 +31,17 @@ TRANSCRIPT_LINES = 80
 LINE_CHARS = 500
 
 WITHHELD = "[a message the guardrail withheld]"
+
+
+@dataclass(frozen=True)
+class SummarySettings:
+    # Sessions that ended longer ago than this are left alone: turning the
+    # task on does not send months of conversations to the model.
+    lookback: timedelta = timedelta(hours=24)
+    # Sessions summarised per pass, one after another.
+    batch: int = 5
+    # How long the model has to answer before code's own wording is used.
+    timeout_seconds: float = 20.0
 
 
 class OrderLineFact(BaseModel):

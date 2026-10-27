@@ -223,6 +223,26 @@ class NotAPickupOrder(OrderingError):
         )
 
 
+class SessionInProgress(OrderingError):
+    """A summary is written once a session has ended, not before."""
+
+    code = "session_in_progress"
+
+    def __init__(self, state: SessionState) -> None:
+        super().__init__(
+            f"This session is still going ({state.value}), so there is nothing "
+            "to summarise yet.",
+            state=state.value,
+        )
+
+
+class SummaryNotFound(OrderingError):
+    code = "summary_not_found"
+
+    def __init__(self, session_id: object) -> None:
+        super().__init__(f"Session {session_id} has no summary yet.")
+
+
 class SessionNotHandedOff(OrderingError):
     """Only a session that was handed to a person can be finished by one."""
 

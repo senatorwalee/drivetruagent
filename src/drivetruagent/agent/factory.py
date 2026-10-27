@@ -68,6 +68,18 @@ def classifier_model_from_settings(settings: Settings) -> ModelClient:
     return model
 
 
+def summary_model_from_settings(settings: Settings) -> ModelClient | None:
+    """The model asked for session summaries' words, or None to use code's
+    own wording: turned off, the scripted demo, or no model set up. The
+    agent's model with no reasoning on OpenAI: a note needs none."""
+    if not settings.summary_uses_model or settings.agent_model == "demo":
+        return None
+    try:
+        return classifier_model_from_settings(settings)
+    except ModelUnavailable:
+        return None
+
+
 def agent_info(settings: Settings) -> AgentInfo:
     if settings.agent_model == "demo":
         return AgentInfo(True, demo_model.MODEL_NAME, True, demo_model.SUGGESTED_LINES)
