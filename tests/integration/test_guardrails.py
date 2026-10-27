@@ -25,7 +25,7 @@ from drivetruagent.agent.guard import (
 )
 from drivetruagent.agent.loop import GAVE_UP_REPLY, AgentConfig, AgentReply, run_turn
 from drivetruagent.agent.messages import ToolCall, UserMessage
-from drivetruagent.agent.model import ModelTurn, ModelUnavailable
+from drivetruagent.agent.model import ModelTurn, ModelUnavailable, ModelUsage
 from drivetruagent.agent.scripted import ScriptedModel, call, say
 from drivetruagent.db.models import Handoff
 from drivetruagent.enums import AgentEventKind, Language, SessionState
@@ -203,6 +203,43 @@ async def test_a_session_ended_for_abuse_takes_no_more_messages(
         await turn(db_session, session_id, "Sorry, can I order now?", agent)
 
     assert agent.requests == []
+
+
+# --- What the classifier cost -----------------------------------------------
+
+
+async def test_each_classifier_call_is_logged_with_its_tokens(
+    db_session: AsyncSession, session_id: uuid.UUID
+) -> None:
+    """It runs on most turns, so a cost that left it out would be wrong."""
+    verdict = replace(
+        labelled("ok"),
+        model="classifier-model",
+        usage=ModelUsage(input_tokens=400, output_tokens=12, cached_input_tokens=300),
+    )
+    guard = Guard(classifier=ModelClassifier(ScriptedModel([verdict])))
+    agent = ScriptedModel([say("What can I get you?")])
+
+    await turn(
+        db_session,
+        session_id,
+        "Hello, what burgers do you have today?",
+        agent,
+        replace(CONFIG, guard=guard),
+    )
+
+    calls = [
+        event.payload
+        for event in await events.load_events(db_session, session_id)
+        if event.kind is AgentEventKind.MODEL_CALL
+    ]
+    assert {
+        "model": "classifier-model",
+        "purpose": "guardrail",
+        "input_tokens": 400,
+        "output_tokens": 12,
+        "cached_input_tokens": 300,
+    } in calls
 
 
 # --- Off topic: the customer may need a person ------------------------------

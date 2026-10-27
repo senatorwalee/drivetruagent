@@ -26,6 +26,9 @@ class ToolDefinition:
 class ModelUsage:
     input_tokens: int
     output_tokens: int
+    # The part of input_tokens read from the provider's cache, which is
+    # billed at a fraction of the price.
+    cached_input_tokens: int = 0
 
 
 @dataclass(frozen=True)

@@ -420,6 +420,9 @@ async def _record_model_call(
             "latency_ms": latency_ms,
             "input_tokens": turn.usage.input_tokens if turn.usage else None,
             "output_tokens": turn.usage.output_tokens if turn.usage else None,
+            "cached_input_tokens": (
+                turn.usage.cached_input_tokens if turn.usage else None
+            ),
             "tool_calls": len(turn.tool_calls),
         },
     )

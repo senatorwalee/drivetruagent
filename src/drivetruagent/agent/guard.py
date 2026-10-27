@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from drivetruagent.agent import events, tracing
 from drivetruagent.agent.messages import AssistantMessage, Message, UserMessage
-from drivetruagent.agent.model import ModelClient, ToolDefinition
+from drivetruagent.agent.model import ModelClient, ModelUsage, ToolDefinition
 from drivetruagent.db.models import CustomerSession
 from drivetruagent.enums import FINAL_SESSION_STATES, AgentEventKind, Language
 from drivetruagent.ordering.sessions import lock_session
@@ -123,6 +123,9 @@ class Classification:
     reason: str
     # Which layer decided: "rules", "classifier", or "none" when neither did.
     source: str
+    # The classifier's model and tokens, so its cost is counted too.
+    model: str | None = None
+    usage: ModelUsage | None = None
 
 
 # How long a turn waits for the classifier. Measured: median 1.55 s, 90th
@@ -174,7 +177,11 @@ class ModelClassifier:
             except ValueError:
                 return None
             return Classification(
-                verdict, str(call.arguments.get("reason", "")), "classifier"
+                verdict,
+                str(call.arguments.get("reason", "")),
+                "classifier",
+                model=turn.model or None,
+                usage=turn.usage,
             )
         return None
 
@@ -260,6 +267,8 @@ async def _check(
     if found is None:
         agent_said = last_agent_line(await events.load_messages(db, session_id))
         found = await guard.classify(text, agent_said)
+    if found.usage is not None:
+        await _record_classifier_call(db, session_id, turn_id, found)
     if found.verdict is Verdict.OK:
         return GuardOutcome(GuardAction.CONTINUE), found
 
@@ -366,6 +375,26 @@ async def _apply(
 
     await events.record_message(db, session_id, turn_id, AssistantMessage(reply))
     return GuardOutcome(decision.action, reply)
+
+
+async def _record_classifier_call(
+    db: AsyncSession, session_id: uuid.UUID, turn_id: uuid.UUID, found: Classification
+) -> None:
+    usage = found.usage
+    assert usage is not None
+    await events.record(
+        db,
+        session_id,
+        turn_id,
+        AgentEventKind.MODEL_CALL,
+        {
+            "model": found.model,
+            "purpose": "guardrail",
+            "input_tokens": usage.input_tokens,
+            "output_tokens": usage.output_tokens,
+            "cached_input_tokens": usage.cached_input_tokens,
+        },
+    )
 
 
 def last_agent_line(messages: Sequence[Message]) -> str | None:
