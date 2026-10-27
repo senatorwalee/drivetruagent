@@ -5,9 +5,11 @@ types. Whether the request is allowed (a quantity of zero, an unknown item)
 is decided by the ordering rules, which answer with a typed error code.
 """
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Self
 
-from drivetruagent.enums import Language
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from drivetruagent.enums import Channel, Language
 
 
 class RequestModel(BaseModel):
@@ -16,7 +18,18 @@ class RequestModel(BaseModel):
 
 
 class OpenSessionRequest(RequestModel):
-    lane: str = Field(default="lane-1", min_length=1, max_length=50)
+    # Left out: "lane-1" for the drive-through, a lane of its own for a call.
+    lane: str | None = Field(default=None, min_length=1, max_length=50)
+    channel: Channel = Channel.DRIVE_THRU
+    # For testing only, and refused unless ALLOW_TYPED_CALLER_ID is on: a real
+    # caller's number comes from the phone line, which can't be typed over.
+    caller_phone: str | None = Field(default=None, max_length=50)
+
+    @model_validator(mode="after")
+    def _caller_only_on_phone(self) -> Self:
+        if self.caller_phone is not None and self.channel is not Channel.PHONE:
+            raise ValueError("caller_phone is only for channel 'phone'")
+        return self
 
 
 class UpdateSessionRequest(RequestModel):

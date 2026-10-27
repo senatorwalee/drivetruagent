@@ -29,6 +29,7 @@ from drivetruagent.policy.rules import (
     ALLERGEN_UNVERIFIED,
     EXTREME_QUANTITY,
     HUMAN_REQUESTED,
+    LARGE_ORDER_CHECK,
     REPEATED_CONFUSION,
     TIME_LIMIT,
 )
@@ -43,6 +44,7 @@ _TITLES = {
     TIME_LIMIT: "Took longer than the time limit",
     REPEATED_CONFUSION: "Kept going off track",
     ALLERGEN_UNVERIFIED: "Allergen question with no checked answer",
+    LARGE_ORDER_CHECK: "Big phone order to confirm",
 }
 
 
@@ -257,6 +259,17 @@ def _what_happened(
             f"no checked information to answer it.{asked} Answer from the "
             "allergen binder or ask the manager before they order."
         )
+    if reason == LARGE_ORDER_CHECK:
+        why = (
+            "has no-shows or was flagged by staff"
+            if details.get("standing") == "flagged"
+            else "was withheld"
+        )
+        return (
+            f"A phone order of {_dollars(details.get('total_cents'))}, from a "
+            f"number that {why}. Nothing is paid until pickup, so confirm the "
+            "order with the caller (a deposit, or a callback) before placing it."
+        )
     if reason == TIME_LIMIT:
         return (
             "The order was not finished within the time limit. Finish it with "
@@ -266,6 +279,10 @@ def _what_happened(
         f"Handed off by the rule '{reason}'. Read the conversation and carry on "
         "from there."
     )
+
+
+def _dollars(cents: object) -> str:
+    return f"${cents / 100:.2f}" if isinstance(cents, int) else "unknown size"
 
 
 def _listed(values: object) -> str:

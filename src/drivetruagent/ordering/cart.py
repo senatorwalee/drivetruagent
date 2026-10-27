@@ -208,6 +208,65 @@ async def remove_line(
     return await _finish_change(db, customer_session, cart, tax_rate, reservation_ttl)
 
 
+async def replace_line(
+    db: AsyncSession,
+    session_id: uuid.UUID,
+    line_no: int,
+    item_code: str,
+    quantity: int | None = None,
+    selections: Selections | None = None,
+    *,
+    tax_rate: Decimal,
+    reservation_ttl: timedelta = DEFAULT_RESERVATION_TTL,
+) -> CartSnapshot:
+    """Swap a line for another item, keeping its line number: "the fish
+    burger instead". Everything that can refuse (an unknown item, a choice
+    still needed, not enough stock) is checked before the line changes, and
+    the caller runs this in a savepoint, so a refusal leaves the line as it was.
+    """
+    customer_session = await lock_active_session(db, session_id)
+    cart = await load_cart(db, session_id)
+    line = await _load_line(db, cart, line_no)
+    old_item = (await load_items_by_id(db, [line.item_id]))[line.item_id]
+    new_quantity = line.quantity if quantity is None else quantity
+    _check_quantity(new_quantity)
+
+    item = await load_item_by_code(db, item_code)
+    if item is None:
+        raise UnknownItem(item_code)
+    if not item.is_active:
+        raise ItemUnavailable(item_code)
+    chosen = resolve_selection(item, selections or {})
+    # Each call counts from the cart as it is now, before the line changes.
+    if item.id == old_item.id:
+        await _hold_stock(
+            db,
+            customer_session,
+            cart,
+            item,
+            new_quantity - line.quantity,
+            reservation_ttl,
+        )
+    else:
+        # The new item's stock first: if there isn't enough, nothing has changed.
+        await _hold_stock(
+            db, customer_session, cart, item, +new_quantity, reservation_ttl
+        )
+        await _hold_stock(
+            db, customer_session, cart, old_item, -line.quantity, reservation_ttl
+        )
+
+    line.item_id = item.id
+    line.quantity = new_quantity
+    await db.execute(
+        delete(CartLineOption).where(CartLineOption.cart_line_id == line.id)
+    )
+    await db.flush()
+    await _write_options(db, line.id, chosen)
+
+    return await _finish_change(db, customer_session, cart, tax_rate, reservation_ttl)
+
+
 async def request_confirmation(
     db: AsyncSession,
     session_id: uuid.UUID,

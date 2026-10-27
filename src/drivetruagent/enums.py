@@ -134,6 +134,50 @@ class AllergenLevel(StrEnum):
     MAY_CONTAIN = "may_contain"
 
 
+class Diet(StrEnum):
+    """Religious dietary rules a guest may ask about."""
+
+    HALAL = "halal"
+    KOSHER = "kosher"
+
+
+class DietStatus(StrEnum):
+    # Holds a certificate from a recognised body.
+    CERTIFIED = "certified"
+    # Nothing the diet forbids, and prepared apart, but not certified. The
+    # agent says exactly that, never just "halal".
+    SUITABLE = "suitable"
+
+
+class Channel(StrEnum):
+    """How a customer reached the agent."""
+
+    # At the speaker in a drive-through lane.
+    DRIVE_THRU = "drive_thru"
+    # On the phone, ordering for pickup.
+    PHONE = "phone"
+
+
+class PickupStatus(StrEnum):
+    """Whether a phone order was collected. Only staff mark it."""
+
+    # Placed, and not yet marked either way.
+    WAITING = "waiting"
+    PICKED_UP = "picked_up"
+    # Never collected. Counts against the number it was ordered from.
+    NO_SHOW = "no_show"
+
+
+class CallerStatus(StrEnum):
+    """What staff have decided about a phone number. Only staff change it."""
+
+    NORMAL = "normal"
+    # Treated as a number with no-shows: big orders go to a person.
+    FLAGGED = "flagged"
+    # Calls from it are not taken.
+    BLOCKED = "blocked"
+
+
 class KnowledgeAudience(StrEnum):
     """Who a knowledge document may be shown to."""
 

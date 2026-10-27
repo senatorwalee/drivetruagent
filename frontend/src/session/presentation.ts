@@ -140,3 +140,10 @@ export function progressSteps(state: SessionState, reachedOrdering: boolean): Pr
 export function isFinal(state: SessionState): boolean {
   return state === 'submitted' || state in OTHER_ENDINGS
 }
+
+/** What an empty conversation says: a car waiting at the speaker, or the line waiting for a call. */
+export function emptyConversationHint(following: boolean, opening = 'A car has pulled up.'): string {
+  return following
+    ? 'Waiting for a call. What the caller and the agent say will appear here.'
+    : `${opening} Say hello to start the order.`
+}

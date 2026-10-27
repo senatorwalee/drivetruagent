@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from drivetruagent.enums import Allergen, Language
+from drivetruagent.enums import Allergen, Diet, DietStatus, Language
 from drivetruagent.ordering.photos import check_photo
 from drivetruagent.seed import MenuSeed, OptionGroupSeed, load_menu, photos_dir_for
 
@@ -63,7 +63,7 @@ def test_real_menu_file_is_valid() -> None:
         "drinks",
         "desserts",
     ]
-    assert len(items) == 20
+    assert len(items) == 21
 
 
 def test_fries_ask_only_for_size() -> None:
@@ -522,6 +522,81 @@ def test_option_allergens_on_an_unreviewed_item_are_rejected() -> None:
 
     with pytest.raises(ValidationError, match="no reviewed allergens"):
         MenuSeed.model_validate(menu(item(option_groups=[cheesy])))
+
+
+# --- Halal and kosher -------------------------------------------------------
+
+
+def real_item(code: str) -> Any:
+    return next(
+        item
+        for category in load_menu(MENU_PATH).categories
+        for item in category.items
+        if item.code == code
+    )
+
+
+def test_the_real_menus_fish_burger_is_halal_suitable_but_not_certified() -> None:
+    fish = real_item("fish_burger")
+
+    assert set(fish.diets) == {Diet.HALAL}
+    assert fish.diets[Diet.HALAL].status is DietStatus.SUITABLE
+    assert "fryer" in fish.diets[Diet.HALAL].note.en
+
+
+def test_nothing_on_the_real_menu_is_kosher_or_certified() -> None:
+    """The kitchen holds no certificate of either kind."""
+    loaded = load_menu(MENU_PATH)
+    entries = [
+        (diet, entry.status)
+        for category in loaded.categories
+        for item in category.items
+        for diet, entry in item.diets.items()
+    ]
+
+    assert Diet.KOSHER not in {diet for diet, _ in entries}
+    assert DietStatus.CERTIFIED not in {status for _, status in entries}
+
+
+def test_the_real_menus_meat_is_not_listed_for_halal() -> None:
+    for code in ("classic_burger", "chicken_burger", "chicken_nuggets"):
+        assert real_item(code).diets == {}, code
+
+
+def test_an_item_needs_no_diets() -> None:
+    loaded = MenuSeed.model_validate(menu(item()))
+
+    assert loaded.categories[0].items[0].diets == {}
+
+
+def test_a_diet_entry_is_accepted() -> None:
+    loaded = MenuSeed.model_validate(
+        menu(item(diets={"kosher": {"status": "certified", "note": name()}}))
+    )
+
+    entry = loaded.categories[0].items[0].diets[Diet.KOSHER]
+    assert entry.status is DietStatus.CERTIFIED
+
+
+def test_an_unknown_diet_is_rejected() -> None:
+    with pytest.raises(ValidationError, match="diets"):
+        MenuSeed.model_validate(
+            menu(item(diets={"vegan": {"status": "suitable", "note": name()}}))
+        )
+
+
+def test_an_unknown_diet_status_is_rejected() -> None:
+    with pytest.raises(ValidationError, match="status"):
+        MenuSeed.model_validate(
+            menu(item(diets={"halal": {"status": "probably", "note": name()}}))
+        )
+
+
+def test_a_diet_entry_needs_a_note_in_each_language() -> None:
+    with pytest.raises(ValidationError, match="note"):
+        MenuSeed.model_validate(
+            menu(item(diets={"halal": {"status": "suitable", "note": {"en": "x"}}}))
+        )
 
 
 # --- Photos -----------------------------------------------------------------

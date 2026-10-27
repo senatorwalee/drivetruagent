@@ -33,6 +33,8 @@ export interface VoiceCallDeps {
   sendOffer: (sdp: string) => Promise<string>
   /** Tells the backend the call is over. */
   hangUp: () => Promise<void>
+  /** Tells the backend the audio is up, for a call that waits for it. */
+  connected?: () => Promise<void>
   /** Where the agent's voice is played. */
   speaker: HTMLAudioElement
 }
@@ -81,7 +83,10 @@ export class VoiceCall {
       }
       connection.onconnectionstatechange = () => {
         const { connectionState } = connection
-        if (connectionState === 'connected') this.update({ status: 'live' })
+        if (connectionState === 'connected') {
+          this.update({ status: 'live' })
+          void this.deps.connected?.().catch(() => undefined)
+        }
         if (connectionState === 'failed') this.fail('The call dropped.')
         if (connectionState === 'closed' || connectionState === 'disconnected') this.finish()
       }

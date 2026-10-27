@@ -168,7 +168,7 @@ def test_mixed_languages_still_match() -> None:
 
 
 def test_a_vague_word_returns_every_candidate_with_the_same_score() -> None:
-    """ "Burger" could be any of five; the agent has to ask which."""
+    """ "Burger" could be any of six; the agent has to ask which."""
     result = scores("burger")
 
     assert set(result) == {
@@ -177,6 +177,7 @@ def test_a_vague_word_returns_every_candidate_with_the_same_score() -> None:
         "double_cheeseburger",
         "chicken_burger",
         "veggie_burger",
+        "fish_burger",
     }
     assert set(result.values()) == {100}
 
@@ -249,6 +250,25 @@ def test_choices_counts_and_filler_are_never_not_offered() -> None:
     leftover = ("two", "large", "oat", "2", "actually")
 
     assert not_offered(leftover, offered={"large", "small"}) == ("oat",)
+
+
+@pytest.mark.parametrize(
+    ("said", "choice"),
+    [
+        ("grande", "grand"),
+        ("grandes", "grand"),
+        ("petite", "petit"),
+        ("moyenne", "moyen"),
+        ("épicée", "épicé"),
+        ("epicee", "épicé"),
+    ],
+)
+def test_a_french_choice_is_offered_in_either_gender(said: str, choice: str) -> None:
+    assert not_offered((said,), offered={choice}) == ()
+
+
+def test_gender_folding_does_not_let_other_words_through() -> None:
+    assert not_offered(("grande", "glacee"), offered={"petit", "grand"}) == ("glacee",)
 
 
 def test_a_phrase_counts_only_as_whole_words_in_order() -> None:

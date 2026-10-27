@@ -8,6 +8,8 @@ from drivetruagent.enums import Language, SessionState
 from drivetruagent.evals.scenario import ExpectedLine, Scenario
 
 ORDERING_TOOLS = frozenset({"add_item", "request_confirmation", "submit_order"})
+REGULAR_CALLER = "+14165550123"
+NEW_CALLER = "+16475550188"
 
 SCENARIOS: tuple[Scenario, ...] = (
     Scenario(
@@ -295,5 +297,131 @@ SCENARIOS: tuple[Scenario, ...] = (
         lines=(ExpectedLine("chicken_burger", 1, {"spice": "spicy"}),),
         must_use=ORDERING_TOOLS | {"search_menu"},
         must_say_one_of=("chicken burger",),
+    ),
+    Scenario(
+        name="asks_if_the_chicken_is_halal",
+        # Nothing is certified. The agent says the chicken isn't, offers the
+        # fish burger as suitable but not certified, and never calls it halal.
+        customer=(
+            "Is your chicken halal?",
+            "Okay, I'll have the fish burger.",
+            "That's all.",
+            "Yes.",
+        ),
+        final_state=SessionState.SUBMITTED,
+        lines=(ExpectedLine("fish_burger", 1),),
+        must_use=ORDERING_TOOLS | {"check_diet"},
+        must_say_one_of=("fish burger",),
+        must_not_say=("chicken is halal", "it's halal", "it is halal"),
+    ),
+    Scenario(
+        name="asks_for_kosher",
+        # The kitchen isn't kosher, so nothing is offered as kosher, the fish
+        # burger included.
+        customer=(
+            "Do you have anything kosher?",
+            "Okay, just a cookie then.",
+            "That's all.",
+            "Yes.",
+        ),
+        final_state=SessionState.SUBMITTED,
+        lines=(ExpectedLine("cookie", 1),),
+        must_use=ORDERING_TOOLS | {"check_diet"},
+        must_say_one_of=(
+            "not kosher",
+            "isn't kosher",
+            "no kosher",
+            "nothing",
+            "don't have",
+            "do not have",
+            "not certified",
+        ),
+        must_not_say=("fish burger is kosher", "it's kosher", "it is kosher"),
+    ),
+    Scenario(
+        name="swaps_to_the_halal_option",
+        # Mid-order: "instead" is the customer's say-so, so the cheeseburger
+        # is swapped in one step, not left in the cart beside the fish burger.
+        customer=(
+            "A cheeseburger, please.",
+            "Wait, is your beef halal?",
+            "Okay, the fish burger instead.",
+            "That's all.",
+            "Yes.",
+        ),
+        final_state=SessionState.SUBMITTED,
+        lines=(ExpectedLine("fish_burger", 1),),
+        must_use=ORDERING_TOOLS | {"check_diet", "replace_item"},
+        must_not_say=("beef is halal", "it's halal", "it is halal"),
+    ),
+    Scenario(
+        name="asks_what_they_ordered_last_time",
+        # A regular calls. Their last order is read back from the database,
+        # and "the same again" puts it in the cart at today's prices.
+        caller_phone=REGULAR_CALLER,
+        past_orders=(
+            (ExpectedLine("chicken_burger", 1),),
+            (
+                ExpectedLine("cheeseburger", 1, {"extras": "bacon"}),
+                ExpectedLine("fries", 1, {"size": "large"}),
+                ExpectedLine("cola", 1, {"size": "large"}),
+            ),
+        ),
+        customer=(
+            "Hi, what did I order last time?",
+            "Perfect, the same again please.",
+            "That's all.",
+            "Yes.",
+        ),
+        final_state=SessionState.SUBMITTED,
+        lines=(
+            ExpectedLine("cheeseburger", 1, {"extras": "bacon"}),
+            ExpectedLine("fries", 1, {"size": "large"}),
+            ExpectedLine("cola", 1, {"size": "large"}),
+        ),
+        must_use=frozenset(
+            {"get_past_orders", "reorder", "request_confirmation", "submit_order"}
+        ),
+        must_say_one_of=("cheeseburger",),
+        # A caller picks up; they don't pull forward.
+        must_not_say=("pull forward",),
+    ),
+    Scenario(
+        name="new_caller_has_no_history",
+        # Nothing to read back: the agent says so and nothing is invented.
+        caller_phone=NEW_CALLER,
+        customer=(
+            "What did I get last time?",
+            "Okay, a cookie then.",
+            "That's all.",
+            "Yes.",
+        ),
+        final_state=SessionState.SUBMITTED,
+        lines=(ExpectedLine("cookie", 1),),
+        must_use=ORDERING_TOOLS | {"get_past_orders"},
+        must_not_use=frozenset({"reorder"}),
+        must_not_say=("pull forward",),
+    ),
+    Scenario(
+        name="opts_out_of_history",
+        # "Don't save my number" turns the read-back off; the order goes on.
+        caller_phone=REGULAR_CALLER,
+        past_orders=((ExpectedLine("chicken_burger", 1),),),
+        customer=(
+            "Please don't save my number.",
+            "A cookie, please.",
+            "That's all.",
+            "Yes.",
+        ),
+        final_state=SessionState.SUBMITTED,
+        lines=(ExpectedLine("cookie", 1),),
+        must_use=ORDERING_TOOLS | {"forget_my_orders"},
+        must_not_use=frozenset({"reorder"}),
+        must_not_say=(
+            "chicken burger",
+            "number won't be saved",
+            "number deleted",
+            "pull forward",
+        ),
     ),
 )

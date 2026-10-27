@@ -1,12 +1,15 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 
-import { INSIGHTS_PATH, LIVE_PATH, MENU_PATH, STAFF_PATH, usePath } from './app/navigation'
+import { CALL_PATH, CALLERS_PATH, CALLS_PATH, INSIGHTS_PATH, LIVE_PATH, MENU_PATH, PICKUPS_PATH, STAFF_PATH, usePath } from './app/navigation'
+import { CallersPage } from './callers/CallersPage'
+import { PickupsPage } from './callers/PickupsPage'
 import { HomePage } from './home/HomePage'
 import { InsightsPage } from './insights/InsightsPage'
 import { MenuPage } from './menu-admin/MenuPage'
 import { StaffPage } from './staff/StaffPage'
 import { LiveSessionPage } from './views/LiveSessionPage'
+import { WebPhonePage } from './web-phone/WebPhonePage'
 
 function createQueryClient(): QueryClient {
   return new QueryClient({
@@ -29,10 +32,18 @@ export function App() {
     <QueryClientProvider client={queryClient}>
       {path === STAFF_PATH ? (
         <StaffPage />
+      ) : path === PICKUPS_PATH ? (
+        <PickupsPage />
+      ) : path === CALLERS_PATH ? (
+        <CallersPage />
       ) : path === INSIGHTS_PATH ? (
         <InsightsPage />
       ) : path === MENU_PATH ? (
         <MenuPage />
+      ) : path === CALLS_PATH ? (
+        <LiveSessionPage follow="phone" />
+      ) : path === CALL_PATH ? (
+        <WebPhonePage />
       ) : path === LIVE_PATH ? (
         <LiveSessionPage />
       ) : (

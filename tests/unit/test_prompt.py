@@ -2,8 +2,10 @@
 
 import re
 
+from drivetruagent.agent.phone import greeting
 from drivetruagent.agent.prompt import render_instructions
 from drivetruagent.agent.tools import TOOL_DEFINITIONS
+from drivetruagent.enums import Channel
 from drivetruagent.ordering.views import CategoryView, MenuItemSummary, MenuView
 
 
@@ -104,3 +106,53 @@ def test_the_model_is_told_it_cannot_grant_a_saving() -> None:
     assert "You never add, apply or promise one yourself." in combos
     assert "offer it once" in combos
     assert "never offer one again" in combos
+
+
+# --- Phone calls ------------------------------------------------------------
+
+PHONE = render_instructions(
+    "Maple Lane Burgers",
+    menu("Fries", "Cola", "Sides", "Drinks"),
+    menu("Frites", "Cola", "Accompagnements", "Boissons"),
+    channel=Channel.PHONE,
+    pickup_minutes=20,
+)
+
+
+def test_a_caller_is_told_about_pickup_not_pulling_forward() -> None:
+    assert PHONE.startswith("You take phone orders for pickup at Maple Lane Burgers")
+    assert "pull forward" not in PHONE
+    assert "ready in about 20 minutes" in PHONE
+    assert "pay when they pick it up" in PHONE
+
+
+def test_a_caller_is_not_greeted_twice() -> None:
+    """The opening notice is said by code before the model speaks."""
+    assert "do not greet them again" in PHONE
+
+
+def test_a_car_is_still_asked_to_pull_forward() -> None:
+    assert INSTRUCTIONS.startswith("You take orders at the drive-through")
+    assert "pull forward" in INSTRUCTIONS
+    assert "pickup" not in INSTRUCTIONS.split("# Past orders")[0]
+
+
+def test_the_notice_says_it_is_automated_recorded_and_why_the_number_is_kept() -> None:
+    notice = greeting("Maple Lane Burgers", number_known=True)
+
+    for words in (
+        "Maple Lane Burgers",
+        "automated assistant",
+        "recorded",
+        "keep your number",
+        "don't save my number",
+        "français",
+    ):
+        assert words in notice, words
+
+
+def test_with_a_withheld_number_the_notice_says_nothing_about_keeping_it() -> None:
+    notice = greeting("Maple Lane Burgers", number_known=False)
+
+    assert "automated assistant" in notice and "recorded" in notice
+    assert "number" not in notice

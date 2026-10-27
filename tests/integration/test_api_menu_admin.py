@@ -53,7 +53,7 @@ async def test_admin_menu_lists_every_item_with_what_the_page_shows(
         "drinks",
         "desserts",
     ]
-    assert len(body["items"]) == 20
+    assert len(body["items"]) == 21
     fries = next(item for item in body["items"] if item["item_code"] == "fries")
     assert fries["name_en"] == "Fries"
     assert fries["name_fr"] == "Frites"
@@ -306,7 +306,7 @@ async def test_seeding_with_photos_gives_every_item_its_photo_and_credit(
     await seed_menu(db_session, load_menu(MENU_PATH), photos_dir_for(MENU_PATH))
 
     count = await db_session.scalar(select(func.count()).select_from(MenuItemPhoto))
-    assert count == 20
+    assert count == 21
     fries = await admin_item(client, "fries")
     assert fries["photo"]["credit"].endswith("on Unsplash")
     photo = await client.get("/menu/items/fries/photo")

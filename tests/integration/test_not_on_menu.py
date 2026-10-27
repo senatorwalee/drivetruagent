@@ -58,6 +58,20 @@ async def test_sizes_choices_counts_and_other_items_are_exact(
     assert (top.match, top.not_offered) == ("exact", [])
 
 
+async def test_a_french_size_is_exact_in_either_gender(
+    db_session: AsyncSession, menu: None
+) -> None:
+    """The menu says Grand; a guest says "une grande frite"."""
+    matches = await search_menu(
+        db_session, "une grande frite et un lait frappé", Language.FR
+    )
+
+    assert {(m.item_code, m.match) for m in matches[:2]} == {
+        ("fries", "exact"),
+        ("milkshake", "exact"),
+    }
+
+
 @pytest.mark.parametrize(
     ("query", "item", "missing", "elsewhere"),
     [

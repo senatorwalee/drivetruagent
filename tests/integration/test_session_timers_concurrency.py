@@ -9,16 +9,17 @@ its turn on the event loop.
 """
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from drivetruagent.agent import events, timekeeper
 from drivetruagent.agent.timekeeper import SweepReport
-from drivetruagent.db.models import CustomerSession
-from drivetruagent.enums import AgentEventKind
+from drivetruagent.db.models import Caller, CustomerSession
+from drivetruagent.enums import AgentEventKind, Channel
 from drivetruagent.ordering.sessions import open_session
 from drivetruagent.ordering.timers import TimerSettings
 
@@ -105,7 +106,10 @@ class SweepClock:
 
 
 async def run_until_one_sweep_is_done(
-    sessions_factory: Sessions, clock: SweepClock
+    sessions_factory: Sessions,
+    clock: SweepClock,
+    *,
+    caller_retention: timedelta | None = None,
 ) -> None:
     task = asyncio.create_task(
         timekeeper.run_forever(
@@ -113,6 +117,7 @@ async def run_until_one_sweep_is_done(
             interval_seconds=0.01,
             timers=TIMERS,
             tax_rate=TAX,
+            caller_retention=caller_retention,
             clock=clock,
         )
     )
@@ -146,3 +151,26 @@ async def test_the_background_task_survives_a_sweep_that_fails(
 
     assert clock.calls >= 4
     assert await nudges(committing_sessions, car) == ["Are you still there?"]
+
+
+async def test_the_background_task_forgets_numbers_past_their_retention(
+    committing_sessions: Sessions,
+) -> None:
+    async with committing_sessions.begin() as db:
+        await open_session(db, channel=Channel.PHONE, caller_phone="+14165550123")
+        await open_session(db, channel=Channel.PHONE, caller_phone="+16475550199")
+        await db.execute(
+            update(Caller)
+            .where(Caller.phone_e164 == "+16475550199")
+            .values(last_call_at=func.now() - timedelta(days=400))
+        )
+
+    await run_until_one_sweep_is_done(
+        committing_sessions,
+        SweepClock(datetime.now(UTC)),
+        caller_retention=timedelta(days=365),
+    )
+
+    async with committing_sessions() as db:
+        kept = (await db.execute(select(Caller.phone_e164))).scalars().all()
+    assert kept == ["+14165550123"]

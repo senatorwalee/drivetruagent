@@ -1,7 +1,7 @@
 import { HomeLink } from '../../app/HomeLink'
 import { INSIGHTS_PATH, MENU_PATH, STAFF_PATH } from '../../app/navigation'
 import { PageLink } from '../../app/PageLink'
-import { clock, progressSteps } from '../../session/presentation'
+import { clock, emptyConversationHint, progressSteps } from '../../session/presentation'
 import type { LiveSession } from '../../session/useLiveSession'
 import { MicButton } from '../shared/MicButton'
 import { ShopBoard } from '../shared/ShopBoard'
@@ -87,7 +87,7 @@ function ProgressSteps({ live }: { live: LiveSession }) {
 function Script({ live }: { live: LiveSession }) {
   const lines = live.timeline.transcript.slice(-4)
   if (lines.length === 0) {
-    return <p className={styles.hint}>A car has pulled up. Say hello to start the order.</p>
+    return <p className={styles.hint}>{emptyConversationHint(live.following)}</p>
   }
   return (
     <div aria-label="Conversation" aria-live="polite" className={styles.script}>

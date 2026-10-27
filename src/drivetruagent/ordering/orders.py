@@ -15,7 +15,7 @@ from drivetruagent.db.models import (
     OrderLine,
     OrderLineOption,
 )
-from drivetruagent.enums import SessionState
+from drivetruagent.enums import Channel, PickupStatus, SessionState
 from drivetruagent.ordering.cart import (
     PricedLine,
     load_cart,
@@ -103,6 +103,10 @@ async def _freeze(
         discount_cents=snapshot.discount_cents,
         tax_cents=snapshot.tax_cents,
         total_cents=snapshot.total_cents,
+        # A phone order waits to be collected; staff mark whether it was.
+        pickup_status=(
+            PickupStatus.WAITING if customer_session.channel is Channel.PHONE else None
+        ),
     )
     db.add(order)
     await db.flush()

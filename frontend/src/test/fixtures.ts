@@ -61,6 +61,7 @@ export const agentInfo: AgentInfo = {
 export const session: Session = {
   session_id: SESSION_ID,
   lane: 'screen-test',
+  channel: 'drive_thru',
   state: 'ordering',
   language: null,
   started_at: '2026-10-13T12:00:00Z',
@@ -230,6 +231,7 @@ const ITEM_NAMES: Record<string, string> = { cookie: 'Chocolate chip cookie', fr
 export function liveSession(overrides: Partial<LiveSession> = {}): LiveSession {
   return {
     status: 'ready',
+    following: false,
     problem: null,
     agent: agentInfo,
     session,

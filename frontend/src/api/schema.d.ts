@@ -108,6 +108,69 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/callers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Phone numbers that have called
+         * @description The latest call first, with no-shows in the window, calls without an
+         *     order in the repeat-call window, and each number's standing.
+         */
+        get: operations["read_callers_callers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/callers/{caller_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Forget a number
+         * @description Deletes the number and everything known about it, including its
+         *     no-shows and status history. Its orders stay, linked to no one.
+         */
+        delete: operations["delete_caller_callers__caller_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/callers/{caller_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Flag, block or clear a number
+         * @description Recorded with who did it and why. Setting the status a number already
+         *     has changes nothing and records nothing.
+         */
+        post: operations["set_status_callers__caller_id__status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/combos": {
         parameters: {
             query?: never;
@@ -437,6 +500,90 @@ export interface paths {
         get: operations["read_order_orders__order_id__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phone/calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Phone calls in progress
+         * @description Newest first. The live screen follows the newest one.
+         */
+        get: operations["phone_calls_phone_calls_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phone/incoming": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer a phone call (OpenAI's webhook)
+         * @description OpenAI calls this when someone rings the restaurant's number. The call
+         *     is answered with the agent's instructions and tools, the caller hears
+         *     the opening notice, and the backend handles the call from then on.
+         */
+        post: operations["incoming_call_phone_incoming_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pickups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Phone orders to be collected
+         * @description Every phone order still waiting, oldest first; then those marked in
+         *     the last twelve hours, so a wrong mark can be put right.
+         */
+        get: operations["read_pickups_pickups_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pickups/{order_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark a phone order picked up, or a no-show
+         * @description Only staff mark no-shows; two within 90 days flag the number, and big
+         *     orders from it then go to a person. A mark can be changed.
+         */
+        post: operations["mark_pickup_pickups__order_id__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -822,6 +969,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/web-phone/calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ring the agent from the web phone
+         * @description Answered like a phone call from WEB_PHONE_CALLER. Refused while the
+         *     last web call is still going.
+         */
+        post: operations["start_web_call_web_phone_calls_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/web-phone/calls/{call_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Hang up the web phone */
+        delete: operations["hang_up_web_call_web_phone_calls__call_key__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/web-phone/calls/{call_key}/connected": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The web phone's audio is connected
+         * @description The agent starts talking now. A call that is over, or unknown, is
+         *     already done with: nothing to do.
+         */
+        post: operations["web_call_connected_web_phone_calls__call_key__connected_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/web-phone/line": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who the web phone calls
+         * @description Lets the page show who it calls, and find out a wrong key before
+         *     anyone taps Call.
+         */
+        get: operations["web_phone_line_web_phone_line_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -847,6 +1074,21 @@ export interface components {
             /** Rule */
             rule?: string | null;
             suggestion?: components["schemas"]["SuggestionView"] | null;
+        };
+        /** ActiveCall */
+        ActiveCall: {
+            /** Caller Last Four */
+            caller_last_four: string | null;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
         };
         /** AddItem */
         AddItem: {
@@ -1002,6 +1244,56 @@ export interface components {
             /** Verified */
             verified: boolean;
         };
+        /** CallAnswered */
+        CallAnswered: {
+            /** Session Id */
+            session_id: string | null;
+            turned_away?: components["schemas"]["TurnAway"] | null;
+        };
+        /**
+         * CallerStatus
+         * @description What staff have decided about a phone number. Only staff change it.
+         * @enum {string}
+         */
+        CallerStatus: "normal" | "flagged" | "blocked";
+        /** CallerView */
+        CallerView: {
+            /** Call Count */
+            call_count: number;
+            /**
+             * Caller Id
+             * Format: uuid
+             */
+            caller_id: string;
+            /**
+             * First Call At
+             * Format: date-time
+             */
+            first_call_at: string;
+            /** History Opted Out */
+            history_opted_out: boolean;
+            /**
+             * Last Call At
+             * Format: date-time
+             */
+            last_call_at: string;
+            /** Order Count */
+            order_count: number;
+            /** Phone E164 */
+            phone_e164: string;
+            /** Recent Calls Without Order */
+            recent_calls_without_order: number;
+            /** Recent No Shows */
+            recent_no_shows: number;
+            standing: components["schemas"]["Standing"];
+            status: components["schemas"]["CallerStatus"];
+            /** Status Changed At */
+            status_changed_at: string | null;
+            /** Status Changed By */
+            status_changed_by: string | null;
+            /** Status Reason */
+            status_reason: string | null;
+        };
         /** CartSnapshot */
         CartSnapshot: {
             /** Discount Cents */
@@ -1044,6 +1336,12 @@ export interface components {
             /** Items */
             items: components["schemas"]["MenuItemSummary"][];
         };
+        /**
+         * Channel
+         * @description How a customer reached the agent.
+         * @enum {string}
+         */
+        Channel: "drive_thru" | "phone";
         /** ChoiceGroupView */
         ChoiceGroupView: {
             /** Default Option Code */
@@ -1379,6 +1677,19 @@ export interface components {
             /** Unit Price Cents */
             unit_price_cents: number;
         };
+        /** MarkPickupRequest */
+        MarkPickupRequest: {
+            /**
+             * By
+             * @default staff
+             */
+            by: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "picked_up" | "no_show";
+        };
         /** MayContainView */
         MayContainView: {
             allergen: components["schemas"]["Allergen"];
@@ -1481,11 +1792,12 @@ export interface components {
         };
         /** OpenSessionRequest */
         OpenSessionRequest: {
-            /**
-             * Lane
-             * @default lane-1
-             */
-            lane: string;
+            /** Caller Phone */
+            caller_phone?: string | null;
+            /** @default drive_thru */
+            channel: components["schemas"]["Channel"];
+            /** Lane */
+            lane?: string | null;
         };
         /** OptionAddsView */
         OptionAddsView: {
@@ -1546,6 +1858,45 @@ export interface components {
             /** Message */
             message: string;
         };
+        /** Pickup */
+        Pickup: {
+            /** Caller Last Four */
+            caller_last_four: string | null;
+            /** Lines */
+            lines: components["schemas"]["PickupLine"][];
+            /** Marked At */
+            marked_at: string | null;
+            /** Marked By */
+            marked_by: string | null;
+            /**
+             * Order Id
+             * Format: uuid
+             */
+            order_id: string;
+            /** Order Number */
+            order_number: number;
+            status: components["schemas"]["PickupStatus"];
+            /**
+             * Submitted At
+             * Format: date-time
+             */
+            submitted_at: string;
+            /** Total Cents */
+            total_cents: number;
+        };
+        /** PickupLine */
+        PickupLine: {
+            /** Item Name */
+            item_name: string;
+            /** Quantity */
+            quantity: number;
+        };
+        /**
+         * PickupStatus
+         * @description Whether a phone order was collected. Only staff mark it.
+         * @enum {string}
+         */
+        PickupStatus: "waiting" | "picked_up" | "no_show";
         /** RemoveLine */
         RemoveLine: {
             /** Line No */
@@ -1555,6 +1906,28 @@ export interface components {
              * @enum {string}
              */
             type: "remove_line";
+        };
+        /**
+         * ReplaceLine
+         * @description Swap a line for another item in one step: "the fish burger instead".
+         *     If the new item can't be added, the line stays as it was.
+         */
+        ReplaceLine: {
+            /** Item Code */
+            item_code: string;
+            /** Line No */
+            line_no: number;
+            /** Quantity */
+            quantity?: number | null;
+            /** Selections */
+            selections?: {
+                [key: string]: string[];
+            };
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "replace_line";
         };
         /**
          * RequestConfirmation
@@ -1605,6 +1978,7 @@ export interface components {
              * Format: date
              */
             business_date: string;
+            channel: components["schemas"]["Channel"];
             /** End Reason */
             end_reason: string | null;
             /** Ended At */
@@ -1629,6 +2003,17 @@ export interface components {
         SetSpecialRequest: {
             /** Is Active */
             is_active: boolean;
+        };
+        /** SetStatusRequest */
+        SetStatusRequest: {
+            /**
+             * By
+             * @default staff
+             */
+            by: string;
+            /** Reason */
+            reason: string;
+            status: components["schemas"]["CallerStatus"];
         };
         /** SetStockRequest */
         SetStockRequest: {
@@ -1667,6 +2052,12 @@ export interface components {
             /** Special Price Cents */
             special_price_cents: number;
         };
+        /**
+         * Standing
+         * @description How much a call can be trusted with.
+         * @enum {string}
+         */
+        Standing: "normal" | "flagged" | "blocked" | "unknown";
         /**
          * Step
          * @description One thing the agent asked the backend to do, or a timer firing.
@@ -1764,6 +2155,12 @@ export interface components {
             /** Text */
             text: string;
         };
+        /**
+         * TurnAway
+         * @description Why a call is not taken.
+         * @enum {string}
+         */
+        TurnAway: "blocked" | "too_many_calls";
         /** UnmetRequest */
         UnmetRequest: {
             /**
@@ -1819,6 +2216,24 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** WebCall */
+        WebCall: {
+            /** Answer Sdp */
+            answer_sdp: string;
+            /**
+             * Call Key
+             * Format: uuid
+             */
+            call_key: string;
+            /** Session Id */
+            session_id: string | null;
+            turned_away?: components["schemas"]["TurnAway"] | null;
+        };
+        /** WebPhoneInfo */
+        WebPhoneInfo: {
+            /** Restaurant Name */
+            restaurant_name: string;
         };
         /**
          * WeekOfSpecialsView
@@ -2059,6 +2474,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentInfoResponse"];
+                };
+            };
+        };
+    };
+    read_callers_callers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CallerView"][];
+                };
+            };
+        };
+    };
+    delete_caller_callers__caller_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caller_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_status_callers__caller_id__status_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caller_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CallerView"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -2655,6 +3172,137 @@ export interface operations {
             };
         };
     };
+    phone_calls_phone_calls_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActiveCall"][];
+                };
+            };
+        };
+    };
+    incoming_call_phone_incoming_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CallAnswered"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_pickups_pickups_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Pickup"][];
+                };
+            };
+        };
+    };
+    mark_pickup_pickups__order_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkPickupRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Pickup"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     open_session_sessions_post: {
         parameters: {
             query?: never;
@@ -2675,6 +3323,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionView"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Conflict */
@@ -2804,7 +3461,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AddItem"] | components["schemas"]["UpdateLine"] | components["schemas"]["RemoveLine"] | components["schemas"]["RequestConfirmation"] | components["schemas"]["SubmitOrder"];
+                "application/json": components["schemas"]["AddItem"] | components["schemas"]["UpdateLine"] | components["schemas"]["RemoveLine"] | components["schemas"]["ReplaceLine"] | components["schemas"]["RequestConfirmation"] | components["schemas"]["SubmitOrder"];
             };
         };
         responses: {
@@ -3581,6 +4238,220 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_web_call_web_phone_calls_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Web-Phone-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebCall"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    hang_up_web_call_web_phone_calls__call_key__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Web-Phone-Key"?: string | null;
+            };
+            path: {
+                call_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    web_call_connected_web_phone_calls__call_key__connected_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Web-Phone-Key"?: string | null;
+            };
+            path: {
+                call_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    web_phone_line_web_phone_line_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Web-Phone-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebPhoneInfo"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

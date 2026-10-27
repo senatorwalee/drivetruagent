@@ -3,7 +3,7 @@ id = "fryer-and-oil"
 title = "Fryer oil and frying"
 type = "preparation"
 audience = "customer"
-items = ["fries", "onion_rings", "chicken_nuggets", "chicken_burger"]
+items = ["fries", "onion_rings", "chicken_nuggets", "chicken_burger", "fish_burger"]
 version = "2026-10-01"
 +++
 
@@ -17,7 +17,8 @@ oils or animal fat such as beef tallow in any fryer.
 ## Which items share a fryer
 
 Fries, onion rings, chicken nuggets and the crispy chicken patty are cooked in
-the same fryers and the same oil. The onion ring batter contains wheat, milk
+the same fryers and the same oil. The fish burger's pollock fillet has a fryer of its
+own and never shares oil with them. The onion ring batter contains wheat, milk
 and egg, and the nugget and chicken breading contains wheat and egg, so fries
 may contain traces of wheat, gluten, milk and egg.
 

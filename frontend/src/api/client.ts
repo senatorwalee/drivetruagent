@@ -32,6 +32,14 @@ export type AdminItem = Schemas['AdminItemView']
 export type AdminCategory = Schemas['AdminCategoryView']
 export type NewItem = Schemas['NewItem']
 export type ItemChanges = Schemas['ItemChanges']
+export type PhoneCall = Schemas['ActiveCall']
+export type Pickup = Schemas['Pickup']
+export type PickupMark = Schemas['MarkPickupRequest']['status']
+export type Caller = Schemas['CallerView']
+export type CallerStatus = Schemas['CallerStatus']
+export type Standing = Schemas['Standing']
+export type WebPhoneInfo = Schemas['WebPhoneInfo']
+export type WebCall = Schemas['WebCall']
 
 const BASE = '/api'
 
@@ -88,6 +96,8 @@ export const api = {
   menu: (language: Language) => request<Menu>(`/menu?language=${language}`),
   openSession: (lane: string) => post<Session>('/sessions', { lane }),
   session: (sessionId: string) => request<Session>(`/sessions/${sessionId}`),
+  /** Phone calls in progress, newest first. */
+  phoneCalls: () => request<PhoneCall[]>('/phone/calls'),
   cart: (sessionId: string) => request<Cart>(`/sessions/${sessionId}/cart`),
   events: (sessionId: string) => request<AgentEvent[]>(`/sessions/${sessionId}/events`),
   /** Stock for every tracked item: on hand, held in carts, available. */
@@ -116,6 +126,38 @@ export const api = {
     if (!response.ok && response.status !== 404) throw await toApiError(response)
   },
 
+  /** The web phone. Every request carries the key from the page's link. */
+  webPhoneLine: async (key: string): Promise<WebPhoneInfo> => {
+    const response = await fetch(`${BASE}/web-phone/line`, { headers: { 'X-Web-Phone-Key': key } })
+    if (!response.ok) throw await toApiError(response)
+    return (await response.json()) as WebPhoneInfo
+  },
+  /** Ring the agent: our WebRTC offer in, the call (with OpenAI's answer) out. */
+  callWebPhone: async (key: string, sdp: string): Promise<WebCall> => {
+    const response = await fetch(`${BASE}/web-phone/calls`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/sdp', 'X-Web-Phone-Key': key },
+      body: sdp,
+    })
+    if (!response.ok) throw await toApiError(response)
+    return (await response.json()) as WebCall
+  },
+  webPhoneConnected: async (key: string, callKey: string): Promise<void> => {
+    const response = await fetch(`${BASE}/web-phone/calls/${callKey}/connected`, {
+      method: 'POST',
+      headers: { 'X-Web-Phone-Key': key },
+    })
+    if (!response.ok) throw await toApiError(response)
+  },
+  hangUpWebPhone: async (key: string, callKey: string): Promise<void> => {
+    const response = await fetch(`${BASE}/web-phone/calls/${callKey}`, {
+      method: 'DELETE',
+      headers: { 'X-Web-Phone-Key': key },
+    })
+    // No call to end is not a problem: the call is over either way.
+    if (!response.ok && response.status !== 404) throw await toApiError(response)
+  },
+
   /** Sessions handed to a person, the longest-waiting first. */
   handoffs: () => request<HandoffSummary[]>('/handoffs'),
   handoff: (handoffId: string) => request<HandoffPackage>(`/handoffs/${handoffId}`),
@@ -123,6 +165,20 @@ export const api = {
     post<HandoffPackage>(`/handoffs/${handoffId}/acknowledge`, { by }),
   resolveHandoff: (handoffId: string, outcome: HandoffOutcome, note: string | null) =>
     post<HandoffPackage>(`/handoffs/${handoffId}/resolve`, { outcome, note }),
+
+  /** Phone orders still to be collected, then the ones marked recently. */
+  pickups: () => request<Pickup[]>('/pickups'),
+  markPickup: (orderId: string, status: PickupMark, by: string) => post<Pickup>(`/pickups/${orderId}`, { status, by }),
+
+  /** Phone numbers that have called, the latest call first. */
+  callers: () => request<Caller[]>('/callers'),
+  setCallerStatus: (callerId: string, status: CallerStatus, reason: string, by: string) =>
+    post<Caller>(`/callers/${callerId}/status`, { status, reason, by }),
+  /** Forgets the number and everything known about it. */
+  deleteCaller: async (callerId: string): Promise<void> => {
+    const response = await fetch(`${BASE}/callers/${callerId}`, { method: 'DELETE' })
+    if (!response.ok) throw await toApiError(response)
+  },
 
   /** What guests asked for that the menu couldn't fill, most asked first. */
   unmetRequests: (days: number) => request<UnmetRequest[]>(`/insights/unmet-requests?days=${days}`),

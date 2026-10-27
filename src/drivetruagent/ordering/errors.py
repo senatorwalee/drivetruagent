@@ -46,6 +46,41 @@ class LaneBusy(OrderingError):
         super().__init__(f"Lane {lane} already has an active session.", lane=lane)
 
 
+class UnknownPastOrder(OrderingError):
+    code = "unknown_past_order"
+
+    def __init__(self, order_number: int, recent: list[int]) -> None:
+        super().__init__(
+            f"Order {order_number} is not one of this caller's recent orders.",
+            order_number=order_number,
+            recent_order_numbers=recent,
+        )
+
+
+class InvalidPhoneNumber(OrderingError):
+    code = "invalid_phone_number"
+
+    def __init__(self) -> None:
+        super().__init__("That is not a phone number that can be called back.")
+
+
+class CallerNotFound(OrderingError):
+    code = "caller_not_found"
+
+    def __init__(self, caller_id: object) -> None:
+        super().__init__(f"No caller with id {caller_id}.")
+
+
+class TypedCallerIdOff(OrderingError):
+    code = "typed_caller_id_off"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "A caller's number comes only from the phone line. Typing one in is "
+            "for testing, and is off (ALLOW_TYPED_CALLER_ID)."
+        )
+
+
 class UnknownItem(OrderingError):
     code = "unknown_item"
 
@@ -174,6 +209,18 @@ class OrderNotFound(OrderingError):
 
     def __init__(self, order_id: object) -> None:
         super().__init__(f"No order with id {order_id}.")
+
+
+class NotAPickupOrder(OrderingError):
+    """Only a phone order is collected later, so only it has a pickup to mark."""
+
+    code = "not_a_pickup_order"
+
+    def __init__(self, order_id: object) -> None:
+        super().__init__(
+            f"Order {order_id} was not ordered by phone, so there is no pickup "
+            "to mark.",
+        )
 
 
 class SessionNotHandedOff(OrderingError):

@@ -8,9 +8,12 @@ from drivetruagent.enums import FINAL_SESSION_STATES, SessionState
 from drivetruagent.policy.actions import (
     Action,
     AddItem,
+    ReplaceLine,
+    RequestConfirmation,
     SubmitOrder,
     UpdateLine,
 )
+from drivetruagent.policy.caller_rules import needs_person_for_size
 from drivetruagent.policy.decisions import (
     ALLOWED,
     Decision,
@@ -23,6 +26,7 @@ SESSION_ENDED = "session_ended"
 ORDER_NOT_CONFIRMED = "order_not_confirmed"
 UNUSUAL_QUANTITY = "unusual_quantity"
 EXTREME_QUANTITY = "extreme_quantity"
+LARGE_ORDER_CHECK = "large_order_check"
 # Reasons a session ends that are not decided by the rules below, but are
 # named here with the rest so every reason code lives in one place.
 HUMAN_REQUESTED = "human_requested"
@@ -47,7 +51,7 @@ def evaluate(
     `confirmed` is True only when the customer has already been asked about
     this exact action and said yes.
     """
-    for rule in (_check_state, _check_quantity):
+    for rule in (_check_state, _check_quantity, _check_order_size_for_caller):
         result = rule(action, context, limits, confirmed)
         if result.decision is not Decision.ALLOW:
             return result
@@ -115,6 +119,34 @@ def _check_quantity(
     return ALLOWED
 
 
+def _check_order_size_for_caller(
+    action: Action, context: PolicyContext, limits: PolicyLimits, confirmed: bool
+) -> PolicyResult:
+    """A big phone order from a number with recent no-shows, or a withheld
+    one, is confirmed by a person: nothing is paid until pickup, so a big
+    order that is never collected is food thrown away. Checked as the order
+    is read back, and again as it is placed."""
+    if not isinstance(action, RequestConfirmation | SubmitOrder):
+        return ALLOWED
+    if context.caller_standing is None or not needs_person_for_size(
+        context.caller_standing, context.cart_total_cents, limits.callers
+    ):
+        return ALLOWED
+    return PolicyResult(
+        Decision.ESCALATE,
+        LARGE_ORDER_CHECK,
+        # The caller is never told why beyond the size.
+        "Say only this, in the customer's language, and give no other "
+        "reason: “For an order this size, I'll pass you to a team member "
+        "to confirm.”",
+        {
+            "total_cents": context.cart_total_cents,
+            "limit_cents": limits.callers.large_order_cents,
+            "standing": context.caller_standing.value,
+        },
+    )
+
+
 def _resulting_quantities(
     action: Action, context: PolicyContext
 ) -> tuple[int, int] | None:
@@ -128,4 +160,10 @@ def _resulting_quantities(
             # No such line. The ordering rules will refuse it with a clear error.
             return None
         return action.quantity, context.cart_item_count - current + action.quantity
+    if isinstance(action, ReplaceLine):
+        current = context.line_quantities.get(action.line_no)
+        if current is None:
+            return None
+        quantity = current if action.quantity is None else action.quantity
+        return quantity, context.cart_item_count - current + quantity
     return None

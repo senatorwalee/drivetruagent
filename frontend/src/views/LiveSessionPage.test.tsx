@@ -161,3 +161,26 @@ describe('the live session page', () => {
     expect(await screen.findByText(/say hello to start/i)).toBeInTheDocument()
   })
 })
+
+describe('following phone calls', () => {
+  beforeEach(() => {
+    window.history.replaceState(null, '', '/calls')
+  })
+
+  it('waits for a call, and opens no session of its own', async () => {
+    render(<App />)
+
+    expect(await screen.findByText(/No call in progress/)).toBeInTheDocument()
+    expect(backend.sessionsOpened()).toBe(0)
+  })
+
+  it('shows the call as it happens, without a way to type into it', async () => {
+    backend.ring()
+    render(<App />)
+
+    expect(await screen.findByText('Hi, thanks for calling Maple Lane Burgers.')).toBeInTheDocument()
+    expect(screen.queryByText(/No call in progress/)).not.toBeInTheDocument()
+    expect(await screen.findByLabelText('What the customer says')).toBeDisabled()
+    expect(backend.sessionsOpened()).toBe(0)
+  })
+})

@@ -17,7 +17,7 @@ built piece by piece.
 | Piece | What it covers | State |
 |---|---|---|
 | 00 | Project setup, database connection, health endpoints, tests, CI | Done |
-| 01a | Menu tables and the seed menu (20 items, English and Canadian French) | Done |
+| 01a | Menu tables and the seed menu (21 items, English and Canadian French) | Done |
 | 01b | Session, cart and order tables | Done |
 | 02 | Cart logic, pricing and order submission | Done |
 | 03 | Ordering API and menu search | Done |
@@ -42,7 +42,12 @@ built piece by piece.
 | 19 | Not on the menu: say so, offer what's close, never what the guest is avoiding | Done; evals pass against the real model |
 | 20 | Insights page: what guests asked for that the menu couldn't fill, at `/insights` | Done; checked in a browser with real conversations |
 | 21 | Menu page: add, edit and take off items, with a photo for each, at `/menu` | Done; checked in a browser |
-| 22 | One look across the app, the Frontdesk name, and a home page at `/`; the live screen moves to `/live` | Done; checked in a browser |
+| 22 | Halal and kosher from a reviewed list, a fish burger, and swapping a line in one step | Done; evals pass against the real model |
+| 23a | Caller memory: a phone caller's last five orders, read back and reordered | Done; evals pass against the real model |
+| 23b | A real phone line: OpenAI Realtime over SIP, with a Twilio number | Done; tested with signed webhooks and a stand-in for OpenAI; a live call needs your Twilio number |
+| 23c | No-shows and repeat calls: staff mark pickups, big orders from flagged numbers go to a person, staff can block | Done; tested with signed webhooks and the real database |
+| 23d | The web phone: call the agent from a phone's browser at `/call`, answered as a phone call, without a number | Done; tested with a stand-in for OpenAI and checked in a browser |
+| 24 | One look across the app, the Frontdesk name, and a home page at `/`; the live screen moves to `/live` | Done; checked in a browser |
 | Later | Demo polish: cost readout, French review, demo script | Planned |
 
 ## Stack
@@ -110,6 +115,7 @@ collide with a Postgres installed directly on your machine.
 | `make demo` | Build and run the whole app in Docker on <http://localhost:8080> |
 | `make up` / `make down` | Start and stop the local Postgres (`down` stops the demo and Phoenix too) |
 | `make phoenix` | Start Arize Phoenix on <http://localhost:6006> for tracing |
+| `make tunnel` | Make the phone webhook (and only it) reachable from the internet, with cloudflared |
 | `make dev` | Run the API with auto-reload |
 | `make migrate` | Apply all database migrations |
 | `make seed` | Load `data/menu.json` and its photos into the database; resets edits made on the menu page |
@@ -211,6 +217,7 @@ these functions:
 | `add_item` | Adds a line; refuses if a required choice is missing |
 | `update_line` | Changes a quantity, the options, or both |
 | `remove_line` | Removes a line; its number is never reused |
+| `replace_line` | Swaps a line for another item in one step; keeps its number |
 | `get_cart` | Returns the cart, priced |
 | `submit_order` | Freezes the cart into an order and ends the session |
 
@@ -269,7 +276,9 @@ Design points:
 |---|---|
 | `search_menu`, `get_item_details`, `get_cart` | Read-only lookups |
 | `get_todays_specials` | Today's specials and the combo deals, read through a cache |
-| `add_item`, `update_item`, `remove_item` | The policy gateway |
+| `check_allergens`, `check_diet` | The allergen matrix; the halal and kosher list |
+| `get_past_orders`, `reorder`, `forget_my_orders` | A phone caller's last five orders; `reorder` adds them through the policy gateway |
+| `add_item`, `update_item`, `remove_item`, `replace_item` | The policy gateway |
 | `request_confirmation`, `submit_order` | The policy gateway |
 | `confirm_pending_action`, `cancel_pending_action` | The customer's answer to a held action |
 | `set_language` | Sets the session language |
@@ -972,6 +981,222 @@ for, and the code decides what may be offered:
 Against the real model: *"Sorry, we don't have an oat milkshake. We do have
 cola, lemon-lime soda, or iced tea, none listed as containing milk."*
 
+## Halal and kosher: a reviewed list, and a swap in one step
+
+"Is your chicken halal?" sounds like general knowledge, and that is the trap. Fish
+is generally halal, but a fish fillet fried beside non-halal chicken may not be
+acceptable, and nothing from a kitchen without kosher supervision is kosher, fish
+included. Only the restaurant knows its fryers and certificates, so the answer is
+**data someone reviewed**, like the allergen matrix, not the model's judgement.
+
+Each item can carry a `diets` entry in the menu file, with one of two levels and
+a note the agent reads out:
+
+| Level | Means | The agent may say |
+|---|---|---|
+| `certified` | The restaurant holds a certificate | "It's halal" |
+| `suitable` | No prohibited ingredients, prepared apart, no certificate | "Suitable for guests eating halal, but not certified", plus the note |
+| *(nothing)* | Not listed | That it isn't certified |
+
+In the demo menu nothing is certified, and only the new **fish burger** is listed,
+as halal-suitable ("fried in its own fryer, apart from the chicken"). The veggie
+burger is not: it shares the grill with the beef. Nothing is kosher.
+
+The `check_diet` tool answers for one item or for every line in the order. It
+names the lines that aren't listed and offers in-stock suitable items (from the
+same part of the menu first: a burger for a burger). Its instruction to the agent
+forbids calling anything halal unless it is certified. A halal question sent to
+knowledge search instead comes back pointing at `check_diet`.
+
+**Mid-order swaps never drop an item silently.** "The fish burger *instead*" is
+the guest's say-so, so `replace_item` swaps the line in one step: the line keeps
+its number and quantity, and the combo is recalculated. "I'll have the fish burger"
+alone is ambiguous, so the agent asks "instead, or as well?". The new item's stock
+is held before the old one is released, inside the gateway's savepoint, so a sold-out
+fish burger leaves the cheeseburger where it was.
+
+Against the real model: *"The cheeseburger isn't listed as halal-certified. The
+fish burger is suitable for guests eating halal, though it isn't certified; would
+you like to swap it for the cheeseburger?"* / "Okay, the fish burger instead." /
+*"I've swapped the cheeseburger for the fish burger."*
+
+The table is `diet_suitability` (item, diet, status, note), made to match the file
+on every seed; the words are recognised in `ordering/diet_words.py` and the reads
+are in `ordering/diet.py`.
+
+## Caller memory: "what did I order last time?"
+
+Phone orders are a session with `channel = phone` and, unless the number was
+withheld, a **caller**: one row per phone number, in E.164 (+14165550123), with
+when it first and last called and how many times. Nothing else is kept about a
+caller: no name, no address, no payment details. Their orders are not copied
+anywhere; they are found through the sessions that link to the number, from the
+frozen order rows.
+
+- **The last five orders** come back newest first, with the restaurant's date
+  and each line's choices, but no totals: prices change, and a past total would
+  be heard as today's.
+- **"The same again"** is `reorder`, which proposes each past line to the policy
+  gateway as an ordinary `add_item`. Today's prices, stock and combos apply; a
+  line since sold out or taken off the menu is refused on its own and the agent
+  says so. It can only reach the caller's own recent orders.
+- **"Don't save my number"** is `forget_my_orders`: nothing is read back from
+  then on. The number itself is kept to help with pickups (see "No-shows and
+  blocked numbers"), as the opening sentence of a call says.
+- **Two calls from one number at the same moment** are both counted: the caller
+  row is written with one `INSERT ... ON CONFLICT DO UPDATE`, and a test fires
+  five at once to prove it.
+- **Typing a caller number is off.** A real caller's number will come only from
+  the phone line, which can't be typed over. `ALLOW_TYPED_CALLER_ID=true` lets
+  `POST /sessions` take `{"channel": "phone", "caller_phone": "..."}` for
+  testing; with it on, anyone could claim a number and hear its orders.
+
+Numbers are parsed in `ordering/phone_numbers.py`: a SIP `From` header, a `tel:`
+link or a typed number all come out the same; a withheld number ("anonymous")
+or an impossible one comes out as none.
+
+Against the real model: *"Your last order was yesterday: a cheeseburger with
+bacon, large plain fries, and a large cola. Would you like that again?"*
+
+## The phone line
+
+A caller rings the restaurant's number and talks to the same agent, with the
+same tools, policy and log as the drive-through:
+
+```
+caller -> Twilio number -> Elastic SIP trunk -> OpenAI Realtime (SIP)
+OpenAI -> POST /phone/incoming (signed webhook: call id, the caller's number)
+backend: check the signature -> open a phone session -> accept the call
+         -> join it on the sideband (as for a browser call) -> say the notice
+```
+
+- **Only OpenAI can ring the line.** The webhook's signature is checked with
+  OpenAI's own library and `OPENAI_WEBHOOK_SECRET`; a forged, altered or
+  unsigned request, or one more than five minutes old, gets 400 and answers
+  nothing. The caller's number is read from the signed request (the SIP
+  `From` header), so it can't be typed over. A webhook delivered twice
+  answers the call once.
+- **The caller hears a fixed notice first**, said by code, not the model:
+  that it's an automated assistant, that the call is recorded, why the number
+  is kept, and how to stop it ("don't save my number"), with a line in French.
+  A withheld number hears the notice without the part about keeping it.
+- **The agent talks about pickup**, not pulling forward: the order number, the
+  total, pay at pickup, ready in about `PICKUP_READY_MINUTES`.
+- **When a person is needed**, the call is put through to `STAFF_PHONE_NUMBER`
+  (a SIP transfer); without one, the caller is told a team member will call
+  them back, and the handoff appears on the staff screen as usual.
+- **Watching a call:** <http://localhost:8080/calls> (or `/calls` on `make
+  ui`) shows the newest phone call in the live views, as it happens. It only
+  watches: the caller talks on their phone.
+
+### Setting it up
+
+These need your accounts, so they're yours to do:
+
+1. **A number.** In Twilio, buy a Canadian number and create an *Elastic SIP
+   Trunk* (this needs an upgraded account: a trial has neither trunking nor
+   forwarding to SIP; without one, use [the web phone](#calling-from-your-phone-without-a-number)). Give it an origination URI of
+   `sip:<your OpenAI project id>@sip.api.openai.com;transport=tls` (the
+   project id starts with `proj_`), and point the number at the trunk.
+2. **The tunnel.** With `make demo` running, run `make tunnel` (install
+   [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
+   first). It prints an address like `https://words.trycloudflare.com`. Only
+   the webhook is behind it: nginx serves nothing else on that port, so the
+   rest of the API, which has no logins yet, stays on your machine.
+3. **The webhook.** In your OpenAI project's Webhooks settings, add
+   `https://words.trycloudflare.com/phone/incoming` for the
+   `realtime.call.incoming` event, and put its signing secret in `.env` as
+   `OPENAI_WEBHOOK_SECRET`. Optionally set `STAFF_PHONE_NUMBER`. Then
+   `make demo` again so the API reads it.
+4. **Call the number.** Open <http://localhost:8080/calls> to watch.
+
+A quick tunnel's address changes each time it starts, so step 3's URL does
+too; a named Cloudflare tunnel keeps one address.
+
+> **Privacy (not legal advice).** In Ontario, PIPEDA applies: say why a number
+> is kept when it is collected, keep only what that needs and only as long as
+> needed, and let people opt out or ask for deletion. Quebec's Law 25 is
+> stricter about profiling: a no-show count may need to be off by default
+> there, with express consent. The opening notice says why a number is kept;
+> a number not heard from in a year is deleted, and staff can delete one on
+> request. Have the wording reviewed before a real launch.
+
+## Calling from your phone without a number
+
+For a demo without a phone line: open a link on your phone, tap **Call**, and
+Frontdesk answers it as a phone call. The same opening notice, pickup
+wording, caller memory, caller rules and log; the call shows on `/calls` like
+any other.
+
+```
+phone's browser (/call) -> POST /web-phone/calls (WebRTC offer, key)
+backend: check the key -> screen the number -> open a phone session
+         -> hand the offer to OpenAI -> answer to the browser
+browser: audio up -> POST .../connected -> the notice is said
+```
+
+- **It needs the key.** Every request carries `WEB_PHONE_KEY`, from the
+  link's `#key=…`, which browsers never send to a server, so it isn't kept
+  in any log. Without the key set, the web phone is off. Anyone holding the
+  link can start calls on your OpenAI key, so share it with nobody, and
+  change the key after a demo.
+- **The number is the server's.** A web call comes from `WEB_PHONE_CALLER`,
+  never from anything the page sends; unset, it is a withheld number.
+- **One call at a time.** A second call while one is going is told the line
+  is busy, which also limits what a leaked link can spend.
+- **No transfer.** There's no line to put a caller through on, so a call that
+  needs a person ends with "a team member will call you back", and the
+  handoff appears on the staff screen as usual.
+
+To try it:
+
+1. In `.env`, set `WEB_PHONE_KEY` (for example `openssl rand -hex 16`) and
+   `WEB_PHONE_CALLER` (the number to treat the calls as coming from, so caller
+   memory works), then `make demo`.
+2. Run `make tunnel`. The web phone needs HTTPS, because phones only let a
+   page use the microphone over HTTPS; the tunnel gives it that.
+3. On your phone, open `https://words.trycloudflare.com/call#key=<your key>`
+   and tap **Call**. Watch on <http://localhost:8080/calls>.
+
+On the computer itself, <http://localhost:8080/call#key=…> works without the
+tunnel. The tunnel serves only the webhook and the web phone (the page and
+`/api/web-phone/…`); the rest of the API stays on your machine.
+
+## No-shows and blocked numbers
+
+Phone orders are paid at pickup, so a big order that nobody collects is food
+thrown away. Nothing here is decided by the model, and nothing counts against
+a number unless a person marked it.
+
+- **Pickups** (<http://localhost:8080/pickups>): every phone order waits there
+  until staff mark it **Picked up** or **No-show**, signed with the name typed
+  on the staff screen. A wrong mark can be changed for twelve hours.
+- **Flagged** numbers have `FLAG_AFTER_NO_SHOWS` (2) no-shows on orders from
+  the last `NO_SHOW_WINDOW_DAYS` (90), or were flagged by staff. The no-show
+  part is counted whenever it's needed, never stored, so it clears itself as
+  old no-shows age out. A flagged number still gets through, and small orders
+  are placed as usual.
+- **Big orders go to a person.** As the agent reads back an order over
+  `FLAGGED_ORDER_CAP_CENTS` ($40) from a flagged number, or from a withheld
+  one (nothing to go on), the policy rule `large_order_check` hands it off:
+  the caller hears only *"For an order this size, I'll pass you to a team
+  member to confirm"* and is put through to `STAFF_PHONE_NUMBER`. The staff
+  screen says how much it was and why it was checked.
+- **Calling again and again without ordering** (`REPEAT_CALL_LIMIT`, 5 calls
+  in `REPEAT_CALL_WINDOW_MINUTES`, 60) and **blocked** numbers are stopped at
+  the webhook: the call is answered with no tools, a fixed sentence is said,
+  and it hangs up. The agent never hears them. The call still counts.
+- **Blocking is staff only** (<http://localhost:8080/callers>). Numbers show
+  only their last four digits until someone asks. Flag, block, unblock or
+  clear each need a reason, kept with who did it and when
+  (`caller_status_changes`). **Delete** forgets the number, its no-shows and
+  its history; its orders stay, linked to no one.
+- **Retention:** the timekeeper deletes numbers not heard from in
+  `CALLER_RETENTION_DAYS` (365), once an hour.
+
+The rules are pure functions in `policy/caller_rules.py`; the agent is never
+told a caller's standing, only its consequence.
+
 ## Policy engine
 
 The model proposes; code decides. Every action the agent proposes goes
@@ -1047,6 +1272,17 @@ Run `make dev` and open <http://127.0.0.1:8000/docs> to try these.
 | `PUT /admin/menu/items/{code}/photo` | Set or replace its photo (the image is the body) |
 | `DELETE /admin/menu/items/{code}/photo` | Remove its photo |
 | `GET /insights/unmet-requests?days=7` | What guests asked for that the menu couldn't fill, most asked first |
+| `POST /phone/incoming` | OpenAI's signed webhook: answer a phone call, or turn it away |
+| `GET /phone/calls` | Phone calls in progress, newest first |
+| `GET /web-phone/line` | The web phone: who it calls; checks `X-Web-Phone-Key` |
+| `POST /web-phone/calls` | Ring the agent from the web phone: a WebRTC offer in, the call (with OpenAI's answer) out |
+| `POST /web-phone/calls/{key}/connected` | The web phone's audio is up: the agent starts talking |
+| `DELETE /web-phone/calls/{key}` | Hang up the web phone |
+| `GET /pickups` | Phone orders waiting to be collected, then the recently marked |
+| `POST /pickups/{order_id}` | Mark one `picked_up` or `no_show` |
+| `GET /callers` | Numbers that have called, with counts and standing |
+| `POST /callers/{id}/status` | Flag, block or clear a number, with a reason |
+| `DELETE /callers/{id}` | Forget a number |
 | `GET /handoffs` | The handoff queue, longest waiting first; `?status=`, `?session_id=` |
 | `GET /handoffs/{id}` | One handoff's package |
 | `POST /handoffs/{id}/acknowledge` | Say you have picked it up |

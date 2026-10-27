@@ -1,5 +1,5 @@
 import { HomeLink } from '../app/HomeLink'
-import { INSIGHTS_PATH, LIVE_PATH, MENU_PATH } from '../app/navigation'
+import { CALLERS_PATH, CALLS_PATH, INSIGHTS_PATH, LIVE_PATH, MENU_PATH, PICKUPS_PATH } from '../app/navigation'
 import { PageLink } from '../app/PageLink'
 import { HandoffQueue } from './HandoffQueue'
 import { PackageView } from './PackageView'
@@ -24,6 +24,12 @@ export function StaffPage() {
           </h1>
         </div>
         <nav className={styles.pageLinks} aria-label="Pages">
+          <PageLink to={PICKUPS_PATH} className={styles.button}>
+            Pickups
+          </PageLink>
+          <PageLink to={CALLERS_PATH} className={styles.button}>
+            Callers
+          </PageLink>
           <PageLink to={INSIGHTS_PATH} className={styles.button}>
             Insights
           </PageLink>
@@ -32,6 +38,9 @@ export function StaffPage() {
           </PageLink>
           <PageLink to={LIVE_PATH} className={styles.button}>
             Live session
+          </PageLink>
+          <PageLink to={CALLS_PATH} className={styles.button}>
+            Phone calls
           </PageLink>
         </nav>
       </header>

@@ -41,7 +41,7 @@ from drivetruagent.agent.messages import (
     UserMessage,
 )
 from drivetruagent.agent.model import ModelClient, ModelTurn
-from drivetruagent.agent.prompt import build_instructions
+from drivetruagent.agent.prompt import DEFAULT_PICKUP_MINUTES, build_instructions
 from drivetruagent.agent.tools import TOOL_DEFINITIONS, ToolContext, run_tool
 from drivetruagent.enums import AgentEventKind, SessionState
 from drivetruagent.knowledge.store import KnowledgeSearch
@@ -83,6 +83,8 @@ class AgentConfig:
     guard_first: bool = False
     # Searches the approved knowledge documents. None: search finds nothing.
     knowledge: KnowledgeSearch | None = None
+    # How long a phone order takes to be ready, as the agent tells the caller.
+    pickup_minutes: int = DEFAULT_PICKUP_MINUTES
 
 
 @dataclass(frozen=True)
@@ -261,7 +263,7 @@ async def _converse(
     instructions = (
         first.instructions
         if first is not None
-        else await build_instructions(db, config.restaurant_name)
+        else await _instructions(db, session_id, config)
     )
     context = ToolContext(
         db,
@@ -341,7 +343,7 @@ async def _check_while_thinking(
     message is blocked, the request is cancelled and its answer never seen:
     no tool runs and nothing it said is kept.
     """
-    instructions = await build_instructions(db, config.restaurant_name)
+    instructions = await _instructions(db, session_id, config)
     messages = await events.load_messages(db, session_id)
     thinking = asyncio.create_task(
         _ask_model(model, instructions, messages, session_id)
@@ -420,4 +422,18 @@ async def _record_model_call(
             "output_tokens": turn.usage.output_tokens if turn.usage else None,
             "tool_calls": len(turn.tool_calls),
         },
+    )
+
+
+async def _instructions(
+    db: AsyncSession, session_id: uuid.UUID, config: AgentConfig
+) -> str:
+    """The instructions for this session: a phone call is told about pickup,
+    a car about pulling forward."""
+    customer_session = await get_session(db, session_id)
+    return await build_instructions(
+        db,
+        config.restaurant_name,
+        channel=customer_session.channel,
+        pickup_minutes=config.pickup_minutes,
     )

@@ -6,6 +6,8 @@ No database: events are built by hand.
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import pytest
+
 from drivetruagent.enums import AgentEventKind
 from drivetruagent.policy.handoff_package import (
     LoggedEvent,
@@ -221,6 +223,7 @@ def test_each_reason_has_a_heading_a_person_can_read() -> None:
     assert reason_title("human_requested") == "A person was asked for"
     assert reason_title("time_limit") == "Took longer than the time limit"
     assert reason_title("repeated_confusion") == "Kept going off track"
+    assert reason_title("large_order_check") == "Big phone order to confirm"
 
 
 def test_an_unknown_reason_still_reads_as_words() -> None:
@@ -253,6 +256,31 @@ def test_a_very_large_change_names_the_line() -> None:
         "The customer asked to change line L2 to 60 and confirmed it."
     )
     assert sentence.endswith("The cart holds 3 items and can be placed as it stands.")
+
+
+@pytest.mark.parametrize(
+    ("standing", "why"),
+    [("flagged", "has no-shows or was flagged by staff"), ("unknown", "was withheld")],
+)
+def test_a_big_phone_order_says_how_much_and_why_it_is_checked(
+    standing: str, why: str
+) -> None:
+    details = {"total_cents": 4561, "limit_cents": 4000, "standing": standing}
+
+    sentence = outstanding(
+        "large_order_check",
+        details,
+        {"type": "request_confirmation"},
+        item_name=None,
+        cart_item_count=3,
+    )
+
+    assert sentence == (
+        f"A phone order of $45.61, from a number that {why}. Nothing is paid "
+        "until pickup, so confirm the order with the caller (a deposit, or a "
+        "callback) before placing it. The cart holds 3 items and can be placed "
+        "as it stands."
+    )
 
 
 def test_a_request_for_a_person_quotes_the_reason_given() -> None:

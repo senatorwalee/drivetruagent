@@ -89,6 +89,38 @@
         "title": "ActionOutcome",
         "type": "object"
       },
+      "ActiveCall": {
+        "properties": {
+          "caller_last_four": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caller Last Four"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "started_at",
+          "caller_last_four"
+        ],
+        "title": "ActiveCall",
+        "type": "object"
+      },
       "AddItem": {
         "additionalProperties": false,
         "properties": {
@@ -565,6 +597,148 @@
         "title": "AllergenReport",
         "type": "object"
       },
+      "CallAnswered": {
+        "properties": {
+          "session_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "turned_away": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TurnAway"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "session_id"
+        ],
+        "title": "CallAnswered",
+        "type": "object"
+      },
+      "CallerStatus": {
+        "description": "What staff have decided about a phone number. Only staff change it.",
+        "enum": [
+          "normal",
+          "flagged",
+          "blocked"
+        ],
+        "title": "CallerStatus",
+        "type": "string"
+      },
+      "CallerView": {
+        "properties": {
+          "call_count": {
+            "title": "Call Count",
+            "type": "integer"
+          },
+          "caller_id": {
+            "format": "uuid",
+            "title": "Caller Id",
+            "type": "string"
+          },
+          "first_call_at": {
+            "format": "date-time",
+            "title": "First Call At",
+            "type": "string"
+          },
+          "history_opted_out": {
+            "title": "History Opted Out",
+            "type": "boolean"
+          },
+          "last_call_at": {
+            "format": "date-time",
+            "title": "Last Call At",
+            "type": "string"
+          },
+          "order_count": {
+            "title": "Order Count",
+            "type": "integer"
+          },
+          "phone_e164": {
+            "title": "Phone E164",
+            "type": "string"
+          },
+          "recent_calls_without_order": {
+            "title": "Recent Calls Without Order",
+            "type": "integer"
+          },
+          "recent_no_shows": {
+            "title": "Recent No Shows",
+            "type": "integer"
+          },
+          "standing": {
+            "$ref": "#/components/schemas/Standing"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CallerStatus"
+          },
+          "status_changed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Changed At"
+          },
+          "status_changed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Changed By"
+          },
+          "status_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Reason"
+          }
+        },
+        "required": [
+          "caller_id",
+          "phone_e164",
+          "first_call_at",
+          "last_call_at",
+          "call_count",
+          "history_opted_out",
+          "order_count",
+          "recent_no_shows",
+          "recent_calls_without_order",
+          "status",
+          "status_reason",
+          "status_changed_by",
+          "status_changed_at",
+          "standing"
+        ],
+        "title": "CallerView",
+        "type": "object"
+      },
       "CartSnapshot": {
         "properties": {
           "discount_cents": {
@@ -676,6 +850,15 @@
         ],
         "title": "CategoryView",
         "type": "object"
+      },
+      "Channel": {
+        "description": "How a customer reached the agent.",
+        "enum": [
+          "drive_thru",
+          "phone"
+        ],
+        "title": "Channel",
+        "type": "string"
       },
       "ChoiceGroupView": {
         "properties": {
@@ -1554,6 +1737,31 @@
         "title": "LineView",
         "type": "object"
       },
+      "MarkPickupRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "by": {
+            "default": "staff",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "By",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "picked_up",
+              "no_show"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "MarkPickupRequest",
+        "type": "object"
+      },
       "MayContainView": {
         "properties": {
           "allergen": {
@@ -1840,12 +2048,34 @@
       "OpenSessionRequest": {
         "additionalProperties": false,
         "properties": {
+          "caller_phone": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caller Phone"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/Channel",
+            "default": "drive_thru"
+          },
           "lane": {
-            "default": "lane-1",
-            "maxLength": 50,
-            "minLength": 1,
-            "title": "Lane",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lane"
           }
         },
         "title": "OpenSessionRequest",
@@ -1990,6 +2220,113 @@
         "title": "OutcomeError",
         "type": "object"
       },
+      "Pickup": {
+        "properties": {
+          "caller_last_four": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caller Last Four"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/PickupLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "marked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marked At"
+          },
+          "marked_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marked By"
+          },
+          "order_id": {
+            "format": "uuid",
+            "title": "Order Id",
+            "type": "string"
+          },
+          "order_number": {
+            "title": "Order Number",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PickupStatus"
+          },
+          "submitted_at": {
+            "format": "date-time",
+            "title": "Submitted At",
+            "type": "string"
+          },
+          "total_cents": {
+            "title": "Total Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "order_id",
+          "order_number",
+          "submitted_at",
+          "total_cents",
+          "lines",
+          "caller_last_four",
+          "status",
+          "marked_by",
+          "marked_at"
+        ],
+        "title": "Pickup",
+        "type": "object"
+      },
+      "PickupLine": {
+        "properties": {
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "quantity",
+          "item_name"
+        ],
+        "title": "PickupLine",
+        "type": "object"
+      },
+      "PickupStatus": {
+        "description": "Whether a phone order was collected. Only staff mark it.",
+        "enum": [
+          "waiting",
+          "picked_up",
+          "no_show"
+        ],
+        "title": "PickupStatus",
+        "type": "string"
+      },
       "RemoveLine": {
         "additionalProperties": false,
         "properties": {
@@ -2008,6 +2345,54 @@
           "line_no"
         ],
         "title": "RemoveLine",
+        "type": "object"
+      },
+      "ReplaceLine": {
+        "additionalProperties": false,
+        "description": "Swap a line for another item in one step: \"the fish burger instead\".\nIf the new item can't be added, the line stays as it was.",
+        "properties": {
+          "item_code": {
+            "minLength": 1,
+            "title": "Item Code",
+            "type": "string"
+          },
+          "line_no": {
+            "title": "Line No",
+            "type": "integer"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "selections": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Selections",
+            "type": "object"
+          },
+          "type": {
+            "const": "replace_line",
+            "default": "replace_line",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "line_no",
+          "item_code"
+        ],
+        "title": "ReplaceLine",
         "type": "object"
       },
       "RequestConfirmation": {
@@ -2113,6 +2498,9 @@
             "title": "Business Date",
             "type": "string"
           },
+          "channel": {
+            "$ref": "#/components/schemas/Channel"
+          },
           "end_reason": {
             "anyOf": [
               {
@@ -2170,6 +2558,7 @@
         "required": [
           "session_id",
           "lane",
+          "channel",
           "state",
           "language",
           "started_at",
@@ -2193,6 +2582,33 @@
           "is_active"
         ],
         "title": "SetSpecialRequest",
+        "type": "object"
+      },
+      "SetStatusRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "by": {
+            "default": "staff",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "By",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CallerStatus"
+          }
+        },
+        "required": [
+          "status",
+          "reason"
+        ],
+        "title": "SetStatusRequest",
         "type": "object"
       },
       "SetStockRequest": {
@@ -2288,6 +2704,17 @@
         ],
         "title": "SpecialView",
         "type": "object"
+      },
+      "Standing": {
+        "description": "How much a call can be trusted with.",
+        "enum": [
+          "normal",
+          "flagged",
+          "blocked",
+          "unknown"
+        ],
+        "title": "Standing",
+        "type": "string"
       },
       "Step": {
         "description": "One thing the agent asked the backend to do, or a timer firing.",
@@ -2527,6 +2954,15 @@
         "title": "TranscriptLine",
         "type": "object"
       },
+      "TurnAway": {
+        "description": "Why a call is not taken.",
+        "enum": [
+          "blocked",
+          "too_many_calls"
+        ],
+        "title": "TurnAway",
+        "type": "string"
+      },
       "UnmetRequest": {
         "properties": {
           "last_asked": {
@@ -2690,6 +3126,61 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "WebCall": {
+        "properties": {
+          "answer_sdp": {
+            "title": "Answer Sdp",
+            "type": "string"
+          },
+          "call_key": {
+            "format": "uuid",
+            "title": "Call Key",
+            "type": "string"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "turned_away": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TurnAway"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "call_key",
+          "answer_sdp",
+          "session_id"
+        ],
+        "title": "WebCall",
+        "type": "object"
+      },
+      "WebPhoneInfo": {
+        "properties": {
+          "restaurant_name": {
+            "title": "Restaurant Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "restaurant_name"
+        ],
+        "title": "WebPhoneInfo",
         "type": "object"
       },
       "WeekOfSpecialsView": {
@@ -3015,6 +3506,143 @@
         "summary": "Which model the agent uses",
         "tags": [
           "conversation"
+        ]
+      }
+    },
+    "/callers": {
+      "get": {
+        "description": "The latest call first, with no-shows in the window, calls without an\norder in the repeat-call window, and each number's standing.",
+        "operationId": "read_callers_callers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CallerView"
+                  },
+                  "title": "Response Read Callers Callers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Phone numbers that have called",
+        "tags": [
+          "callers"
+        ]
+      }
+    },
+    "/callers/{caller_id}": {
+      "delete": {
+        "description": "Deletes the number and everything known about it, including its\nno-shows and status history. Its orders stay, linked to no one.",
+        "operationId": "delete_caller_callers__caller_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "caller_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Caller Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Forget a number",
+        "tags": [
+          "callers"
+        ]
+      }
+    },
+    "/callers/{caller_id}/status": {
+      "post": {
+        "description": "Recorded with who did it and why. Setting the status a number already\nhas changes nothing and records nothing.",
+        "operationId": "set_status_callers__caller_id__status_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "caller_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Caller Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallerView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Flag, block or clear a number",
+        "tags": [
+          "callers"
         ]
       }
     },
@@ -3920,6 +4548,174 @@
         ]
       }
     },
+    "/phone/calls": {
+      "get": {
+        "description": "Newest first. The live screen follows the newest one.",
+        "operationId": "phone_calls_phone_calls_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ActiveCall"
+                  },
+                  "title": "Response Phone Calls Phone Calls Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Phone calls in progress",
+        "tags": [
+          "phone"
+        ]
+      }
+    },
+    "/phone/incoming": {
+      "post": {
+        "description": "OpenAI calls this when someone rings the restaurant's number. The call\nis answered with the agent's instructions and tools, the caller hears\nthe opening notice, and the backend handles the call from then on.",
+        "operationId": "incoming_call_phone_incoming_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallAnswered"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Answer a phone call (OpenAI's webhook)",
+        "tags": [
+          "phone"
+        ]
+      }
+    },
+    "/pickups": {
+      "get": {
+        "description": "Every phone order still waiting, oldest first; then those marked in\nthe last twelve hours, so a wrong mark can be put right.",
+        "operationId": "read_pickups_pickups_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Pickup"
+                  },
+                  "title": "Response Read Pickups Pickups Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Phone orders to be collected",
+        "tags": [
+          "pickups"
+        ]
+      }
+    },
+    "/pickups/{order_id}": {
+      "post": {
+        "description": "Only staff mark no-shows; two within 90 days flag the number, and big\norders from it then go to a person. A mark can be changed.",
+        "operationId": "mark_pickup_pickups__order_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Order Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkPickupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pickup"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark a phone order picked up, or a no-show",
+        "tags": [
+          "pickups"
+        ]
+      }
+    },
     "/sessions": {
       "post": {
         "description": "Start a customer's visit, with an empty cart. Refused if the lane\nalready has a session in progress.\n\nThe session keeps today's date, where the restaurant is, for as long as\nit lasts: a special heard about before midnight is still given after it.",
@@ -3951,6 +4747,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "409": {
             "content": {
@@ -4149,6 +4955,7 @@
                   "mapping": {
                     "add_item": "#/components/schemas/AddItem",
                     "remove_line": "#/components/schemas/RemoveLine",
+                    "replace_line": "#/components/schemas/ReplaceLine",
                     "request_confirmation": "#/components/schemas/RequestConfirmation",
                     "submit_order": "#/components/schemas/SubmitOrder",
                     "update_line": "#/components/schemas/UpdateLine"
@@ -4164,6 +4971,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/RemoveLine"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ReplaceLine"
                   },
                   {
                     "$ref": "#/components/schemas/RequestConfirmation"
@@ -5290,6 +6100,311 @@
         "summary": "End a special early, or bring it back",
         "tags": [
           "offers"
+        ]
+      }
+    },
+    "/web-phone/calls": {
+      "post": {
+        "description": "Answered like a phone call from WEB_PHONE_CALLER. Refused while the\nlast web call is still going.",
+        "operationId": "start_web_call_web_phone_calls_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Web-Phone-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Web-Phone-Key"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebCall"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Ring the agent from the web phone",
+        "tags": [
+          "web phone"
+        ]
+      }
+    },
+    "/web-phone/calls/{call_key}": {
+      "delete": {
+        "operationId": "hang_up_web_call_web_phone_calls__call_key__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "call_key",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Call Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Web-Phone-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Web-Phone-Key"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Hang up the web phone",
+        "tags": [
+          "web phone"
+        ]
+      }
+    },
+    "/web-phone/calls/{call_key}/connected": {
+      "post": {
+        "description": "The agent starts talking now. A call that is over, or unknown, is\nalready done with: nothing to do.",
+        "operationId": "web_call_connected_web_phone_calls__call_key__connected_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "call_key",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Call Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Web-Phone-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Web-Phone-Key"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "The web phone's audio is connected",
+        "tags": [
+          "web phone"
+        ]
+      }
+    },
+    "/web-phone/line": {
+      "get": {
+        "description": "Lets the page show who it calls, and find out a wrong key before\nanyone taps Call.",
+        "operationId": "web_phone_line_web_phone_line_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Web-Phone-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Web-Phone-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebPhoneInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Who the web phone calls",
+        "tags": [
+          "web phone"
         ]
       }
     }

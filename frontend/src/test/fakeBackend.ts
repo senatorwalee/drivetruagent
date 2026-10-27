@@ -28,6 +28,8 @@ export function installFakeBackend() {
   const requests: Request[] = []
   let sessionCount = 0
   let session: Session | null = null
+  // Phone calls ring in by themselves; this page only watches them.
+  let phoneCall: Session | null = null
   let events: AgentEvent[] = []
   let cart: Cart | null = null
   let seq = 1
@@ -41,6 +43,7 @@ export function installFakeBackend() {
     session = {
       session_id: `session-${sessionCount}`,
       lane,
+      channel: 'drive_thru',
       state: 'greeting',
       language: null,
       started_at: new Date().toISOString(),
@@ -115,6 +118,13 @@ export function installFakeBackend() {
       if (path === '/inventory') return respond(200, stockLevels)
       if (path === '/specials/week') return respond(200, week)
       if (path === '/sessions' && method === 'POST') return respond(201, openSession(body.lane))
+      if (path === '/phone/calls') {
+        const live = phoneCall && phoneCall.ended_at === null ? [phoneCall] : []
+        return respond(
+          200,
+          live.map((call) => ({ session_id: call.session_id, started_at: call.started_at, caller_last_four: '0123' })),
+        )
+      }
 
       const match = /^\/sessions\/([^/]+)(\/\w+)?$/.exec(path)
       if (!match || !session || match[1] !== session.session_id) return notFound()
@@ -148,6 +158,14 @@ export function installFakeBackend() {
       record('timer', { action: 'abandon', rule: 'silence_timeout', after_seconds: 40 })
       session = { ...session!, state: 'abandoned', ended_at: new Date().toISOString(), end_reason: 'silence_timeout' }
       cart = { ...cart!, state: 'abandoned' }
+    },
+    /** Someone rings the restaurant: a phone session opens and the notice is said. */
+    ring: () => {
+      const call = openSession('phone-1')
+      phoneCall = { ...call, channel: 'phone', session_id: `call-${sessionCount}` }
+      session = phoneCall
+      cart = { ...cart!, session_id: phoneCall.session_id }
+      record('assistant_message', { text: 'Hi, thanks for calling Maple Lane Burgers.' })
     },
     sessionsOpened: () => requests.filter((request) => request.method === 'POST' && request.path === '/sessions').length,
   }

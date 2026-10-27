@@ -11,6 +11,7 @@ Cropped to 800 × 600. Each is loaded into the database by the seed, with its cr
 | `double_cheeseburger.jpg` | [amirali mirhashemian](https://unsplash.com/@amir_v_ali) | [on Unsplash](https://unsplash.com/photos/double-patty-cheeseburger-jh5XyK4Rr3Y) |
 | `chicken_burger.jpg` | [Bilal Rana](https://unsplash.com/@billa029rana) | [on Unsplash](https://unsplash.com/photos/a-fried-chicken-sandwich-with-lettuce-and-tomatoes-rCl6ZyI0jXg) |
 | `veggie_burger.jpg` | [Zoshua Colah](https://unsplash.com/@zoshuacolah) | [on Unsplash](https://unsplash.com/photos/veggie-burger-with-tomato-and-cheese-mBdGdycNse8) |
+| `fish_burger.jpg` | [Caramel](https://unsplash.com/@caramel_works) | [on Unsplash](https://unsplash.com/photos/a-sandwich-is-sitting-in-a-bowl-on-a-table-iWGs4QrQ3Yo) |
 | `fries.jpg` | [Mitchell Luo](https://unsplash.com/@mitchel3uo) | [on Unsplash](https://unsplash.com/photos/a-basket-of-french-fries-sitting-on-top-of-a-wooden-table-ChXHveqrb28) |
 | `onion_rings.jpg` | [Esperanza Doronila](https://unsplash.com/@edoronila) | [on Unsplash](https://unsplash.com/photos/a-pile-of-fried-onion-rings-sitting-on-top-of-a-newspaper-4FO9vox0T7M) |
 | `chicken_nuggets.jpg` | [Tyson](https://unsplash.com/@tysonbrand) | [on Unsplash](https://unsplash.com/photos/fried-food-on-white-ceramic-plate-UmkODKl4E1M) |

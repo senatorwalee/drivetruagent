@@ -27,11 +27,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from drivetruagent.agent import tracing
 from drivetruagent.agent.model import ToolDefinition
-from drivetruagent.enums import Allergen, Language
+from drivetruagent.enums import Allergen, Diet, Language
 from drivetruagent.knowledge.embedding import EmbeddingUnavailable
 from drivetruagent.knowledge.store import KnowledgeSearch, Retrieval
 from drivetruagent.ordering import allergen_matrix
+from drivetruagent.ordering import callers as caller_rules
 from drivetruagent.ordering import cart as cart_rules
+from drivetruagent.ordering import diet as diet_rules
 from drivetruagent.ordering import menu as menu_rules
 from drivetruagent.ordering import offers as offer_rules
 from drivetruagent.ordering import sessions as session_rules
@@ -41,7 +43,8 @@ from drivetruagent.ordering.allergens import (
     is_about_allergens,
 )
 from drivetruagent.ordering.catalog import load_item_by_code
-from drivetruagent.ordering.errors import OrderingError, UnknownItem
+from drivetruagent.ordering.diet_words import diets_named
+from drivetruagent.ordering.errors import OrderingError, UnknownItem, UnknownPastOrder
 from drivetruagent.ordering.inventory import DEFAULT_RESERVATION_TTL
 from drivetruagent.ordering.offers import SpecialsCache
 from drivetruagent.ordering.views import DEFAULT_LANGUAGE, MenuMatch, localize
@@ -50,11 +53,13 @@ from drivetruagent.policy.actions import (
     Action,
     AddItem,
     RemoveLine,
+    ReplaceLine,
     RequestConfirmation,
     SubmitOrder,
     UpdateLine,
 )
-from drivetruagent.policy.decisions import PolicyLimits
+from drivetruagent.policy.decisions import Decision, PolicyLimits
+from drivetruagent.policy.outcome import ActionOutcome
 
 INVALID_TOOL_CALL = "invalid_tool_call"
 
@@ -138,6 +143,22 @@ class HumanArgs(Args):
 class KnowledgeArgs(Args):
     query: str
     item_code: str | None
+
+
+class DietArgs(Args):
+    diet: Diet
+    item_code: str | None
+
+
+class ReplaceItemArgs(Args):
+    line_no: int
+    item_code: str
+    quantity: int | None
+    selections: list[Selection]
+
+
+class ReorderArgs(Args):
+    order_number: int
 
 
 class AllergenArgs(Args):
@@ -499,6 +520,7 @@ async def _search_knowledge(context: ToolContext, args: KnowledgeArgs) -> ToolOu
                 for hit in retrieval.hits
             ],
             "message": KNOWLEDGE_INSTRUCTIONS,
+            **_diet_redirect(args.query),
             **trace,
         }
     if is_about_allergens(args.query):
@@ -516,7 +538,202 @@ async def _search_knowledge(context: ToolContext, args: KnowledgeArgs) -> ToolOu
             "sources": [],
             **trace,
         }
-    return {"sources": [], "message": NO_SOURCE, **trace}
+    return {
+        "sources": [],
+        "message": NO_SOURCE,
+        **_diet_redirect(args.query),
+        **trace,
+    }
+
+
+def _diet_redirect(query: str) -> dict[str, Any]:
+    """A halal or kosher question is answered from the reviewed list, not from
+    whatever the documents say in passing."""
+    diets = sorted(diet.value for diet in diets_named(query))
+    if not diets:
+        return {}
+    return {
+        "check_diet_first": diets,
+        "diet_message": (
+            "This is about "
+            + " and ".join(diets)
+            + ". Call check_diet before answering: it lists what is suitable."
+        ),
+    }
+
+
+async def _check_diet(context: ToolContext, args: DietArgs) -> ToolOutput:
+    language = await _session_language(context)
+    diet = args.diet
+    if args.item_code is not None:
+        items = [await diet_rules.item_diet(context.db, args.item_code, diet, language)]
+    else:
+        items = await diet_rules.cart_diet(
+            context.db, context.session_id, diet, language, tax_rate=context.tax_rate
+        )
+    not_suitable = [item for item in items if item.status is None]
+    # Offer from the same part of the menu as what didn't fit: a burger for a
+    # burger. With nothing named, from the whole menu.
+    category = not_suitable[0].category_code if not_suitable else None
+    options = await diet_rules.suitable_items(
+        context.db, diet, language, category_code=category
+    )
+    if not options and category is not None:
+        options = await diet_rules.suitable_items(context.db, diet, language)
+    return {
+        "diet": diet.value,
+        "items": [item.model_dump(mode="json") for item in items],
+        "not_suitable_lines": [item.line_no for item in not_suitable if item.line_no],
+        "options": [option.model_dump(mode="json") for option in options],
+        "message": _diet_message(diet, bool(options)),
+    }
+
+
+def _diet_message(diet: Diet, has_options: bool) -> str:
+    name = diet.value
+    parts = [
+        f"Say plainly which items are not {name}-certified. Call something {name} "
+        f"only if its status is certified. For status suitable, say it is "
+        f"suitable for guests eating {name} but not certified, and give its note."
+    ]
+    if has_options:
+        parts.append(
+            "Offer the options listed, with their note. If the customer clearly "
+            "wants one instead of an item in the order, swap it with replace_item. "
+            "If it is unclear whether they want it instead or as well, ask."
+        )
+    else:
+        parts.append(f"Nothing on the menu is listed for {name}: say so plainly.")
+    return " ".join(parts)
+
+
+async def _replace_item(context: ToolContext, args: ReplaceItemArgs) -> ToolOutput:
+    return await _propose(
+        context,
+        ReplaceLine(
+            line_no=args.line_no,
+            item_code=args.item_code,
+            quantity=args.quantity,
+            selections=_as_mapping(args.selections),
+        ),
+    )
+
+
+PAST_ORDERS_INSTRUCTIONS = (
+    "Read back only what the customer asked for: usually the latest order, "
+    "when it was (say the day, worked out from today) and what was in it. "
+    "These are not today's prices: never say a past total. To order one "
+    "again, use reorder with its order_number."
+)
+NO_PAST_ORDERS = (
+    "There are no past orders to read back on this call. Say so in a few "
+    "words and take the order as usual."
+)
+REORDER_INSTRUCTIONS = (
+    "Tell the customer what was added. For anything not added, say why in a "
+    "few words and offer to add something else. Today's prices apply. A line "
+    "whose decision is confirm needs the customer's answer, as usual."
+)
+FORGOTTEN = (
+    "Done. Tell the customer, in one sentence, that their orders won't be kept "
+    "to read back from now on. Do not say their number is deleted: it is kept "
+    "only to help with pickups, as the greeting said. Then carry on with the "
+    "order."
+)
+NOTHING_TO_FORGET = (
+    "There is no number on this call, so nothing is being kept. Tell the "
+    "customer so, and carry on with the order."
+)
+
+
+async def _get_past_orders(context: ToolContext, args: NoArgs) -> ToolOutput:
+    customer_session = await session_rules.get_session(context.db, context.session_id)
+    found = await caller_rules.past_orders(context.db, context.session_id)
+    return {
+        "today": customer_session.business_date.isoformat(),
+        # No totals: prices have changed since, and a past total would be
+        # heard as today's.
+        "orders": [
+            order.model_dump(mode="json", exclude={"total_cents"}) for order in found
+        ],
+        "message": PAST_ORDERS_INSTRUCTIONS if found else NO_PAST_ORDERS,
+    }
+
+
+async def _reorder(context: ToolContext, args: ReorderArgs) -> ToolOutput:
+    found = await caller_rules.past_orders(context.db, context.session_id)
+    order = next((o for o in found if o.order_number == args.order_number), None)
+    if order is None:
+        raise UnknownPastOrder(args.order_number, [o.order_number for o in found])
+
+    lines: list[dict[str, Any]] = []
+    outcome: ActionOutcome | None = None
+    for index, line in enumerate(order.lines):
+        selections: dict[str, list[str]] = {}
+        for option in line.options:
+            selections.setdefault(option.group_code, []).append(option.option_code)
+        # Each line is its own proposal, judged and priced as if asked for
+        # today: an item since taken off the menu or sold out is refused and
+        # the rest still go in.
+        outcome = await gateway.execute(
+            context.db,
+            context.session_id,
+            AddItem(
+                item_code=line.item_code, quantity=line.quantity, selections=selections
+            ),
+            tax_rate=context.tax_rate,
+            limits=context.limits,
+            reservation_ttl=context.reservation_ttl,
+            idempotency_key=(
+                None
+                if context.idempotency_key is None
+                else f"{context.idempotency_key}:{index}"
+            ),
+        )
+        lines.append(
+            {
+                "item_name": line.item_name,
+                "quantity": line.quantity,
+                "decision": outcome.decision.value,
+                **({"rule": outcome.rule} if outcome.rule else {}),
+                **(
+                    {"pending_action_id": str(outcome.pending_action_id)}
+                    if outcome.pending_action_id
+                    else {}
+                ),
+            }
+        )
+        if outcome.decision is Decision.ESCALATE:
+            # A person has taken over: nothing more is added.
+            break
+    if outcome is None:
+        cart = await cart_rules.get_cart(
+            context.db, context.session_id, tax_rate=context.tax_rate
+        )
+        return {
+            "lines": [],
+            "cart": cart.model_dump(mode="json"),
+            "message": REORDER_INSTRUCTIONS,
+        }
+    return {
+        "lines": lines,
+        "cart": outcome.cart.model_dump(mode="json"),
+        **(
+            {"suggestion": outcome.suggestion.model_dump(mode="json")}
+            if outcome.suggestion
+            else {}
+        ),
+        "message": (
+            outcome.message
+            if outcome.decision is Decision.ESCALATE
+            else REORDER_INSTRUCTIONS
+        ),
+    }
+
+
+async def _forget_my_orders(context: ToolContext, args: NoArgs) -> ToolOutput:
+    forgotten = await caller_rules.forget_history(context.db, context.session_id)
+    return {"message": FORGOTTEN if forgotten else NOTHING_TO_FORGET}
 
 
 async def _request_human(context: ToolContext, args: HumanArgs) -> ToolOutput:
@@ -631,6 +848,28 @@ TOOLS: tuple[Tool[Any], ...] = (
         _get_todays_specials,
     ),
     _tool(
+        "check_diet",
+        "Check whether items are halal or kosher, from the restaurant's own "
+        "reviewed list, and what to offer instead. Use it for every halal or "
+        "kosher question; never answer one from memory. Give an item, or null "
+        "for every line in the order.",
+        _object(
+            {
+                "diet": {
+                    "type": "string",
+                    "enum": [diet.value for diet in Diet],
+                    "description": "'halal' or 'kosher'.",
+                },
+                "item_code": {
+                    "type": ["string", "null"],
+                    "description": "The item's code, or null for the whole order.",
+                },
+            }
+        ),
+        DietArgs,
+        _check_diet,
+    ),
+    _tool(
         "check_allergens",
         "Look up allergens in the restaurant's allergen information. Use it "
         "for every allergen or dietary question; never answer one from memory "
@@ -726,6 +965,59 @@ TOOLS: tuple[Tool[Any], ...] = (
         ),
         UpdateItemArgs,
         _update_item,
+    ),
+    _tool(
+        "replace_item",
+        "Swap a line in the order for another item in one step, keeping its line "
+        "number: use it when the customer clearly wants something instead of what "
+        "they ordered. If the new item can't be added, nothing changes. Pass null "
+        "quantity to keep the line's quantity.",
+        _object(
+            {
+                "line_no": _LINE_NO,
+                "item_code": _ITEM_CODE,
+                "quantity": {
+                    "type": ["integer", "null"],
+                    "description": "The new quantity, or null to keep it.",
+                },
+                "selections": _SELECTIONS,
+            }
+        ),
+        ReplaceItemArgs,
+        _replace_item,
+    ),
+    _tool(
+        "get_past_orders",
+        "On a phone call: the caller's last few orders, newest first. Use it "
+        "only when they ask what they ordered before, or ask for 'the usual' "
+        "or 'the same as last time'.",
+        _NO_ARGUMENTS,
+        NoArgs,
+        _get_past_orders,
+    ),
+    _tool(
+        "reorder",
+        "Add everything from one of the caller's past orders to this order, "
+        "at today's prices. Use it when they ask for a past order again, "
+        "after get_past_orders.",
+        _object(
+            {
+                "order_number": {
+                    "type": "integer",
+                    "description": "The order_number from get_past_orders.",
+                }
+            }
+        ),
+        ReorderArgs,
+        _reorder,
+    ),
+    _tool(
+        "forget_my_orders",
+        "The caller asked not to have their number or orders saved: stop "
+        "keeping their orders to read back.",
+        _NO_ARGUMENTS,
+        NoArgs,
+        _forget_my_orders,
     ),
     _tool(
         "remove_item",
