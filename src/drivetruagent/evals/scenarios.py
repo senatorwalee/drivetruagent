@@ -383,6 +383,8 @@ SCENARIOS: tuple[Scenario, ...] = (
             {"get_past_orders", "reorder", "request_confirmation", "submit_order"}
         ),
         must_say_one_of=("cheeseburger",),
+        # A caller picks up; they don't pull forward.
+        must_not_say=("pull forward",),
     ),
     Scenario(
         name="new_caller_has_no_history",
@@ -398,6 +400,7 @@ SCENARIOS: tuple[Scenario, ...] = (
         lines=(ExpectedLine("cookie", 1),),
         must_use=ORDERING_TOOLS | {"get_past_orders"},
         must_not_use=frozenset({"reorder"}),
+        must_not_say=("pull forward",),
     ),
     Scenario(
         name="opts_out_of_history",
@@ -414,6 +417,11 @@ SCENARIOS: tuple[Scenario, ...] = (
         lines=(ExpectedLine("cookie", 1),),
         must_use=ORDERING_TOOLS | {"forget_my_orders"},
         must_not_use=frozenset({"reorder"}),
-        must_not_say=("chicken burger", "number won't be saved", "number deleted"),
+        must_not_say=(
+            "chicken burger",
+            "number won't be saved",
+            "number deleted",
+            "pull forward",
+        ),
     ),
 )
