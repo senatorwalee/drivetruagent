@@ -45,6 +45,7 @@ built piece by piece.
 | 23a | Caller memory: a phone caller's last five orders, read back and reordered | Done; evals pass against the real model |
 | 23b | A real phone line: OpenAI Realtime over SIP, with a Twilio number | Done; tested with signed webhooks and a stand-in for OpenAI; a live call needs your Twilio number |
 | 23c | No-shows and repeat calls: staff mark pickups, big orders from flagged numbers go to a person, staff can block | Done; tested with signed webhooks and the real database |
+| 23d | The web phone: call the agent from a phone's browser at `/call`, answered as a phone call, without a number | Done; tested with a stand-in for OpenAI and checked in a browser |
 | Later | Demo polish: cost readout, French review, demo script | Planned |
 
 ## Stack
@@ -1088,7 +1089,8 @@ backend: check the signature -> open a phone session -> accept the call
 These need your accounts, so they're yours to do:
 
 1. **A number.** In Twilio, buy a Canadian number and create an *Elastic SIP
-   Trunk*. Give it an origination URI of
+   Trunk* (this needs an upgraded account: a trial has neither trunking nor
+   forwarding to SIP; without one, use [the web phone](#calling-from-your-phone-without-a-number)). Give it an origination URI of
    `sip:<your OpenAI project id>@sip.api.openai.com;transport=tls` (the
    project id starts with `proj_`), and point the number at the trunk.
 2. **The tunnel.** With `make demo` running, run `make tunnel` (install
@@ -1113,6 +1115,47 @@ too; a named Cloudflare tunnel keeps one address.
 > there, with express consent. The opening notice says why a number is kept;
 > a number not heard from in a year is deleted, and staff can delete one on
 > request. Have the wording reviewed before a real launch.
+
+## Calling from your phone without a number
+
+For a demo without a phone line: open a link on your phone, tap **Call**, and
+Frontdesk answers it as a phone call. The same opening notice, pickup
+wording, caller memory, caller rules and log; the call shows on `/calls` like
+any other.
+
+```
+phone's browser (/call) -> POST /web-phone/calls (WebRTC offer, key)
+backend: check the key -> screen the number -> open a phone session
+         -> hand the offer to OpenAI -> answer to the browser
+browser: audio up -> POST .../connected -> the notice is said
+```
+
+- **It needs the key.** Every request carries `WEB_PHONE_KEY`, from the
+  link's `#key=…`, which browsers never send to a server, so it isn't kept
+  in any log. Without the key set, the web phone is off. Anyone holding the
+  link can start calls on your OpenAI key, so share it with nobody, and
+  change the key after a demo.
+- **The number is the server's.** A web call comes from `WEB_PHONE_CALLER`,
+  never from anything the page sends; unset, it is a withheld number.
+- **One call at a time.** A second call while one is going is told the line
+  is busy, which also limits what a leaked link can spend.
+- **No transfer.** There's no line to put a caller through on, so a call that
+  needs a person ends with "a team member will call you back", and the
+  handoff appears on the staff screen as usual.
+
+To try it:
+
+1. In `.env`, set `WEB_PHONE_KEY` (for example `openssl rand -hex 16`) and
+   `WEB_PHONE_CALLER` (the number to treat the calls as coming from, so caller
+   memory works), then `make demo`.
+2. Run `make tunnel`. The web phone needs HTTPS, because phones only let a
+   page use the microphone over HTTPS; the tunnel gives it that.
+3. On your phone, open `https://words.trycloudflare.com/call#key=<your key>`
+   and tap **Call**. Watch on <http://localhost:8080/calls>.
+
+On the computer itself, <http://localhost:8080/call#key=…> works without the
+tunnel. The tunnel serves only the webhook and the web phone (the page and
+`/api/web-phone/…`); the rest of the API stays on your machine.
 
 ## No-shows and blocked numbers
 
@@ -1226,6 +1269,10 @@ Run `make dev` and open <http://127.0.0.1:8000/docs> to try these.
 | `GET /insights/unmet-requests?days=7` | What guests asked for that the menu couldn't fill, most asked first |
 | `POST /phone/incoming` | OpenAI's signed webhook: answer a phone call, or turn it away |
 | `GET /phone/calls` | Phone calls in progress, newest first |
+| `GET /web-phone/line` | The web phone: who it calls; checks `X-Web-Phone-Key` |
+| `POST /web-phone/calls` | Ring the agent from the web phone: a WebRTC offer in, the call (with OpenAI's answer) out |
+| `POST /web-phone/calls/{key}/connected` | The web phone's audio is up: the agent starts talking |
+| `DELETE /web-phone/calls/{key}` | Hang up the web phone |
 | `GET /pickups` | Phone orders waiting to be collected, then the recently marked |
 | `POST /pickups/{order_id}` | Mark one `picked_up` or `no_show` |
 | `GET /callers` | Numbers that have called, with counts and standing |

@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+
 import { useNow } from '../session/useNow'
 import { MicrophoneIcon } from '../views/shared/icons'
 import { type PhoneParts, useWebPhone } from './useWebPhone'
@@ -28,6 +30,10 @@ export function WebPhonePage({ parts }: { parts?: PhoneParts }) {
   const turnedAway = turnedAwayLine(phone.turnedAway)
   const name = phone.restaurantName ?? 'Frontdesk'
   const canCall = phone.restaurantName !== null && phone.lineProblem === null
+
+  useEffect(() => {
+    document.title = `Call ${name}`
+  }, [name])
 
   return (
     <main className={styles.page}>
