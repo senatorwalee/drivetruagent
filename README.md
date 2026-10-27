@@ -43,7 +43,7 @@ built piece by piece.
 | 21 | Menu page: add, edit and take off items, with a photo for each, at `/menu` | Done; checked in a browser |
 | 22 | Halal and kosher from a reviewed list, a fish burger, and swapping a line in one step | Done; evals pass against the real model |
 | 23a | Caller memory: a phone caller's last five orders, read back and reordered | Done; evals pass against the real model |
-| 23b | A real phone line: OpenAI Realtime over SIP, with a Twilio number | Planned |
+| 23b | A real phone line: OpenAI Realtime over SIP, with a Twilio number | Done; tested with signed webhooks and a stand-in for OpenAI; a live call needs your Twilio number |
 | 23c | No-shows and repeat calls: staff mark pickups, big orders from flagged numbers go to a person, staff can block | Planned |
 | Later | Demo polish: cost readout, French review, demo script | Planned |
 
@@ -111,6 +111,7 @@ collide with a Postgres installed directly on your machine.
 | `make demo` | Build and run the whole app in Docker on <http://localhost:8080> |
 | `make up` / `make down` | Start and stop the local Postgres (`down` stops the demo and Phoenix too) |
 | `make phoenix` | Start Arize Phoenix on <http://localhost:6006> for tracing |
+| `make tunnel` | Make the phone webhook (and only it) reachable from the internet, with cloudflared |
 | `make dev` | Run the API with auto-reload |
 | `make migrate` | Apply all database migrations |
 | `make seed` | Load `data/menu.json` and its photos into the database; resets edits made on the menu page |
@@ -1051,11 +1052,65 @@ or an impossible one comes out as none.
 Against the real model: *"Your last order was yesterday: a cheeseburger with
 bacon, large plain fries, and a large cola. Would you like that again?"*
 
+## The phone line
+
+A caller rings the restaurant's number and talks to the same agent, with the
+same tools, policy and log as the drive-through:
+
+```
+caller -> Twilio number -> Elastic SIP trunk -> OpenAI Realtime (SIP)
+OpenAI -> POST /phone/incoming (signed webhook: call id, the caller's number)
+backend: check the signature -> open a phone session -> accept the call
+         -> join it on the sideband (as for a browser call) -> say the notice
+```
+
+- **Only OpenAI can ring the line.** The webhook's signature is checked with
+  OpenAI's own library and `OPENAI_WEBHOOK_SECRET`; a forged, altered or
+  unsigned request, or one more than five minutes old, gets 400 and answers
+  nothing. The caller's number is read from the signed request (the SIP
+  `From` header), so it can't be typed over. A webhook delivered twice
+  answers the call once.
+- **The caller hears a fixed notice first**, said by code, not the model:
+  that it's an automated assistant, that the call is recorded, why the number
+  is kept, and how to stop it ("don't save my number"), with a line in French.
+  A withheld number hears the notice without the part about keeping it.
+- **The agent talks about pickup**, not pulling forward: the order number, the
+  total, pay at pickup, ready in about `PICKUP_READY_MINUTES`.
+- **When a person is needed**, the call is put through to `STAFF_PHONE_NUMBER`
+  (a SIP transfer); without one, the caller is told a team member will call
+  them back, and the handoff appears on the staff screen as usual.
+- **Watching a call:** <http://localhost:8080/calls> (or `/calls` on `make
+  ui`) shows the newest phone call in the live views, as it happens. It only
+  watches: the caller talks on their phone.
+
+### Setting it up
+
+These need your accounts, so they're yours to do:
+
+1. **A number.** In Twilio, buy a Canadian number and create an *Elastic SIP
+   Trunk*. Give it an origination URI of
+   `sip:<your OpenAI project id>@sip.api.openai.com;transport=tls` (the
+   project id starts with `proj_`), and point the number at the trunk.
+2. **The tunnel.** With `make demo` running, run `make tunnel` (install
+   [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
+   first). It prints an address like `https://words.trycloudflare.com`. Only
+   the webhook is behind it: nginx serves nothing else on that port, so the
+   rest of the API, which has no logins yet, stays on your machine.
+3. **The webhook.** In your OpenAI project's Webhooks settings, add
+   `https://words.trycloudflare.com/phone/incoming` for the
+   `realtime.call.incoming` event, and put its signing secret in `.env` as
+   `OPENAI_WEBHOOK_SECRET`. Optionally set `STAFF_PHONE_NUMBER`. Then
+   `make demo` again so the API reads it.
+4. **Call the number.** Open <http://localhost:8080/calls> to watch.
+
+A quick tunnel's address changes each time it starts, so step 3's URL does
+too; a named Cloudflare tunnel keeps one address.
+
 > **Privacy (not legal advice).** In Ontario, PIPEDA applies: say why a number
 > is kept when it is collected, keep only what that needs and only as long as
 > needed, and let people opt out or ask for deletion. Quebec's Law 25 is
-> stricter about profiling. The phone line's opening sentence, retention limits
-> and staff deletion arrive with the phone line and no-show pieces; have the
+> stricter about profiling. The phone line's opening notice covers the first;
+> retention limits and staff deletion arrive with the no-show piece. Have the
 > wording reviewed before a real launch.
 
 ## Policy engine

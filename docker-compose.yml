@@ -42,6 +42,8 @@ services:
     profiles: ["app"]
     ports:
       - "8080:80"
+      # The phone webhook only; see frontend/nginx.conf and `make tunnel`.
+      - "127.0.0.1:8081:8081"
     depends_on:
       api:
         condition: service_healthy

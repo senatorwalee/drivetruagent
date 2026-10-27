@@ -443,6 +443,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/phone/calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Phone calls in progress
+         * @description Newest first. The live screen follows the newest one.
+         */
+        get: operations["phone_calls_phone_calls_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phone/incoming": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer a phone call (OpenAI's webhook)
+         * @description OpenAI calls this when someone rings the restaurant's number. The call
+         *     is answered with the agent's instructions and tools, the caller hears
+         *     the opening notice, and the backend handles the call from then on.
+         */
+        post: operations["incoming_call_phone_incoming_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sessions": {
         parameters: {
             query?: never;
@@ -848,6 +890,21 @@ export interface components {
             rule?: string | null;
             suggestion?: components["schemas"]["SuggestionView"] | null;
         };
+        /** ActiveCall */
+        ActiveCall: {
+            /** Caller Last Four */
+            caller_last_four: string | null;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+        };
         /** AddItem */
         AddItem: {
             /** Item Code */
@@ -1001,6 +1058,11 @@ export interface components {
             reviewed_on: string | null;
             /** Verified */
             verified: boolean;
+        };
+        /** CallAnswered */
+        CallAnswered: {
+            /** Session Id */
+            session_id: string | null;
         };
         /** CartSnapshot */
         CartSnapshot: {
@@ -2681,6 +2743,64 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    phone_calls_phone_calls_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActiveCall"][];
+                };
+            };
+        };
+    };
+    incoming_call_phone_incoming_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CallAnswered"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

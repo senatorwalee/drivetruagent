@@ -8,6 +8,7 @@ from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from drivetruagent.agent.voice import VoiceSettings
+from drivetruagent.ordering.phone_numbers import normalize_phone
 from drivetruagent.ordering.timers import TimerSettings
 from drivetruagent.policy.decisions import PolicyLimits
 
@@ -104,6 +105,15 @@ class Settings(BaseSettings):
     # a phone; anyone could then claim a number and hear its orders, so it
     # stays off anywhere real.
     allow_typed_caller_id: bool = False
+    # The phone line. OpenAI signs each incoming-call webhook with this
+    # secret (whsec_...), from the webhook's page in the OpenAI project.
+    # Unset: the phone line is off and the webhook answers 503.
+    openai_webhook_secret: SecretStr | None = None
+    # Where a call goes when a person is needed, as a number in any form.
+    # Unset: the agent says a team member will call back, and hangs up.
+    staff_phone_number: str | None = None
+    # How long a phone order takes to be ready, as the agent tells the caller.
+    pickup_ready_minutes: int = Field(default=15, ge=1, le=240)
 
     # Policy limits. More than this many of one item on a line is unusual,
     # and the customer is asked to confirm it.
@@ -121,6 +131,16 @@ class Settings(BaseSettings):
         except (ZoneInfoNotFoundError, ValueError) as error:
             raise ValueError(f"unknown timezone: {name!r}") from error
         return name
+
+    @field_validator("staff_phone_number")
+    @classmethod
+    def check_staff_phone_number(cls, number: str | None) -> str | None:
+        if number is None:
+            return None
+        normalized = normalize_phone(number)
+        if normalized is None:
+            raise ValueError(f"not a phone number: {number!r}")
+        return normalized
 
     @model_validator(mode="after")
     def check_limits_are_in_order(self) -> Self:

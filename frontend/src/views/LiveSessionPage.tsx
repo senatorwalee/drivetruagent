@@ -15,11 +15,12 @@ const VIEW_COMPONENTS: Record<ViewId, ComponentType<LiveSessionViewProps>> = {
 
 /**
  * The live session screen. One session, three ways of looking at it: the
+ * session's own lane, or with `follow="phone"` the newest phone call. The
  * session's state lives here, above the views, so switching view mid-order
  * changes how it looks and nothing else.
  */
-export function LiveSessionPage() {
-  const live = useLiveSession()
+export function LiveSessionPage({ follow }: { follow?: 'phone' }) {
+  const live = useLiveSession({ follow })
   const [view, setView] = useViewPreference()
   const View = VIEW_COMPONENTS[view]
 

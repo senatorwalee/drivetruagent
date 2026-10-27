@@ -91,6 +91,7 @@ class FakeCall:
         self.responses = 0
         self.said: list[str] = []
         self.hung_up = 0
+        self.transferred: list[str] = []
 
     async def send_function_output(self, call_id: str, output: str) -> None:
         self.outputs.append((call_id, json.loads(output)))
@@ -103,6 +104,9 @@ class FakeCall:
 
     async def hang_up(self) -> None:
         self.hung_up += 1
+
+    async def transfer(self, target_uri: str) -> None:
+        self.transferred.append(target_uri)
 
 
 class Pauses:
@@ -595,6 +599,102 @@ async def test_the_handoff_is_said_and_then_the_call_ends(
         "A team member will help you finish your order. One moment, please."
     ]
     assert pauses.seconds and call.hung_up == 1
+
+
+def phone_bridge(
+    db_session: AsyncSession,
+    session_id: uuid.UUID,
+    call: FakeCall,
+    pauses: Pauses,
+    **phone: Any,
+) -> VoiceBridge:
+    return VoiceBridge(
+        session_id=session_id,
+        scope=lambda: borrowed(db_session),
+        call=call,
+        config=CONFIG,
+        model_name="gpt-realtime-2.1-mini",
+        sleep=pauses,
+        **phone,
+    )
+
+
+async def hand_off_at_the_time_limit(
+    db_session: AsyncSession, session_id: uuid.UUID
+) -> None:
+    started = (await get_session(db_session, session_id)).started_at
+    three_minutes = started + timedelta(seconds=180)
+    await sessions.end_turn(db_session, session_id, now=three_minutes)
+    await timekeeper.enforce(
+        db_session, session_id, now=three_minutes, timers=TIMERS, tax_rate=TAX
+    )
+    await db_session.commit()
+
+
+async def test_a_phone_handoff_puts_the_caller_through_to_staff(
+    db_session: AsyncSession, session_id: uuid.UUID, call: FakeCall, pauses: Pauses
+) -> None:
+    bridge = phone_bridge(
+        db_session, session_id, call, pauses, transfer_to="tel:+14165550100"
+    )
+    await bridge.start_watching_timers()
+    await hand_off_at_the_time_limit(db_session, session_id)
+
+    await bridge.check_timers()
+
+    assert call.transferred == ["tel:+14165550100"]
+    assert call.hung_up == 0
+    assert bridge.ended
+
+
+async def test_with_no_staff_number_the_caller_is_told_they_will_be_called_back(
+    db_session: AsyncSession, session_id: uuid.UUID, call: FakeCall, pauses: Pauses
+) -> None:
+    bridge = phone_bridge(
+        db_session, session_id, call, pauses, callback_sentence="We'll call you back."
+    )
+    await bridge.start_watching_timers()
+    await hand_off_at_the_time_limit(db_session, session_id)
+
+    await bridge.check_timers()
+
+    assert call.said[-1] == "We'll call you back."
+    assert (call.transferred, call.hung_up) == ([], 1)
+
+
+async def test_a_placed_phone_order_hangs_up_rather_than_transferring(
+    db_session: AsyncSession, session_id: uuid.UUID, call: FakeCall, pauses: Pauses
+) -> None:
+    bridge = phone_bridge(
+        db_session,
+        session_id,
+        call,
+        pauses,
+        transfer_to="tel:+14165550100",
+        callback_sentence="We'll call you back.",
+    )
+    await add_item(db_session, session_id, "cookie", tax_rate=TAX)
+    await bridge.handle(
+        calls_tool("request_confirmation", {}, response_id="r1", call_id="c1")
+    )
+    await bridge.handle(finished("r1", output=[a_function_call_item()]))
+    await bridge.handle(calls_tool("submit_order", {}, response_id="r2", call_id="c2"))
+    await bridge.handle(finished("r2", output=[a_function_call_item()]))
+
+    await bridge.handle(finished("r3", output=[a_spoken_item("Thanks, bye!")]))
+
+    assert (call.transferred, call.said, call.hung_up) == ([], [], 1)
+
+
+async def test_the_opening_sentence_is_said_and_logged_as_the_agents(
+    bridge: VoiceBridge, call: FakeCall, db_session: AsyncSession, session_id: uuid.UUID
+) -> None:
+    await bridge.greet("Hi, thanks for calling.")
+
+    assert call.said == ["Hi, thanks for calling."]
+    assert await logged(db_session, session_id) == [
+        ("assistant_message", "Hi, thanks for calling.")
+    ]
 
 
 async def test_hanging_up_twice_is_hanging_up_once(

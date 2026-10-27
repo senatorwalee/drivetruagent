@@ -1,6 +1,6 @@
-import { INSIGHTS_PATH, MENU_PATH, STAFF_PATH } from '../../app/navigation'
+import { CALLS_PATH, INSIGHTS_PATH, LIVE_PATH, MENU_PATH, STAFF_PATH } from '../../app/navigation'
 import { PageLink } from '../../app/PageLink'
-import { clock } from '../../session/presentation'
+import { clock, emptyConversationHint } from '../../session/presentation'
 import type { LiveSession } from '../../session/useLiveSession'
 import { MicButton } from '../shared/MicButton'
 import { ShopBoard } from '../shared/ShopBoard'
@@ -36,6 +36,9 @@ export function ControlRoom({ live, view, onViewChange }: LiveSessionViewProps) 
           </PageLink>
           <PageLink to={MENU_PATH} className={styles.button}>
             Menu
+          </PageLink>
+          <PageLink to={live.following ? LIVE_PATH : CALLS_PATH} className={styles.button}>
+            {live.following ? 'Drive-through' : 'Phone calls'}
           </PageLink>
           <button type="button" className={styles.button} aria-pressed={live.paused} onClick={live.togglePause}>
             {live.paused ? 'Resume' : 'Pause'}
@@ -92,7 +95,7 @@ function Readouts({ live }: { live: LiveSession }) {
 function TranscriptLog({ live }: { live: LiveSession }) {
   const lines = live.timeline.transcript.slice(-5)
   if (lines.length === 0) {
-    return <p className={styles.hint}>No conversation yet. Say hello to start the order.</p>
+    return <p className={styles.hint}>{emptyConversationHint(live.following, 'No conversation yet.')}</p>
   }
   return (
     <div aria-label="Conversation" aria-live="polite" className={styles.transcript}>

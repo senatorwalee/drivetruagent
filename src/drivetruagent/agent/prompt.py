@@ -6,15 +6,54 @@ decided by the backend, whatever the model does. Nothing secret goes in here;
 assume a determined customer can get the model to recite it.
 """
 
+from dataclasses import dataclass
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from drivetruagent.enums import Language
+from drivetruagent.enums import Channel, Language
 from drivetruagent.ordering.menu import get_menu
 from drivetruagent.ordering.views import MenuView
 
+# How long a phone order takes to be ready, unless the restaurant says.
+DEFAULT_PICKUP_MINUTES = 15
+
+
+@dataclass(frozen=True)
+class _Setting:
+    """What changes with how the customer reached the agent."""
+
+    intro: str
+    manner: str
+    finish: str
+
+
+_SETTINGS = {
+    Channel.DRIVE_THRU: _Setting(
+        intro=(
+            "You take orders at the drive-through of {restaurant_name}. You are "
+            "talking with a customer at the speaker. What you write is spoken aloud."
+        ),
+        manner="a friendly person at a drive-through",
+        finish="Tell them their order number and total, and ask them to pull forward.",
+    ),
+    Channel.PHONE: _Setting(
+        intro=(
+            "You take phone orders for pickup at {restaurant_name}. You are on the "
+            "phone with a caller. What you write is spoken aloud. They have "
+            "already heard a greeting that says the call is recorded and how "
+            "their number is used: do not greet them again or repeat it."
+        ),
+        manner="a friendly person taking a phone order",
+        finish=(
+            "Tell them their order number and total, that they pay when they "
+            "pick it up, and that it will be ready in about {pickup_minutes} "
+            "minutes."
+        ),
+    ),
+}
+
 _INSTRUCTIONS = """\
-You take orders at the drive-through of {restaurant_name}. You are talking \
-with a customer at the speaker. What you write is spoken aloud.
+{intro}
 
 # What you do
 - Take the customer's food and drink order and answer questions about the menu.
@@ -25,8 +64,7 @@ would like.
 use request_human.
 
 # How you speak
-- One or two short sentences at a time, the way a friendly person at a \
-drive-through speaks.
+- One or two short sentences at a time, the way {manner} speaks.
 - Plain spoken words only: no lists, no symbols, no item codes, no line numbers.
 - Speak the customer's language, English or Canadian French. It is detected \
 and set for you from what they say: do not call set_language for that. Call \
@@ -115,7 +153,7 @@ them, and stop taking the order.
 2. Read the items and the total back, briefly, and ask if it is right.
 3. If they change something, make the change, then do steps 1 and 2 again.
 4. When they say it is right, call submit_order.
-5. Tell them their order number and total, and ask them to pull forward.
+5. {finish}
 
 # Menu index
 Item codes with their English and French names. Prices and choices are not \
@@ -124,18 +162,39 @@ listed here: get them from the tools.
 """
 
 
-async def build_instructions(db: AsyncSession, restaurant_name: str) -> str:
+async def build_instructions(
+    db: AsyncSession,
+    restaurant_name: str,
+    *,
+    channel: Channel = Channel.DRIVE_THRU,
+    pickup_minutes: int = DEFAULT_PICKUP_MINUTES,
+) -> str:
     """The instructions for a session, with the menu index read from the database."""
     english = await get_menu(db, Language.EN)
     french = await get_menu(db, Language.FR)
-    return render_instructions(restaurant_name, english, french)
+    return render_instructions(
+        restaurant_name,
+        english,
+        french,
+        channel=channel,
+        pickup_minutes=pickup_minutes,
+    )
 
 
 def render_instructions(
-    restaurant_name: str, english: MenuView, french: MenuView
+    restaurant_name: str,
+    english: MenuView,
+    french: MenuView,
+    *,
+    channel: Channel = Channel.DRIVE_THRU,
+    pickup_minutes: int = DEFAULT_PICKUP_MINUTES,
 ) -> str:
+    setting = _SETTINGS[channel]
     return _INSTRUCTIONS.format(
-        restaurant_name=restaurant_name, menu_index=_menu_index(english, french)
+        intro=setting.intro.format(restaurant_name=restaurant_name),
+        manner=setting.manner,
+        finish=setting.finish.format(pickup_minutes=pickup_minutes),
+        menu_index=_menu_index(english, french),
     )
 
 

@@ -1,4 +1,4 @@
-import { INSIGHTS_PATH, LIVE_PATH, MENU_PATH } from '../app/navigation'
+import { CALLS_PATH, INSIGHTS_PATH, LIVE_PATH, MENU_PATH } from '../app/navigation'
 import { PageLink } from '../app/PageLink'
 import { HandoffQueue } from './HandoffQueue'
 import { PackageView } from './PackageView'
@@ -28,6 +28,9 @@ export function StaffPage() {
           </PageLink>
           <PageLink to={LIVE_PATH} className={styles.button}>
             Live session
+          </PageLink>
+          <PageLink to={CALLS_PATH} className={styles.button}>
+            Phone calls
           </PageLink>
         </nav>
       </header>

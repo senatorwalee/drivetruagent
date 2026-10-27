@@ -113,7 +113,12 @@ async def start_call(
     if calls.is_live(session_id):
         raise VoiceCallInProgress()
 
-    instructions = await build_instructions(db, settings.restaurant_name)
+    instructions = await build_instructions(
+        db,
+        settings.restaurant_name,
+        channel=customer_session.channel,
+        pickup_minutes=settings.pickup_ready_minutes,
+    )
     call_id, answer = await create_call(
         client,
         offer,

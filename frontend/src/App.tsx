@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 
-import { INSIGHTS_PATH, MENU_PATH, STAFF_PATH, usePath } from './app/navigation'
+import { CALLS_PATH, INSIGHTS_PATH, MENU_PATH, STAFF_PATH, usePath } from './app/navigation'
 import { InsightsPage } from './insights/InsightsPage'
 import { MenuPage } from './menu-admin/MenuPage'
 import { StaffPage } from './staff/StaffPage'
@@ -32,6 +32,8 @@ export function App() {
         <InsightsPage />
       ) : path === MENU_PATH ? (
         <MenuPage />
+      ) : path === CALLS_PATH ? (
+        <LiveSessionPage follow="phone" />
       ) : (
         <LiveSessionPage />
       )}

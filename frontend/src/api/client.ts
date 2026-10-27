@@ -32,6 +32,7 @@ export type AdminItem = Schemas['AdminItemView']
 export type AdminCategory = Schemas['AdminCategoryView']
 export type NewItem = Schemas['NewItem']
 export type ItemChanges = Schemas['ItemChanges']
+export type PhoneCall = Schemas['ActiveCall']
 
 const BASE = '/api'
 
@@ -88,6 +89,8 @@ export const api = {
   menu: (language: Language) => request<Menu>(`/menu?language=${language}`),
   openSession: (lane: string) => post<Session>('/sessions', { lane }),
   session: (sessionId: string) => request<Session>(`/sessions/${sessionId}`),
+  /** Phone calls in progress, newest first. */
+  phoneCalls: () => request<PhoneCall[]>('/phone/calls'),
   cart: (sessionId: string) => request<Cart>(`/sessions/${sessionId}/cart`),
   events: (sessionId: string) => request<AgentEvent[]>(`/sessions/${sessionId}/events`),
   /** Stock for every tracked item: on hand, held in carts, available. */
