@@ -9,7 +9,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { api, ApiError, type AgentInfo, type Cart, type Menu, type Session, type WeekOfSpecials } from '../api/client'
+import { api, ApiError, type AgentInfo, type Cart, type Cost, type Menu, type Session, type WeekOfSpecials } from '../api/client'
 import { deriveAgentState, isFinal, runningSeconds, speakingMilliseconds, timerNote } from './presentation'
 import { useVoiceCall, type Voice } from '../voice/useVoiceCall'
 import { stockGroups, type StockGroup } from './board'
@@ -56,6 +56,8 @@ export interface LiveSession {
   elapsedSeconds: number
   /** What the backend's timers are counting down to, in words. Null if nothing. */
   timerNote: string | null
+  /** What the session's model calls have cost so far. Null until known, or without prices. */
+  cost: Cost | null
   /** For the scripted demo: the next line to type. Null with a real model. */
   suggestedLine: string | null
   /** Display names for item codes, for things not in the cart yet. */
@@ -182,6 +184,14 @@ export function useLiveSession(options: { follow?: 'phone' } = {}): LiveSession 
     queryFn: () => api.events(sessionId!),
     ...follow,
   })
+  // Kept up with the events: each new step may be a model call.
+  const costQuery = useQuery({
+    queryKey: ['session', sessionId, 'cost', eventsQuery.data?.length ?? 0],
+    queryFn: () => api.sessionCost(sessionId!),
+    enabled: Boolean(sessionId),
+    placeholderData: (previous) => previous,
+    retry: false,
+  })
   const cart = cartQuery.data ?? null
   const language = cart?.language ?? 'en'
   const menuQuery = useQuery({ queryKey: ['menu', language], queryFn: () => api.menu(language), staleTime: Infinity })
@@ -265,6 +275,7 @@ export function useLiveSession(options: { follow?: 'phone' } = {}): LiveSession 
     }),
     elapsedSeconds: session ? runningSeconds(session, now) : 0,
     timerNote: ended ? null : timerNote(session?.timers, now),
+    cost: costQuery.data?.conversation ?? null,
     suggestedLine: agent?.scripted && !ended ? (agent.suggested_lines[customerTurns] ?? null) : null,
     itemName,
     paused,

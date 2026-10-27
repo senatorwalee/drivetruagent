@@ -2,7 +2,8 @@
  * Pure helpers that turn session summaries into the words the conversations
  * page shows. No React and no network, so each is tested on its own.
  */
-import type { ConversationSummary, Mood, SessionFacts, SessionState } from '../api/client'
+import type { ConversationSummary, DaySpend, Mood, SessionFacts, SessionState } from '../api/client'
+import { modelCost } from '../session/presentation'
 
 /** What the page can show: everything, the notes with something to do, or one outcome. */
 export type Filter = 'all' | 'follow_up' | SessionState
@@ -113,12 +114,31 @@ export function factLines(facts: SessionFacts): Fact[] {
       value: `${counted(facts.flagged_messages, 'message')} flagged · ${facts.abuse_strikes} abuse, ${facts.confusion_strikes} confusion strikes`,
     })
   if (facts.nudges) lines.push({ label: 'Asked if still there', value: counted(facts.nudges, 'time') })
-  if (facts.model_calls)
+  if (facts.model_calls) {
+    const cost = facts.cost ? ` · ${modelCost(facts.cost)}` : ''
     lines.push({
       label: 'Model',
-      value: `${counted(facts.model_calls, 'call')} · ${facts.input_tokens.toLocaleString('en-CA')} tokens in, ${facts.output_tokens.toLocaleString('en-CA')} out`,
+      value: `${counted(facts.model_calls, 'call')} · ${facts.input_tokens.toLocaleString('en-CA')} tokens in, ${facts.output_tokens.toLocaleString('en-CA')} out${cost}`,
     })
+  }
   return lines
+}
+
+/** Who wrote it, and what the conversation cost, for under a note. */
+export function noteMeta(summary: Pick<ConversationSummary, 'written_by' | 'mood' | 'cost'>): string {
+  return summary.cost ? `${authorNote(summary)} · model cost ${modelCost(summary.cost)}` : authorNote(summary)
+}
+
+/** The day so far: "14 conversations · 5 orders · 0.4¢ a conversation · 1.1¢ an order · 6.0¢ in all". */
+export function dayLine(day: DaySpend): string {
+  const per = (micro: number | null) => (micro === null ? '—' : modelCost({ micro_usd: micro, unpriced_calls: 0, estimated_calls: 0 }))
+  return [
+    counted(day.conversations, 'conversation'),
+    counted(day.orders, 'order'),
+    `${per(day.per_conversation_micro_usd)} a conversation`,
+    `${per(day.per_order_micro_usd)} an order`,
+    `${modelCost(day.total)} in all`,
+  ].join(' · ')
 }
 
 function counted(count: number, noun: string): string {

@@ -7,11 +7,11 @@ import { CALLERS_PATH, LIVE_PATH, PICKUPS_PATH, STAFF_PATH } from '../app/naviga
 import { PageLink } from '../app/PageLink'
 import list from '../callers/Callers.module.css'
 import { ago, describeProblem } from '../callers/words'
-import { money } from '../session/presentation'
+import { modelCost, money } from '../session/presentation'
 import { useNow } from '../session/useNow'
 import staff from '../staff/Staff.module.css'
 import styles from './Conversations.module.css'
-import { authorNote, factLines, FILTERS, outcomeAsked, outcomeLabel, placeLabel, shown, whyNotTheModel, type Filter } from './words'
+import { dayLine, factLines, FILTERS, noteMeta, outcomeAsked, outcomeLabel, placeLabel, shown, whyNotTheModel, type Filter } from './words'
 
 // A new note arrives a few seconds after each session ends.
 const REFRESH_MS = 10_000
@@ -74,6 +74,8 @@ export function ConversationsPage() {
           </p>
         </div>
 
+        <DayCost />
+
         <div className={styles.filters} role="group" aria-label="Show">
           {FILTERS.map((option) => (
             <button
@@ -120,6 +122,26 @@ export function ConversationsPage() {
   )
 }
 
+/** What the model has cost today, if there is a price list to work it out. */
+function DayCost() {
+  const day = useQuery({ queryKey: ['costs-today'], queryFn: api.costsToday, refetchInterval: REFRESH_MS, retry: false })
+  if (!day.data) return null
+  return (
+    <section className={styles.day} aria-label="Model cost today">
+      <p className={styles.dayLine}>
+        <strong>Today</strong> {dayLine(day.data)}
+      </p>
+      <p className={list.rowMeta}>
+        Prices checked {day.data.prices_checked_on}, from{' '}
+        <a href={day.data.prices_source} target="_blank" rel="noreferrer">
+          the provider’s price list
+        </a>
+        .
+      </p>
+    </section>
+  )
+}
+
 interface RowProps {
   summary: ConversationSummary
   nowMs: number
@@ -150,7 +172,7 @@ function Row({ summary, nowMs, open, onToggle }: RowProps) {
         </p>
       )}
       <div className={styles.rowFoot}>
-        <span className={list.rowMeta}>{authorNote(summary)}</span>
+        <span className={list.rowMeta}>{noteMeta(summary)}</span>
         <button type="button" className={styles.toggle} aria-expanded={open} aria-controls={detailsId} onClick={onToggle}>
           {open ? 'Hide details' : 'Details'}
         </button>
@@ -203,6 +225,7 @@ function Details({ id, sessionId }: { id: string; sessionId: string }) {
           </div>
         ))}
       </dl>
+      {detail.data.summary_cost && <p className={list.rowMeta}>Writing this note cost {modelCost(detail.data.summary_cost)}.</p>}
       {whyNot && <p className={list.rowMeta}>{whyNot}</p>}
       {problem && (
         <p role="alert" className={list.problem}>

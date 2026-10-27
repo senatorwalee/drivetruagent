@@ -104,6 +104,20 @@ function installBackend(summaries: ConversationSummary[] = [HANDED_OFF, ORDERED]
           summaries.filter((summary) => !outcome || summary.outcome === outcome),
         )
       }
+      if (path === '/costs/today') {
+        return respond(200, {
+          business_date: '2026-10-27',
+          conversations: 2,
+          orders: 1,
+          total: { micro_usd: 3_668, calls: 12, unpriced_calls: 0, estimated_calls: 0 },
+          by_purpose: {},
+          by_channel: {},
+          per_conversation_micro_usd: 1_834,
+          per_order_micro_usd: 3_668,
+          prices_checked_on: '2026-10-27',
+          prices_source: 'https://example.test/pricing',
+        })
+      }
       if (path === `/sessions/${ORDERED.session_id}/summary`) {
         if (method === 'POST') detail = { ...detail, gist: 'Two cheeseburgers and fries, quick and easy.' }
         return respond(200, detail)
@@ -173,6 +187,17 @@ describe('the conversations page', () => {
     await waitFor(() =>
       expect(sent).toContainEqual({ method: 'POST', path: `/sessions/${ORDERED.session_id}/summary` }),
     )
+  })
+
+  it('says what the model cost today, and each conversation', async () => {
+    installBackend()
+    open()
+
+    const day = await screen.findByRole('region', { name: 'Model cost today' })
+    expect(day).toHaveTextContent('2 conversations · 1 order · 0.18¢ a conversation · 0.37¢ an order · 0.37¢ in all')
+    expect(day).toHaveTextContent('Prices checked 2026-10-27')
+    const rows = within(screen.getByRole('list', { name: 'Conversations' })).getAllByRole('listitem')
+    expect(rows[1]).toHaveTextContent('model cost 0.18¢')
   })
 
   it('says when there are no notes yet', async () => {

@@ -240,6 +240,7 @@ export function liveSession(overrides: Partial<LiveSession> = {}): LiveSession {
     agentState: 'speaking',
     elapsedSeconds: 42,
     timerNote: 'hand-off in 2:18',
+    cost: { micro_usd: 2_689, calls: 4, unpriced_calls: 0, estimated_calls: 0 },
     suggestedLine: 'No, just two.',
     itemName: (code) => ITEM_NAMES[code] ?? code,
     paused: false,

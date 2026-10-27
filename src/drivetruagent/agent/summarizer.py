@@ -239,13 +239,23 @@ async def store(
 
 
 async def pending(
-    db: AsyncSession, *, now: datetime, lookback: timedelta, limit: int
+    db: AsyncSession,
+    *,
+    now: datetime,
+    lookback: timedelta,
+    limit: int,
+    settle: timedelta = timedelta(0),
 ) -> list[uuid.UUID]:
-    """Sessions that ended within `lookback` and have no summary, oldest first."""
+    """Sessions that ended within `lookback`, at least `settle` ago, and have
+    no summary, oldest first."""
     summarised = exists().where(SessionSummary.session_id == CustomerSession.id)
     rows = await db.execute(
         select(CustomerSession.id)
-        .where(CustomerSession.ended_at >= now - lookback, ~summarised)
+        .where(
+            CustomerSession.ended_at >= now - lookback,
+            CustomerSession.ended_at <= now - settle,
+            ~summarised,
+        )
         .order_by(CustomerSession.ended_at, CustomerSession.id)
         .limit(limit)
     )
@@ -264,7 +274,11 @@ async def summarize_pending(
     many were written."""
     async with session_factory() as db:
         waiting = await pending(
-            db, now=now, lookback=settings.lookback, limit=settings.batch
+            db,
+            now=now,
+            lookback=settings.lookback,
+            limit=settings.batch,
+            settle=settings.settle,
         )
     written = 0
     for session_id in waiting:
