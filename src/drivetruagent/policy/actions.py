@@ -35,6 +35,18 @@ class RemoveLine(ActionModel):
     line_no: int
 
 
+class ReplaceLine(ActionModel):
+    """Swap a line for another item in one step: "the fish burger instead".
+    If the new item can't be added, the line stays as it was."""
+
+    type: Literal["replace_line"] = "replace_line"
+    line_no: int
+    item_code: str = Field(min_length=1)
+    # None: keep the line's quantity.
+    quantity: int | None = None
+    selections: dict[str, list[str]] = Field(default_factory=dict)
+
+
 class RequestConfirmation(ActionModel):
     """The agent is about to read the order back and ask if it is right."""
 
@@ -46,7 +58,7 @@ class SubmitOrder(ActionModel):
 
 
 Action = Annotated[
-    AddItem | UpdateLine | RemoveLine | RequestConfirmation | SubmitOrder,
+    AddItem | UpdateLine | RemoveLine | ReplaceLine | RequestConfirmation | SubmitOrder,
     Field(discriminator="type"),
 ]
 

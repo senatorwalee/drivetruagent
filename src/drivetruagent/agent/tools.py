@@ -27,11 +27,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from drivetruagent.agent import tracing
 from drivetruagent.agent.model import ToolDefinition
-from drivetruagent.enums import Allergen, Language
+from drivetruagent.enums import Allergen, Diet, Language
 from drivetruagent.knowledge.embedding import EmbeddingUnavailable
 from drivetruagent.knowledge.store import KnowledgeSearch, Retrieval
 from drivetruagent.ordering import allergen_matrix
 from drivetruagent.ordering import cart as cart_rules
+from drivetruagent.ordering import diet as diet_rules
 from drivetruagent.ordering import menu as menu_rules
 from drivetruagent.ordering import offers as offer_rules
 from drivetruagent.ordering import sessions as session_rules
@@ -41,6 +42,7 @@ from drivetruagent.ordering.allergens import (
     is_about_allergens,
 )
 from drivetruagent.ordering.catalog import load_item_by_code
+from drivetruagent.ordering.diet_words import diets_named
 from drivetruagent.ordering.errors import OrderingError, UnknownItem
 from drivetruagent.ordering.inventory import DEFAULT_RESERVATION_TTL
 from drivetruagent.ordering.offers import SpecialsCache
@@ -50,6 +52,7 @@ from drivetruagent.policy.actions import (
     Action,
     AddItem,
     RemoveLine,
+    ReplaceLine,
     RequestConfirmation,
     SubmitOrder,
     UpdateLine,
@@ -138,6 +141,18 @@ class HumanArgs(Args):
 class KnowledgeArgs(Args):
     query: str
     item_code: str | None
+
+
+class DietArgs(Args):
+    diet: Diet
+    item_code: str | None
+
+
+class ReplaceItemArgs(Args):
+    line_no: int
+    item_code: str
+    quantity: int | None
+    selections: list[Selection]
 
 
 class AllergenArgs(Args):
@@ -499,6 +514,7 @@ async def _search_knowledge(context: ToolContext, args: KnowledgeArgs) -> ToolOu
                 for hit in retrieval.hits
             ],
             "message": KNOWLEDGE_INSTRUCTIONS,
+            **_diet_redirect(args.query),
             **trace,
         }
     if is_about_allergens(args.query):
@@ -516,7 +532,85 @@ async def _search_knowledge(context: ToolContext, args: KnowledgeArgs) -> ToolOu
             "sources": [],
             **trace,
         }
-    return {"sources": [], "message": NO_SOURCE, **trace}
+    return {
+        "sources": [],
+        "message": NO_SOURCE,
+        **_diet_redirect(args.query),
+        **trace,
+    }
+
+
+def _diet_redirect(query: str) -> dict[str, Any]:
+    """A halal or kosher question is answered from the reviewed list, not from
+    whatever the documents say in passing."""
+    diets = sorted(diet.value for diet in diets_named(query))
+    if not diets:
+        return {}
+    return {
+        "check_diet_first": diets,
+        "diet_message": (
+            "This is about "
+            + " and ".join(diets)
+            + ". Call check_diet before answering: it lists what is suitable."
+        ),
+    }
+
+
+async def _check_diet(context: ToolContext, args: DietArgs) -> ToolOutput:
+    language = await _session_language(context)
+    diet = args.diet
+    if args.item_code is not None:
+        items = [await diet_rules.item_diet(context.db, args.item_code, diet, language)]
+    else:
+        items = await diet_rules.cart_diet(
+            context.db, context.session_id, diet, language, tax_rate=context.tax_rate
+        )
+    not_suitable = [item for item in items if item.status is None]
+    # Offer from the same part of the menu as what didn't fit: a burger for a
+    # burger. With nothing named, from the whole menu.
+    category = not_suitable[0].category_code if not_suitable else None
+    options = await diet_rules.suitable_items(
+        context.db, diet, language, category_code=category
+    )
+    if not options and category is not None:
+        options = await diet_rules.suitable_items(context.db, diet, language)
+    return {
+        "diet": diet.value,
+        "items": [item.model_dump(mode="json") for item in items],
+        "not_suitable_lines": [item.line_no for item in not_suitable if item.line_no],
+        "options": [option.model_dump(mode="json") for option in options],
+        "message": _diet_message(diet, bool(options)),
+    }
+
+
+def _diet_message(diet: Diet, has_options: bool) -> str:
+    name = diet.value
+    parts = [
+        f"Say plainly which items are not {name}-certified. Call something {name} "
+        f"only if its status is certified. For status suitable, say it is "
+        f"suitable for guests eating {name} but not certified, and give its note."
+    ]
+    if has_options:
+        parts.append(
+            "Offer the options listed, with their note. If the customer clearly "
+            "wants one instead of an item in the order, swap it with replace_item. "
+            "If it is unclear whether they want it instead or as well, ask."
+        )
+    else:
+        parts.append(f"Nothing on the menu is listed for {name}: say so plainly.")
+    return " ".join(parts)
+
+
+async def _replace_item(context: ToolContext, args: ReplaceItemArgs) -> ToolOutput:
+    return await _propose(
+        context,
+        ReplaceLine(
+            line_no=args.line_no,
+            item_code=args.item_code,
+            quantity=args.quantity,
+            selections=_as_mapping(args.selections),
+        ),
+    )
 
 
 async def _request_human(context: ToolContext, args: HumanArgs) -> ToolOutput:
@@ -631,6 +725,28 @@ TOOLS: tuple[Tool[Any], ...] = (
         _get_todays_specials,
     ),
     _tool(
+        "check_diet",
+        "Check whether items are halal or kosher, from the restaurant's own "
+        "reviewed list, and what to offer instead. Use it for every halal or "
+        "kosher question; never answer one from memory. Give an item, or null "
+        "for every line in the order.",
+        _object(
+            {
+                "diet": {
+                    "type": "string",
+                    "enum": [diet.value for diet in Diet],
+                    "description": "'halal' or 'kosher'.",
+                },
+                "item_code": {
+                    "type": ["string", "null"],
+                    "description": "The item's code, or null for the whole order.",
+                },
+            }
+        ),
+        DietArgs,
+        _check_diet,
+    ),
+    _tool(
         "check_allergens",
         "Look up allergens in the restaurant's allergen information. Use it "
         "for every allergen or dietary question; never answer one from memory "
@@ -726,6 +842,26 @@ TOOLS: tuple[Tool[Any], ...] = (
         ),
         UpdateItemArgs,
         _update_item,
+    ),
+    _tool(
+        "replace_item",
+        "Swap a line in the order for another item in one step, keeping its line "
+        "number: use it when the customer clearly wants something instead of what "
+        "they ordered. If the new item can't be added, nothing changes. Pass null "
+        "quantity to keep the line's quantity.",
+        _object(
+            {
+                "line_no": _LINE_NO,
+                "item_code": _ITEM_CODE,
+                "quantity": {
+                    "type": ["integer", "null"],
+                    "description": "The new quantity, or null to keep it.",
+                },
+                "selections": _SELECTIONS,
+            }
+        ),
+        ReplaceItemArgs,
+        _replace_item,
     ),
     _tool(
         "remove_item",

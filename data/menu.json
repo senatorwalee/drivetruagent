@@ -358,6 +358,75 @@
               }
             ]
           }
+        },
+        {
+          "code": "fish_burger",
+          "name": {
+            "en": "Fish burger",
+            "fr": "Burger au poisson"
+          },
+          "description": {
+            "en": "Crispy pollock fillet, lettuce and tartar sauce.",
+            "fr": "Filet de goberge croustillant, laitue et sauce tartare."
+          },
+          "photo": {
+            "file": "fish_burger.jpg",
+            "credit": "Caramel on Unsplash"
+          },
+          "base_price_cents": 649,
+          "stock": 40,
+          "aliases": {
+            "en": [
+              "burger",
+              "fish sandwich",
+              "fish fillet",
+              "fish",
+              "fish burger"
+            ],
+            "fr": [
+              "poisson",
+              "filet de poisson",
+              "burger poisson",
+              "burger"
+            ]
+          },
+          "option_groups": [
+            {
+              "code": "extras",
+              "name": {
+                "en": "Extras",
+                "fr": "Suppléments"
+              },
+              "min_select": 0,
+              "max_select": 1,
+              "options": [
+                {
+                  "code": "cheese",
+                  "name": {
+                    "en": "Cheese",
+                    "fr": "Fromage"
+                  },
+                  "price_delta_cents": 75,
+                  "allergens": {
+                    "contains": ["milk"]
+                  }
+                }
+              ]
+            }
+          ],
+          "allergens": {
+            "reviewed_on": "2026-10-24",
+            "contains": ["fish", "wheat", "gluten", "sesame", "soy", "egg", "mustard"]
+          },
+          "diets": {
+            "halal": {
+              "status": "suitable",
+              "note": {
+                "en": "No meat. The fillet is fried in its own fryer, apart from the chicken.",
+                "fr": "Sans viande. Le filet est frit dans sa propre friteuse, à part du poulet."
+              }
+            }
+          }
         }
       ]
     },

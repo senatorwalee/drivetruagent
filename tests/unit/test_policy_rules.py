@@ -18,6 +18,7 @@ from drivetruagent.policy.actions import (
     Action,
     AddItem,
     RemoveLine,
+    ReplaceLine,
     RequestConfirmation,
     SubmitOrder,
     UpdateLine,
@@ -40,6 +41,7 @@ EVERY_ACTION: list[Action] = [
     AddItem(item_code="cookie"),
     UpdateLine(line_no=1, quantity=2),
     RemoveLine(line_no=1),
+    ReplaceLine(line_no=1, item_code="fish_burger"),
     RequestConfirmation(),
     SubmitOrder(),
 ]
@@ -235,6 +237,37 @@ def test_removing_a_line_never_triggers_the_quantity_rule() -> None:
     assert decide(RemoveLine(line_no=1), ctx).decision is Decision.ALLOW
 
 
+def test_a_swap_keeps_the_lines_quantity_and_never_asks() -> None:
+    """Swapping 2 cheeseburgers for fish burgers is 2 fish burgers."""
+    ctx = context(lines={1: 2})
+
+    assert decide(ReplaceLine(line_no=1, item_code="fish_burger"), ctx).decision is (
+        Decision.ALLOW
+    )
+
+
+def test_a_swap_to_an_unusual_quantity_is_asked_about() -> None:
+    ctx = context(lines={1: 2})
+    action = ReplaceLine(line_no=1, item_code="fish_burger", quantity=12)
+
+    assert decide(action, ctx).decision is Decision.CONFIRM
+
+
+def test_a_swap_of_an_unusual_line_is_judged_like_the_line() -> None:
+    """The line already had 12: swapping it is asked about, like adding 12."""
+    ctx = context(lines={1: 12})
+
+    assert decide(ReplaceLine(line_no=1, item_code="fish_burger"), ctx).decision is (
+        Decision.CONFIRM
+    )
+
+
+def test_a_swap_of_a_missing_line_is_left_to_the_ordering_rules() -> None:
+    action = ReplaceLine(line_no=9, item_code="fish_burger", quantity=500)
+
+    assert decide(action).decision is Decision.ALLOW
+
+
 # --- Rule order -------------------------------------------------------------
 
 
@@ -264,6 +297,10 @@ def test_same_inputs_always_give_the_same_decision() -> None:
             UpdateLine(line_no=2, quantity=3),
         ),
         ({"type": "remove_line", "line_no": 2}, RemoveLine(line_no=2)),
+        (
+            {"type": "replace_line", "line_no": 2, "item_code": "fish_burger"},
+            ReplaceLine(line_no=2, item_code="fish_burger"),
+        ),
         ({"type": "request_confirmation"}, RequestConfirmation()),
         ({"type": "submit_order"}, SubmitOrder()),
     ],
@@ -287,6 +324,7 @@ def test_action_survives_a_round_trip_through_json() -> None:
         {"type": "add_item", "item_code": "fries", "price_cents": 0},
         {"type": "add_item", "item_code": "fries", "unit_price_cents": 1},
         {"type": "submit_order", "total_cents": 0},
+        {"type": "replace_line", "line_no": 1, "item_code": "x", "price_cents": 0},
         {"item_code": "fries"},
     ],
 )

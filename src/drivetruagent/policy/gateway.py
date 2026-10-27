@@ -36,6 +36,7 @@ from drivetruagent.policy.actions import (
     Action,
     AddItem,
     RemoveLine,
+    ReplaceLine,
     RequestConfirmation,
     SubmitOrder,
     UpdateLine,
@@ -386,11 +387,11 @@ async def _run(
 
     # Something happened, so a question still waiting for an answer is stale.
     await _supersede_pending(db, session_id)
-    # Only an addition prompts a suggestion. Offering a combo to someone who
+    # Only an addition or a swap prompts a suggestion. Offering a combo to someone who
     # has just taken the drink off their order would be the wrong moment.
     suggestion = (
         await cart_rules.suggestion_for(db, session_id)
-        if isinstance(action, AddItem)
+        if isinstance(action, AddItem | ReplaceLine)
         else None
     )
     message = _done_message(action)
@@ -443,6 +444,18 @@ async def _perform(
             reservation_ttl=reservation_ttl,
         )
         return snapshot, None
+    if isinstance(action, ReplaceLine):
+        snapshot = await cart_rules.replace_line(
+            db,
+            session_id,
+            action.line_no,
+            action.item_code,
+            action.quantity,
+            action.selections,
+            tax_rate=tax_rate,
+            reservation_ttl=reservation_ttl,
+        )
+        return snapshot, None
     if isinstance(action, RequestConfirmation):
         snapshot = await cart_rules.request_confirmation(
             db, session_id, tax_rate=tax_rate, reservation_ttl=reservation_ttl
@@ -461,6 +474,10 @@ def _done_message(action: Action) -> str:
         )
     if isinstance(action, SubmitOrder):
         return "The order is placed. Give the customer their order number and total."
+    if isinstance(action, ReplaceLine):
+        return (
+            "Swapped. Tell the customer what was replaced with what, and the new total."
+        )
     return "Done. Briefly tell the customer what changed."
 
 

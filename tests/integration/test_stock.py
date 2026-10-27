@@ -518,7 +518,7 @@ async def test_the_agent_is_told_what_is_left_and_what_to_offer(
 async def test_the_seed_sets_stock_and_running_it_again_restocks(
     db_session: AsyncSession, car_a: uuid.UUID
 ) -> None:
-    assert len(await stock_levels(db_session)) == 20
+    assert len(await stock_levels(db_session)) == 21
     assert (await level(db_session, "cookie")).on_hand == 100
     await set_on_hand(db_session, "cookie", 2)
 

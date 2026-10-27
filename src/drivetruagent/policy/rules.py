@@ -8,6 +8,7 @@ from drivetruagent.enums import FINAL_SESSION_STATES, SessionState
 from drivetruagent.policy.actions import (
     Action,
     AddItem,
+    ReplaceLine,
     SubmitOrder,
     UpdateLine,
 )
@@ -128,4 +129,10 @@ def _resulting_quantities(
             # No such line. The ordering rules will refuse it with a clear error.
             return None
         return action.quantity, context.cart_item_count - current + action.quantity
+    if isinstance(action, ReplaceLine):
+        current = context.line_quantities.get(action.line_no)
+        if current is None:
+            return None
+        quantity = current if action.quantity is None else action.quantity
+        return quantity, context.cart_item_count - current + quantity
     return None

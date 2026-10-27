@@ -26,7 +26,7 @@ from drivetruagent.db.base import (
     has_english,
     text_enum,
 )
-from drivetruagent.enums import Allergen, AllergenLevel, Language
+from drivetruagent.enums import Allergen, AllergenLevel, Diet, DietStatus, Language
 
 # Translated text, one entry per language: {"en": "Fries", "fr": "Frites"}.
 type LocalizedText = dict[str, str]
@@ -240,3 +240,26 @@ class AllergenDeclaration(UuidPrimaryKey, Timestamps, Base):
     level: Mapped[AllergenLevel] = mapped_column(text_enum(AllergenLevel))
     # Why it may be present: "Fried in the same oil as the onion rings."
     note_i18n: Mapped[LocalizedText | None] = mapped_column(LOCALIZED_TEXT)
+
+
+class DietSuitability(UuidPrimaryKey, Timestamps, Base):
+    """An item the restaurant has reviewed as certified, or suitable, for a
+    diet such as halal. Only what is listed counts: an item with no row is
+    not listed as suitable, and nothing about it may be claimed.
+    """
+
+    __tablename__ = "diet_suitability"
+    __table_args__ = (
+        UniqueConstraint("item_id", "diet"),
+        enum_check("diet", Diet),
+        enum_check("status", DietStatus),
+        has_english("note_i18n"),
+    )
+
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("menu_items.id", ondelete="CASCADE"), index=True
+    )
+    diet: Mapped[Diet] = mapped_column(text_enum(Diet))
+    status: Mapped[DietStatus] = mapped_column(text_enum(DietStatus))
+    # Why, in words a guest can hear: "No meat. Fried in its own fryer."
+    note_i18n: Mapped[LocalizedText] = mapped_column(LOCALIZED_TEXT)
