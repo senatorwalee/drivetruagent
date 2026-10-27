@@ -99,6 +99,12 @@ class Settings(BaseSettings):
     # How many times the model may ask for tools within one customer turn.
     agent_max_tool_rounds: int = Field(default=8, ge=1)
 
+    # Phone orders. A caller's number comes from the phone line. True lets a
+    # number be typed when opening a session, to test caller memory without
+    # a phone; anyone could then claim a number and hear its orders, so it
+    # stays off anywhere real.
+    allow_typed_caller_id: bool = False
+
     # Policy limits. More than this many of one item on a line is unusual,
     # and the customer is asked to confirm it.
     line_quantity_confirm_above: int = Field(default=10, ge=1)

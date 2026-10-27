@@ -27,7 +27,12 @@ from drivetruagent.db.base import (
     text_enum,
 )
 from drivetruagent.db.models.catalog import MenuItem, Option
-from drivetruagent.enums import ACTIVE_SESSION_STATES, Language, SessionState
+from drivetruagent.enums import (
+    ACTIVE_SESSION_STATES,
+    Channel,
+    Language,
+    SessionState,
+)
 
 # SQL list of the in-progress states, e.g. 'confirming', 'greeting', 'ordering'.
 _ACTIVE_STATES_SQL = ", ".join(
@@ -42,6 +47,12 @@ class CustomerSession(UuidPrimaryKey, Timestamps, Base):
     __table_args__ = (
         enum_check("state", SessionState),
         enum_check("language", Language),
+        enum_check("channel", Channel),
+        # Only a phone call has a caller. A phone call may have none: the
+        # number was withheld.
+        CheckConstraint(
+            "caller_id IS NULL OR channel = 'phone'", name="caller_only_on_phone"
+        ),
         # ended_at is set exactly when the session has reached a final state.
         CheckConstraint(
             f"(ended_at IS NULL) = (state IN ({_ACTIVE_STATES_SQL}))",
@@ -62,6 +73,14 @@ class CustomerSession(UuidPrimaryKey, Timestamps, Base):
     )
 
     lane: Mapped[str] = mapped_column(server_default=text("'lane-1'"))
+    channel: Mapped[Channel] = mapped_column(
+        text_enum(Channel), server_default=text("'drive_thru'")
+    )
+    # Who called, for a phone order. Set null if the caller is deleted: the
+    # order stays, and no longer says whose it was.
+    caller_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("callers.id", ondelete="SET NULL"), index=True
+    )
     state: Mapped[SessionState] = mapped_column(
         text_enum(SessionState), server_default=text("'greeting'")
     )

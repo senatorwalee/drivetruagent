@@ -8,6 +8,8 @@ from drivetruagent.enums import Language, SessionState
 from drivetruagent.evals.scenario import ExpectedLine, Scenario
 
 ORDERING_TOOLS = frozenset({"add_item", "request_confirmation", "submit_order"})
+REGULAR_CALLER = "+14165550123"
+NEW_CALLER = "+16475550188"
 
 SCENARIOS: tuple[Scenario, ...] = (
     Scenario(
@@ -351,5 +353,67 @@ SCENARIOS: tuple[Scenario, ...] = (
         lines=(ExpectedLine("fish_burger", 1),),
         must_use=ORDERING_TOOLS | {"check_diet", "replace_item"},
         must_not_say=("beef is halal", "it's halal", "it is halal"),
+    ),
+    Scenario(
+        name="asks_what_they_ordered_last_time",
+        # A regular calls. Their last order is read back from the database,
+        # and "the same again" puts it in the cart at today's prices.
+        caller_phone=REGULAR_CALLER,
+        past_orders=(
+            (ExpectedLine("chicken_burger", 1),),
+            (
+                ExpectedLine("cheeseburger", 1, {"extras": "bacon"}),
+                ExpectedLine("fries", 1, {"size": "large"}),
+                ExpectedLine("cola", 1, {"size": "large"}),
+            ),
+        ),
+        customer=(
+            "Hi, what did I order last time?",
+            "Perfect, the same again please.",
+            "That's all.",
+            "Yes.",
+        ),
+        final_state=SessionState.SUBMITTED,
+        lines=(
+            ExpectedLine("cheeseburger", 1, {"extras": "bacon"}),
+            ExpectedLine("fries", 1, {"size": "large"}),
+            ExpectedLine("cola", 1, {"size": "large"}),
+        ),
+        must_use=frozenset(
+            {"get_past_orders", "reorder", "request_confirmation", "submit_order"}
+        ),
+        must_say_one_of=("cheeseburger",),
+    ),
+    Scenario(
+        name="new_caller_has_no_history",
+        # Nothing to read back: the agent says so and nothing is invented.
+        caller_phone=NEW_CALLER,
+        customer=(
+            "What did I get last time?",
+            "Okay, a cookie then.",
+            "That's all.",
+            "Yes.",
+        ),
+        final_state=SessionState.SUBMITTED,
+        lines=(ExpectedLine("cookie", 1),),
+        must_use=ORDERING_TOOLS | {"get_past_orders"},
+        must_not_use=frozenset({"reorder"}),
+    ),
+    Scenario(
+        name="opts_out_of_history",
+        # "Don't save my number" turns the read-back off; the order goes on.
+        caller_phone=REGULAR_CALLER,
+        past_orders=((ExpectedLine("chicken_burger", 1),),),
+        customer=(
+            "Please don't save my number.",
+            "A cookie, please.",
+            "That's all.",
+            "Yes.",
+        ),
+        final_state=SessionState.SUBMITTED,
+        lines=(ExpectedLine("cookie", 1),),
+        must_use=ORDERING_TOOLS | {"forget_my_orders"},
+        must_not_use=frozenset({"reorder"}),
+        must_not_say=("chicken burger", "number won't be saved", "number deleted"),
     ),
 )

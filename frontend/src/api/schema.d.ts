@@ -1044,6 +1044,12 @@ export interface components {
             /** Items */
             items: components["schemas"]["MenuItemSummary"][];
         };
+        /**
+         * Channel
+         * @description How a customer reached the agent.
+         * @enum {string}
+         */
+        Channel: "drive_thru" | "phone";
         /** ChoiceGroupView */
         ChoiceGroupView: {
             /** Default Option Code */
@@ -1481,11 +1487,12 @@ export interface components {
         };
         /** OpenSessionRequest */
         OpenSessionRequest: {
-            /**
-             * Lane
-             * @default lane-1
-             */
-            lane: string;
+            /** Caller Phone */
+            caller_phone?: string | null;
+            /** @default drive_thru */
+            channel: components["schemas"]["Channel"];
+            /** Lane */
+            lane?: string | null;
         };
         /** OptionAddsView */
         OptionAddsView: {
@@ -1627,6 +1634,7 @@ export interface components {
              * Format: date
              */
             business_date: string;
+            channel: components["schemas"]["Channel"];
             /** End Reason */
             end_reason: string | null;
             /** Ended At */
@@ -2697,6 +2705,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionView"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Conflict */

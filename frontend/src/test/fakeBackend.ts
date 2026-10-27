@@ -41,6 +41,7 @@ export function installFakeBackend() {
     session = {
       session_id: `session-${sessionCount}`,
       lane,
+      channel: 'drive_thru',
       state: 'greeting',
       language: null,
       started_at: new Date().toISOString(),
