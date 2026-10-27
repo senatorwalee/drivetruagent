@@ -42,6 +42,7 @@ PURE_MODULES = [
     "policy/caller_rules.py",
     "agent/messages.py",
     "agent/model.py",
+    "agent/summary.py",
     "evals/scenario.py",
 ]
 

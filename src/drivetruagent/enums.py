@@ -178,6 +178,23 @@ class CallerStatus(StrEnum):
     BLOCKED = "blocked"
 
 
+class SummaryAuthor(StrEnum):
+    """Who wrote a session summary's words. The facts are always code's."""
+
+    # The model wrote them, and they passed the checks.
+    MODEL = "model"
+    # Fixed wording filled in from the facts: no model, or its words failed.
+    TEMPLATE = "template"
+
+
+class Mood(StrEnum):
+    """How the customer came across, as the model judged it."""
+
+    PLEASED = "pleased"
+    NEUTRAL = "neutral"
+    FRUSTRATED = "frustrated"
+
+
 class KnowledgeAudience(StrEnum):
     """Who a knowledge document may be shown to."""
 

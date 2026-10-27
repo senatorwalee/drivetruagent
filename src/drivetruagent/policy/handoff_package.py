@@ -55,6 +55,9 @@ class LoggedEvent:
     kind: AgentEventKind
     payload: Mapping[str, Any]
     at: datetime
+    # The customer turn it belongs to; only needed to match a guardrail
+    # event to the message it withheld.
+    turn_id: uuid.UUID | None = None
 
 
 class TranscriptLine(BaseModel):
