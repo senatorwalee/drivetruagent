@@ -20,6 +20,7 @@ from drivetruagent.api import (
     pickups,
     sessions,
     voice,
+    web_phone,
 )
 from drivetruagent.api.errors import register_error_handlers
 from drivetruagent.config import get_settings
@@ -80,6 +81,7 @@ def create_app() -> FastAPI:
     app.include_router(handoffs.router)
     app.include_router(voice.router)
     app.include_router(phone.router)
+    app.include_router(web_phone.router)
     app.include_router(pickups.router)
     app.include_router(callers.router)
     app.include_router(insights.router)

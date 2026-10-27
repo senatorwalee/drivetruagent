@@ -3128,6 +3128,61 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "WebCall": {
+        "properties": {
+          "answer_sdp": {
+            "title": "Answer Sdp",
+            "type": "string"
+          },
+          "call_key": {
+            "format": "uuid",
+            "title": "Call Key",
+            "type": "string"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "turned_away": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TurnAway"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "call_key",
+          "answer_sdp",
+          "session_id"
+        ],
+        "title": "WebCall",
+        "type": "object"
+      },
+      "WebPhoneInfo": {
+        "properties": {
+          "restaurant_name": {
+            "title": "Restaurant Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "restaurant_name"
+        ],
+        "title": "WebPhoneInfo",
+        "type": "object"
+      },
       "WeekOfSpecialsView": {
         "description": "The specials for each day of this week, Monday to Sunday.",
         "properties": {
@@ -6045,6 +6100,311 @@
         "summary": "End a special early, or bring it back",
         "tags": [
           "offers"
+        ]
+      }
+    },
+    "/web-phone/calls": {
+      "post": {
+        "description": "Answered like a phone call from WEB_PHONE_CALLER. Refused while the\nlast web call is still going.",
+        "operationId": "start_web_call_web_phone_calls_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Web-Phone-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Web-Phone-Key"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebCall"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Ring the agent from the web phone",
+        "tags": [
+          "web phone"
+        ]
+      }
+    },
+    "/web-phone/calls/{call_key}": {
+      "delete": {
+        "operationId": "hang_up_web_call_web_phone_calls__call_key__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "call_key",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Call Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Web-Phone-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Web-Phone-Key"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Hang up the web phone",
+        "tags": [
+          "web phone"
+        ]
+      }
+    },
+    "/web-phone/calls/{call_key}/connected": {
+      "post": {
+        "description": "The agent starts talking now. A call that is over, or unknown, is\nalready done with: nothing to do.",
+        "operationId": "web_call_connected_web_phone_calls__call_key__connected_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "call_key",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Call Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Web-Phone-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Web-Phone-Key"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "The web phone's audio is connected",
+        "tags": [
+          "web phone"
+        ]
+      }
+    },
+    "/web-phone/line": {
+      "get": {
+        "description": "Lets the page show who it calls, and find out a wrong key before\nanyone taps Call.",
+        "operationId": "web_phone_line_web_phone_line_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Web-Phone-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Web-Phone-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebPhoneInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Who the web phone calls",
+        "tags": [
+          "web phone"
         ]
       }
     }

@@ -38,6 +38,8 @@ export type PickupMark = Schemas['MarkPickupRequest']['status']
 export type Caller = Schemas['CallerView']
 export type CallerStatus = Schemas['CallerStatus']
 export type Standing = Schemas['Standing']
+export type WebPhoneInfo = Schemas['WebPhoneInfo']
+export type WebCall = Schemas['WebCall']
 
 const BASE = '/api'
 
@@ -120,6 +122,38 @@ export const api = {
   },
   endVoice: async (sessionId: string): Promise<void> => {
     const response = await fetch(`${BASE}/sessions/${sessionId}/voice`, { method: 'DELETE' })
+    // No call to end is not a problem: the call is over either way.
+    if (!response.ok && response.status !== 404) throw await toApiError(response)
+  },
+
+  /** The web phone. Every request carries the key from the page's link. */
+  webPhoneLine: async (key: string): Promise<WebPhoneInfo> => {
+    const response = await fetch(`${BASE}/web-phone/line`, { headers: { 'X-Web-Phone-Key': key } })
+    if (!response.ok) throw await toApiError(response)
+    return (await response.json()) as WebPhoneInfo
+  },
+  /** Ring the agent: our WebRTC offer in, the call (with OpenAI's answer) out. */
+  callWebPhone: async (key: string, sdp: string): Promise<WebCall> => {
+    const response = await fetch(`${BASE}/web-phone/calls`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/sdp', 'X-Web-Phone-Key': key },
+      body: sdp,
+    })
+    if (!response.ok) throw await toApiError(response)
+    return (await response.json()) as WebCall
+  },
+  webPhoneConnected: async (key: string, callKey: string): Promise<void> => {
+    const response = await fetch(`${BASE}/web-phone/calls/${callKey}/connected`, {
+      method: 'POST',
+      headers: { 'X-Web-Phone-Key': key },
+    })
+    if (!response.ok) throw await toApiError(response)
+  },
+  hangUpWebPhone: async (key: string, callKey: string): Promise<void> => {
+    const response = await fetch(`${BASE}/web-phone/calls/${callKey}`, {
+      method: 'DELETE',
+      headers: { 'X-Web-Phone-Key': key },
+    })
     // No call to end is not a problem: the call is over either way.
     if (!response.ok && response.status !== 404) throw await toApiError(response)
   },

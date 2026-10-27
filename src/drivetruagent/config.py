@@ -113,6 +113,13 @@ class Settings(BaseSettings):
     # Where a call goes when a person is needed, as a number in any form.
     # Unset: the agent says a team member will call back, and hangs up.
     staff_phone_number: str | None = None
+    # The web phone: a page at /call that rings the agent from a phone's
+    # browser, as a phone call, without a number. Anyone holding this key
+    # can start calls on the OpenAI key. Unset: the web phone is off.
+    web_phone_key: SecretStr | None = None
+    # The number a web call comes from, in any form, so caller memory and
+    # the caller rules apply. Unset: a withheld number.
+    web_phone_caller: str | None = None
     # How long a phone order takes to be ready, as the agent tells the caller.
     pickup_ready_minutes: int = Field(default=15, ge=1, le=240)
     # Problem numbers. Only staff mark a no-show; this many within the

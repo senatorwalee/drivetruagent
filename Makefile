@@ -15,10 +15,10 @@ demo:
 	@echo "Open http://localhost:8080 (staff screen: http://localhost:8080/staff)"
 
 # Arize Phoenix on http://localhost:6006. Set TRACING_ENDPOINT to send it traces.
-# Make the phone webhook (and only it) reachable from the internet, for
-# OpenAI to ring. Needs `make demo` running and cloudflared installed. Prints
-# a https://....trycloudflare.com address: the webhook URL is that address
-# followed by /phone/incoming.
+# Make the phone webhook and the web phone (and only them) reachable from the
+# internet. Needs `make demo` running and cloudflared installed. Prints a
+# https://....trycloudflare.com address: the webhook URL is that address
+# followed by /phone/incoming, and the web phone is at /call#key=<WEB_PHONE_KEY>.
 tunnel:
 	cloudflared tunnel --url http://localhost:8081
 
