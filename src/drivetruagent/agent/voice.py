@@ -554,6 +554,17 @@ async def turn_away(
     Raises ModelUnavailable if OpenAI would not take the call.
     """
     await accept_call(client, call_id, refusal_config(settings))
+    await say_and_hang_up(client, call_id, sentence, sleep=sleep)
+
+
+async def say_and_hang_up(
+    client: RealtimeClient,
+    call_id: str,
+    sentence: str,
+    *,
+    sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+) -> None:
+    """Join a call set up with refusal_config, say the sentence, hang up."""
     async with client.realtime.connect(call_id=call_id) as connection:
         call = OpenAICall(client, call_id, connection)
         await call.say(sentence)

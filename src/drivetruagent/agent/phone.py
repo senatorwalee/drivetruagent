@@ -96,40 +96,18 @@ async def answer_call(
     """
     if not calls.claim(incoming.call_id):
         return CallOutcome()
-    if incoming.caller_phone is not None:
-        counts = await counts_for(
-            db, caller_limits, now=datetime.now(UTC), phone_e164=incoming.caller_phone
+    refusal = await screen_caller(db, incoming.caller_phone, caller_limits)
+    if refusal is not None:
+        calls.start(
+            # Not a session; the key only has to be unique.
+            uuid.uuid4(),
+            incoming.call_id,
+            turn_away(client, incoming.call_id, TURN_AWAY_SENTENCES[refusal], voice),
         )
-        refusal = caller_rules.turn_away(counts, caller_limits)
-        if refusal is not None:
-            # Still a call from this number: it counts, and keeps the
-            # number from being forgotten while it goes on calling.
-            await record_call(db, incoming.caller_phone)
-            await db.commit()
-            calls.start(
-                # Not a session; the key only has to be unique.
-                uuid.uuid4(),
-                incoming.call_id,
-                turn_away(
-                    client, incoming.call_id, TURN_AWAY_SENTENCES[refusal], voice
-                ),
-            )
-            return CallOutcome(turned_away=refusal)
+        return CallOutcome(turned_away=refusal)
 
-    customer_session = await open_session(
-        db,
-        business_date=business_date,
-        channel=Channel.PHONE,
-        caller_phone=incoming.caller_phone,
-    )
-    await db.commit()
-    session_id = customer_session.id
-
-    instructions = await build_instructions(
-        db,
-        config.restaurant_name,
-        channel=Channel.PHONE,
-        pickup_minutes=config.pickup_minutes,
+    session_id, instructions = await open_phone_session(
+        db, incoming.caller_phone, business_date=business_date, config=config
     )
     try:
         await accept_call(
@@ -142,7 +120,82 @@ async def answer_call(
         await db.commit()
         raise
 
-    number_known = incoming.caller_phone is not None
+    handle_phone_call(
+        session_id,
+        incoming.call_id,
+        incoming.caller_phone,
+        client=client,
+        calls=calls,
+        scope=scope,
+        config=config,
+        voice=voice,
+        transfer_to=None if staff_phone is None else f"tel:{staff_phone}",
+    )
+    return CallOutcome(session_id=session_id)
+
+
+async def screen_caller(
+    db: AsyncSession, caller_phone: str | None, limits: CallerLimits
+) -> caller_rules.TurnAway | None:
+    """Why a call from this number is turned away, if it is.
+
+    A withheld number is never turned away here. A refused call is still a
+    call from the number: it counts, and keeps the number from being
+    forgotten while it goes on calling.
+    """
+    if caller_phone is None:
+        return None
+    counts = await counts_for(
+        db, limits, now=datetime.now(UTC), phone_e164=caller_phone
+    )
+    refusal = caller_rules.turn_away(counts, limits)
+    if refusal is not None:
+        await record_call(db, caller_phone)
+        await db.commit()
+    return refusal
+
+
+async def open_phone_session(
+    db: AsyncSession,
+    caller_phone: str | None,
+    *,
+    business_date: date,
+    config: AgentConfig,
+) -> tuple[uuid.UUID, str]:
+    """Open the call's session, committed. Returns it with the instructions
+    the call is set up with."""
+    customer_session = await open_session(
+        db,
+        business_date=business_date,
+        channel=Channel.PHONE,
+        caller_phone=caller_phone,
+    )
+    await db.commit()
+    instructions = await build_instructions(
+        db,
+        config.restaurant_name,
+        channel=Channel.PHONE,
+        pickup_minutes=config.pickup_minutes,
+    )
+    return customer_session.id, instructions
+
+
+def handle_phone_call(
+    session_id: uuid.UUID,
+    call_id: str,
+    caller_phone: str | None,
+    *,
+    client: RealtimeClient,
+    calls: LiveCalls,
+    scope: SessionScope,
+    config: AgentConfig,
+    voice: VoiceSettings,
+    transfer_to: str | None,
+) -> None:
+    """Handle an answered call in the background, from the opening notice
+    on. `transfer_to`: where the call goes when a person is needed; None
+    and the caller is told someone will call back."""
+    number_known = caller_phone is not None
 
     def bridge_for(call: CallControl) -> VoiceBridge:
         return VoiceBridge(
@@ -151,18 +204,17 @@ async def answer_call(
             call=call,
             config=config,
             model_name=voice.model,
-            transfer_to=None if staff_phone is None else f"tel:{staff_phone}",
+            transfer_to=transfer_to,
             callback_sentence=CALL_YOU_BACK if number_known else CALL_US_BACK,
         )
 
     calls.start(
         session_id,
-        incoming.call_id,
+        call_id,
         run_call(
             client,
-            incoming.call_id,
+            call_id,
             bridge_for,
             greeting=greeting(config.restaurant_name, number_known=number_known),
         ),
     )
-    return CallOutcome(session_id=session_id)
