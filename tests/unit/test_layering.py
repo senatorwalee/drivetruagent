@@ -29,6 +29,7 @@ PURE_MODULES = [
     "ordering/allergens.py",
     "ordering/language.py",
     "ordering/diet_words.py",
+    "ordering/phone_numbers.py",
     "ordering/photos.py",
     "knowledge/documents.py",
     "knowledge/embedding.py",
