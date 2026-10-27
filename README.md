@@ -42,6 +42,9 @@ built piece by piece.
 | 20 | Insights page: what guests asked for that the menu couldn't fill, at `/insights` | Done; checked in a browser with real conversations |
 | 21 | Menu page: add, edit and take off items, with a photo for each, at `/menu` | Done; checked in a browser |
 | 22 | Halal and kosher from a reviewed list, a fish burger, and swapping a line in one step | Done; evals pass against the real model |
+| 23a | Caller memory: a phone caller's last five orders, read back and reordered | Done; evals pass against the real model |
+| 23b | A real phone line: OpenAI Realtime over SIP, with a Twilio number | Planned |
+| 23c | No-shows and repeat calls: staff mark pickups, big orders from flagged numbers go to a person, staff can block | Planned |
 | Later | Demo polish: cost readout, French review, demo script | Planned |
 
 ## Stack
@@ -269,6 +272,7 @@ Design points:
 | `search_menu`, `get_item_details`, `get_cart` | Read-only lookups |
 | `get_todays_specials` | Today's specials and the combo deals, read through a cache |
 | `check_allergens`, `check_diet` | The allergen matrix; the halal and kosher list |
+| `get_past_orders`, `reorder`, `forget_my_orders` | A phone caller's last five orders; `reorder` adds them through the policy gateway |
 | `add_item`, `update_item`, `remove_item`, `replace_item` | The policy gateway |
 | `request_confirmation`, `submit_order` | The policy gateway |
 | `confirm_pending_action`, `cancel_pending_action` | The customer's answer to a held action |
@@ -1012,6 +1016,47 @@ you like to swap it for the cheeseburger?"* / "Okay, the fish burger instead." /
 The table is `diet_suitability` (item, diet, status, note), made to match the file
 on every seed; the words are recognised in `ordering/diet_words.py` and the reads
 are in `ordering/diet.py`.
+
+## Caller memory: "what did I order last time?"
+
+Phone orders are a session with `channel = phone` and, unless the number was
+withheld, a **caller**: one row per phone number, in E.164 (+14165550123), with
+when it first and last called and how many times. Nothing else is kept about a
+caller: no name, no address, no payment details. Their orders are not copied
+anywhere; they are found through the sessions that link to the number, from the
+frozen order rows.
+
+- **The last five orders** come back newest first, with the restaurant's date
+  and each line's choices, but no totals: prices change, and a past total would
+  be heard as today's.
+- **"The same again"** is `reorder`, which proposes each past line to the policy
+  gateway as an ordinary `add_item`. Today's prices, stock and combos apply; a
+  line since sold out or taken off the menu is refused on its own and the agent
+  says so. It can only reach the caller's own recent orders.
+- **"Don't save my number"** is `forget_my_orders`: nothing is read back from
+  then on. The number itself is kept to help with pickups (no-shows come next),
+  which the opening sentence of a call will say.
+- **Two calls from one number at the same moment** are both counted: the caller
+  row is written with one `INSERT ... ON CONFLICT DO UPDATE`, and a test fires
+  five at once to prove it.
+- **Typing a caller number is off.** A real caller's number will come only from
+  the phone line, which can't be typed over. `ALLOW_TYPED_CALLER_ID=true` lets
+  `POST /sessions` take `{"channel": "phone", "caller_phone": "..."}` for
+  testing; with it on, anyone could claim a number and hear its orders.
+
+Numbers are parsed in `ordering/phone_numbers.py`: a SIP `From` header, a `tel:`
+link or a typed number all come out the same; a withheld number ("anonymous")
+or an impossible one comes out as none.
+
+Against the real model: *"Your last order was yesterday: a cheeseburger with
+bacon, large plain fries, and a large cola. Would you like that again?"*
+
+> **Privacy (not legal advice).** In Ontario, PIPEDA applies: say why a number
+> is kept when it is collected, keep only what that needs and only as long as
+> needed, and let people opt out or ask for deletion. Quebec's Law 25 is
+> stricter about profiling. The phone line's opening sentence, retention limits
+> and staff deletion arrive with the phone line and no-show pieces; have the
+> wording reviewed before a real launch.
 
 ## Policy engine
 
