@@ -1,4 +1,4 @@
-import { INSIGHTS_PATH, MENU_PATH, STAFF_PATH } from '../../app/navigation'
+import { CALLS_PATH, INSIGHTS_PATH, LIVE_PATH, MENU_PATH, STAFF_PATH } from '../../app/navigation'
 import { PageLink } from '../../app/PageLink'
 import { clock } from '../../session/presentation'
 import type { LiveSession } from '../../session/useLiveSession'
@@ -36,6 +36,9 @@ export function ControlRoom({ live, view, onViewChange }: LiveSessionViewProps) 
           </PageLink>
           <PageLink to={MENU_PATH} className={styles.button}>
             Menu
+          </PageLink>
+          <PageLink to={live.following ? LIVE_PATH : CALLS_PATH} className={styles.button}>
+            {live.following ? 'Drive-through' : 'Phone calls'}
           </PageLink>
           <button type="button" className={styles.button} aria-pressed={live.paused} onClick={live.togglePause}>
             {live.paused ? 'Resume' : 'Pause'}

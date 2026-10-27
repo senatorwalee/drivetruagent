@@ -29,14 +29,22 @@ const IDLE_INTERVAL_MS = 1000
 const STOCK_INTERVAL_MS = 2000
 /** The week's specials rarely change; only whether one has sold out does. */
 const SPECIALS_INTERVAL_MS = 10000
+/** Following phone calls: how often to look for a new one. */
+const CALL_LOOKUP_INTERVAL_MS = 2000
 
 const NO_MODEL = 'No model is configured. In .env, set AGENT_MODEL=demo, or add an OpenAI or Gemini key.'
+const NO_CALL = 'No call in progress. The next call to the restaurant’s number will show here as it rings.'
 
 const EMPTY_TIMELINE: Timeline = { transcript: [], decisions: [], pending: null, order: null }
 
 export interface LiveSession {
-  /** `starting` until a session exists; `failed` if the backend is unreachable. */
-  status: 'starting' | 'ready' | 'failed'
+  /**
+   * `starting` until a session exists; `failed` if the backend is unreachable;
+   * `waiting` when following phone calls and none has come in yet.
+   */
+  status: 'starting' | 'ready' | 'waiting' | 'failed'
+  /** Following phone calls: the screen watches, the caller talks on their phone. */
+  following: boolean
   /** Something the viewer should be told, in plain words. */
   problem: string | null
   agent: AgentInfo | null
@@ -84,7 +92,18 @@ async function resumeOrOpen(): Promise<Session> {
   return session
 }
 
-export function useLiveSession(): LiveSession {
+/**
+ * The newest phone call, or the one already on screen when no call is in
+ * progress, so a finished call stays up until the next one rings.
+ */
+async function newestCall(onScreen: Session | null | undefined): Promise<Session | null> {
+  const [newest] = await api.phoneCalls()
+  if (!newest) return onScreen ?? null
+  return api.session(newest.session_id)
+}
+
+export function useLiveSession(options: { follow?: 'phone' } = {}): LiveSession {
+  const following = options.follow === 'phone'
   const queryClient = useQueryClient()
   // Bumping the generation makes the query below run again: a new session.
   const [generation, setGeneration] = useState(0)
@@ -93,12 +112,16 @@ export function useLiveSession(): LiveSession {
   const speakingTimer = useRef<number | undefined>(undefined)
 
   const agentQuery = useQuery({ queryKey: ['agent'], queryFn: api.agentInfo, staleTime: Infinity })
+  const openedKey = ['live-session', following ? 'phone' : 'lane', generation]
   const opened = useQuery({
-    queryKey: ['live-session', generation],
-    queryFn: resumeOrOpen,
+    queryKey: openedKey,
+    queryFn: following
+      ? () => newestCall(queryClient.getQueryData<Session | null>(openedKey))
+      : resumeOrOpen,
     staleTime: Infinity,
     gcTime: Infinity,
     retry: false,
+    refetchInterval: following ? CALL_LOOKUP_INTERVAL_MS : false,
   })
   const sessionId = opened.data?.session_id
 
@@ -119,7 +142,7 @@ export function useLiveSession(): LiveSession {
   const sessionQuery = useQuery({
     queryKey: sessionKey,
     queryFn: () => api.session(sessionId!),
-    initialData: opened.data,
+    initialData: opened.data ?? undefined,
     enabled: Boolean(sessionId),
     // While a turn is running, each tool's work is saved as it finishes, so
     // polling shows items arriving one by one instead of all at the end.
@@ -139,16 +162,19 @@ export function useLiveSession(): LiveSession {
   const paused = session?.timers.paused ?? false
   const agent = agentQuery.data ?? null
 
-  const voice = useVoiceCall({ sessionId, enabled: Boolean(agent?.voice_available), ended, paused })
+  // On a phone call the caller talks on their own phone, not through this page.
+  const voice = useVoiceCall({ sessionId, enabled: !following && Boolean(agent?.voice_available), ended, paused })
+  // A phone call is a call in progress too, so the screen keeps up with it.
+  const callInProgress = voice.active || (following && Boolean(sessionId) && !ended)
   useEffect(() => {
-    callLive.current = voice.active
-  }, [voice.active])
+    callLive.current = callInProgress
+  }, [callInProgress])
 
   // During a turn or a call, each step is saved as it happens, so the screen
   // looks often and shows items arriving one by one.
   const follow = {
     enabled: Boolean(sessionId),
-    refetchInterval: followInterval(session ?? undefined, message.isPending || voice.active),
+    refetchInterval: followInterval(session ?? undefined, message.isPending || callInProgress),
   } as const
   const cartQuery = useQuery({ queryKey: ['session', sessionId, 'cart'], queryFn: () => api.cart(sessionId!), ...follow })
   const eventsQuery = useQuery({
@@ -198,7 +224,8 @@ export function useLiveSession(): LiveSession {
   const customerTurns = timeline.transcript.filter((line) => line.speaker === 'customer').length
   // Typing is off during a call: the voice model keeps its own conversation,
   // and a typed message would go to the text model instead.
-  const canSend = Boolean(sessionId) && Boolean(agent?.available) && !ended && !paused && !message.isPending && !voice.active
+  const canSend =
+    !following && Boolean(sessionId) && Boolean(agent?.available) && !ended && !paused && !message.isPending && !voice.active
 
   const send = useCallback(
     (text: string) => {
@@ -209,17 +236,22 @@ export function useLiveSession(): LiveSession {
   )
 
   const startNewSession = useCallback(() => {
-    window.sessionStorage.removeItem(STORED_SESSION)
+    // Following calls, this looks for the newest call again instead.
+    if (!following) window.sessionStorage.removeItem(STORED_SESSION)
     window.clearTimeout(speakingTimer.current)
     setSpeaking(false)
     voice.stop()
     message.reset()
     setGeneration((current) => current + 1)
-  }, [message, voice])
+  }, [following, message, voice])
 
   return {
-    status: opened.isError ? 'failed' : sessionId ? 'ready' : 'starting',
-    problem: voice.problem ?? describeProblem(opened.error, message.error, agent),
+    status: opened.isError ? 'failed' : sessionId ? 'ready' : following && opened.isSuccess ? 'waiting' : 'starting',
+    following,
+    problem:
+      following && opened.isSuccess && !sessionId
+        ? NO_CALL
+        : (voice.problem ?? describeProblem(opened.error, message.error, following ? null : agent)),
     agent,
     session,
     cart,

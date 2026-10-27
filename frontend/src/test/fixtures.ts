@@ -231,6 +231,7 @@ const ITEM_NAMES: Record<string, string> = { cookie: 'Chocolate chip cookie', fr
 export function liveSession(overrides: Partial<LiveSession> = {}): LiveSession {
   return {
     status: 'ready',
+    following: false,
     problem: null,
     agent: agentInfo,
     session,
