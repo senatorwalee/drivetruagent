@@ -33,6 +33,11 @@ export type AdminCategory = Schemas['AdminCategoryView']
 export type NewItem = Schemas['NewItem']
 export type ItemChanges = Schemas['ItemChanges']
 export type PhoneCall = Schemas['ActiveCall']
+export type Pickup = Schemas['Pickup']
+export type PickupMark = Schemas['MarkPickupRequest']['status']
+export type Caller = Schemas['CallerView']
+export type CallerStatus = Schemas['CallerStatus']
+export type Standing = Schemas['Standing']
 
 const BASE = '/api'
 
@@ -126,6 +131,20 @@ export const api = {
     post<HandoffPackage>(`/handoffs/${handoffId}/acknowledge`, { by }),
   resolveHandoff: (handoffId: string, outcome: HandoffOutcome, note: string | null) =>
     post<HandoffPackage>(`/handoffs/${handoffId}/resolve`, { outcome, note }),
+
+  /** Phone orders still to be collected, then the ones marked recently. */
+  pickups: () => request<Pickup[]>('/pickups'),
+  markPickup: (orderId: string, status: PickupMark, by: string) => post<Pickup>(`/pickups/${orderId}`, { status, by }),
+
+  /** Phone numbers that have called, the latest call first. */
+  callers: () => request<Caller[]>('/callers'),
+  setCallerStatus: (callerId: string, status: CallerStatus, reason: string, by: string) =>
+    post<Caller>(`/callers/${callerId}/status`, { status, reason, by }),
+  /** Forgets the number and everything known about it. */
+  deleteCaller: async (callerId: string): Promise<void> => {
+    const response = await fetch(`${BASE}/callers/${callerId}`, { method: 'DELETE' })
+    if (!response.ok) throw await toApiError(response)
+  },
 
   /** What guests asked for that the menu couldn't fill, most asked first. */
   unmetRequests: (days: number) => request<UnmetRequest[]>(`/insights/unmet-requests?days=${days}`),
