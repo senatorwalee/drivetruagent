@@ -32,6 +32,19 @@
   letter-spacing: -0.01em;
 }
 
+.titleGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+}
+
+/* The page's name, set off from the Frontdesk wordmark by a hairline. */
+.titleGroup .title {
+  padding-left: 16px;
+  border-left: 1px solid var(--hairline);
+}
+
 .titleSub {
   margin-left: 8px;
   color: var(--muted);

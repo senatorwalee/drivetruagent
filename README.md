@@ -1,6 +1,7 @@
-# Drive-through agent
+# Frontdesk
 
-A voice-first ordering agent for a fast-food drive-through. A customer speaks,
+Frontdesk is a voice-first ordering agent for a fast-food drive-through.
+(The code and the Python package are still called `drivetruagent`.) A customer speaks,
 the agent takes the order, and a backend service stays in charge of everything
 that has to be correct: the menu, prices, stock, order submission and the rules
 for when a human takes over.
@@ -46,6 +47,7 @@ built piece by piece.
 | 23b | A real phone line: OpenAI Realtime over SIP, with a Twilio number | Done; tested with signed webhooks and a stand-in for OpenAI; a live call needs your Twilio number |
 | 23c | No-shows and repeat calls: staff mark pickups, big orders from flagged numbers go to a person, staff can block | Done; tested with signed webhooks and the real database |
 | 23d | The web phone: call the agent from a phone's browser at `/call`, answered as a phone call, without a number | Done; tested with a stand-in for OpenAI and checked in a browser |
+| 24 | One look across the app, the Frontdesk name, and a home page at `/`; the live screen moves to `/live` | Done; checked in a browser |
 | Later | Demo polish: cost readout, French review, demo script | Planned |
 
 ## Stack
@@ -69,8 +71,9 @@ You need Docker and `make`.
 make demo
 ```
 
-Then open <http://localhost:8080> (staff screen: <http://localhost:8080/staff>,
-menu page: <http://localhost:8080/menu>).
+Then open <http://localhost:8080>: the Frontdesk home page, with a card for
+each part (live lane at `/live`, staff at `/staff`, insights at `/insights`,
+menu at `/menu`).
 That builds and starts Postgres, the API and the web app; the API migrates the
 database, loads the menu the first time (so edits made on the menu page survive
 a restart) and the knowledge documents on every start, and nginx serves the web
@@ -377,8 +380,10 @@ what to type at each turn.
 
 ## The live session screen
 
-`frontend/` is a React app with one screen so far: a live view of a session,
-for demos. It shows the agent (an indicator that changes as it listens, works
+`frontend/` is a React app. It opens on a home page (`/`) that says what
+Frontdesk is and shows a live number for each part: today's special, handoffs
+waiting, the most-asked missing item, and the items on the menu. The live
+session screen is at `/live`: a live view of a session, for demos. It shows the agent (an indicator that changes as it listens, works
 and speaks), the conversation, the order filling up as items are added, and
 every tool call with the backend's decision.
 
@@ -388,7 +393,7 @@ make dev                        # the API, in one terminal
 make ui                         # the web app, in another
 ```
 
-Then open <http://localhost:5174>. With `AGENT_MODEL=demo` in `.env` the
+Then open <http://localhost:5174/live>. With `AGENT_MODEL=demo` in `.env` the
 screen offers the next line of the script at each turn, so the whole order
 can be played with a click per turn.
 

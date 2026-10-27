@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api, type Pickup, type PickupMark } from '../api/client'
+import { HomeLink } from '../app/HomeLink'
 import { CALLERS_PATH, LIVE_PATH, STAFF_PATH } from '../app/navigation'
 import { PageLink } from '../app/PageLink'
 import { money } from '../session/presentation'
@@ -75,9 +76,12 @@ export function PickupsPage() {
   return (
     <div className={staff.screen}>
       <header className={staff.topBar}>
-        <h1 className={staff.title}>
-          Staff <span className={staff.titleSub}>Pickups</span>
-        </h1>
+        <div className={staff.titleGroup}>
+          <HomeLink />
+          <h1 className={staff.title}>
+            Staff <span className={staff.titleSub}>Pickups</span>
+          </h1>
+        </div>
         <nav className={staff.pageLinks} aria-label="Pages">
           <PageLink to={STAFF_PATH} className={staff.button}>
             Handoffs

@@ -1,3 +1,4 @@
+import { HomeLink } from '../../app/HomeLink'
 import { CALLS_PATH, INSIGHTS_PATH, LIVE_PATH, MENU_PATH, STAFF_PATH } from '../../app/navigation'
 import { PageLink } from '../../app/PageLink'
 import { clock, emptyConversationHint } from '../../session/presentation'
@@ -17,9 +18,10 @@ export function ControlRoom({ live, view, onViewChange }: LiveSessionViewProps) 
   return (
     <div className={styles.screen}>
       <header className={styles.topBar}>
+        <HomeLink />
         <div className={styles.brand}>
           <span aria-hidden="true" className={styles.beacon} data-live={live.status === 'ready' && live.agentState !== 'ended'} />
-          <span className={styles.brandName}>{live.agent?.restaurant_name ?? 'Drive-through'}</span>
+          <span className={styles.brandName}>{live.agent?.restaurant_name ?? 'Restaurant'}</span>
         </div>
         <Readouts live={live} />
         <div className={styles.controls}>

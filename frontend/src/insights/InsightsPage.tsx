@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { api } from '../api/client'
+import { HomeLink } from '../app/HomeLink'
 import { LIVE_PATH, MENU_PATH, STAFF_PATH } from '../app/navigation'
 import { PageLink } from '../app/PageLink'
 import { useNow } from '../session/useNow'
@@ -39,9 +40,12 @@ export function InsightsPage() {
   return (
     <div className={staff.screen}>
       <header className={staff.topBar}>
-        <h1 className={staff.title}>
-          Insights <span className={staff.titleSub}>What guests ask for</span>
-        </h1>
+        <div className={staff.titleGroup}>
+          <HomeLink />
+          <h1 className={staff.title}>
+            Insights <span className={staff.titleSub}>What guests ask for</span>
+          </h1>
+        </div>
         <nav className={styles.links} aria-label="Pages">
           <PageLink to={STAFF_PATH} className={staff.button}>
             Staff

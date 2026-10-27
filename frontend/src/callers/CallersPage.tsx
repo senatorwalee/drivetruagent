@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 
 import { api, type Caller, type CallerStatus } from '../api/client'
+import { HomeLink } from '../app/HomeLink'
 import { LIVE_PATH, PICKUPS_PATH, STAFF_PATH } from '../app/navigation'
 import { PageLink } from '../app/PageLink'
 import { useNow } from '../session/useNow'
@@ -114,9 +115,12 @@ export function CallersPage() {
   return (
     <div className={staff.screen}>
       <header className={staff.topBar}>
-        <h1 className={staff.title}>
-          Staff <span className={staff.titleSub}>Callers</span>
-        </h1>
+        <div className={staff.titleGroup}>
+          <HomeLink />
+          <h1 className={staff.title}>
+            Staff <span className={staff.titleSub}>Callers</span>
+          </h1>
+        </div>
         <nav className={staff.pageLinks} aria-label="Pages">
           <PageLink to={STAFF_PATH} className={staff.button}>
             Handoffs

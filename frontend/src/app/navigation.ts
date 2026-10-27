@@ -4,6 +4,7 @@
  */
 import { useSyncExternalStore } from 'react'
 
+export const HOME_PATH = '/'
 export const STAFF_PATH = '/staff'
 /** Phone orders waiting to be collected. */
 export const PICKUPS_PATH = '/pickups'
@@ -11,11 +12,11 @@ export const PICKUPS_PATH = '/pickups'
 export const CALLERS_PATH = '/callers'
 export const INSIGHTS_PATH = '/insights'
 export const MENU_PATH = '/menu'
+export const LIVE_PATH = '/live'
 /** The live views, following the newest phone call instead of a lane. */
 export const CALLS_PATH = '/calls'
 /** The web phone: ring the restaurant from a phone's browser. */
 export const CALL_PATH = '/call'
-export const LIVE_PATH = '/'
 
 function subscribe(onChange: () => void): () => void {
   window.addEventListener('popstate', onChange)
