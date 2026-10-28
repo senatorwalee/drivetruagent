@@ -93,6 +93,8 @@ class FakeCall:
         self.said: list[str] = []
         self.hung_up = 0
         self.transferred: list[str] = []
+        # Everything asked of the call, in order, to check what came first.
+        self.actions: list[str] = []
 
     async def send_function_output(self, call_id: str, output: str) -> None:
         self.outputs.append((call_id, json.loads(output)))
@@ -102,12 +104,21 @@ class FakeCall:
 
     async def say(self, sentence: str) -> None:
         self.said.append(sentence)
+        self.actions.append(f"say: {sentence}")
 
     async def hang_up(self) -> None:
         self.hung_up += 1
+        self.actions.append("hang up")
 
     async def transfer(self, target_uri: str) -> None:
         self.transferred.append(target_uri)
+        self.actions.append(f"transfer: {target_uri}")
+
+    async def stop_talking(self) -> None:
+        self.actions.append("stop talking")
+
+    async def stop_listening(self) -> None:
+        self.actions.append("stop listening")
 
 
 class Pauses:
@@ -707,6 +718,42 @@ async def test_with_no_staff_number_the_caller_is_told_they_will_be_called_back(
 
     assert call.said[-1] == "We'll call you back."
     assert (call.transferred, call.hung_up) == ([], 1)
+
+
+async def test_the_handoff_cuts_off_the_agent_and_stops_it_answering_first(
+    db_session: AsyncSession, session_id: uuid.UUID, call: FakeCall, pauses: Pauses
+) -> None:
+    """At the time limit the agent was mid-answer; the rest of that answer
+    played after the handoff sentence, and it could still answer back."""
+    bridge = phone_bridge(
+        db_session, session_id, call, pauses, callback_sentence="We'll call you back."
+    )
+    await bridge.start_watching_timers()
+    await hand_off_at_the_time_limit(db_session, session_id)
+
+    await bridge.check_timers()
+
+    assert call.actions == [
+        "stop listening",
+        "stop talking",
+        f"say: {timekeeper.HANDING_OFF[Language.EN]}",
+        "say: We'll call you back.",
+        "hang up",
+    ]
+
+
+async def test_the_third_insult_cuts_off_the_agent_before_the_goodbye(
+    guarded: VoiceBridge, call: FakeCall
+) -> None:
+    for _ in range(3):
+        await guarded.handle(heard("You're useless."))
+
+    assert call.actions[-4:] == [
+        "stop listening",
+        "stop talking",
+        f"say: {ENDED[Language.EN]}",
+        "hang up",
+    ]
 
 
 async def test_a_placed_phone_order_hangs_up_rather_than_transferring(

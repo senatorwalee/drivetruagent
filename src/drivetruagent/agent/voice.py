@@ -206,6 +206,15 @@ class CallControl(Protocol):
         """Pass a phone call to another number, such as tel:+14165550100."""
         ...
 
+    async def stop_talking(self) -> None:
+        """Stop whatever the agent is saying, including audio already made
+        and still being played to the caller."""
+        ...
+
+    async def stop_listening(self) -> None:
+        """From now on, nothing the caller says starts an answer."""
+        ...
+
 
 def speaking_seconds(text: str) -> float:
     """Roughly how long a sentence takes to say, so a goodbye is not cut off."""
@@ -334,8 +343,11 @@ class VoiceBridge:
             await db.commit()
         if outcome.reply is None:
             return
+        ending = outcome.action in (GuardAction.TERMINATE, GuardAction.HAND_OFF)
+        if ending:
+            await self._wind_down()
         await self._call.say(outcome.reply)
-        if outcome.action in (GuardAction.TERMINATE, GuardAction.HAND_OFF):
+        if ending:
             await self._sleep(speaking_seconds(outcome.reply))
             await self._end_call(handed_off=outcome.action is GuardAction.HAND_OFF)
 
@@ -478,10 +490,21 @@ class VoiceBridge:
             if action == "abandon":
                 await self._end_call()
             elif sentence:
+                if action == "hand_off":
+                    # The agent may be part way through an answer: the
+                    # handoff replaces it, and nothing said now is answered.
+                    await self._wind_down()
                 await self._call.say(sentence)
                 if action == "hand_off":
                     await self._sleep(speaking_seconds(sentence))
                     await self._end_call(handed_off=True)
+
+    async def _wind_down(self) -> None:
+        """Before the call's last fixed sentence: stop answering, and stop
+        whatever is still being said, so the sentence is not talked over or
+        followed by the rest of an earlier answer."""
+        await self._call.stop_listening()
+        await self._call.stop_talking()
 
     async def _end_call(self, *, handed_off: bool = False) -> None:
         """Hang up; or, when a person is taking over a phone call, put the
@@ -669,6 +692,18 @@ class OpenAICall:
 
     async def transfer(self, target_uri: str) -> None:
         await self._client.realtime.calls.refer(self._call_id, target_uri=target_uri)
+
+    async def stop_talking(self) -> None:
+        # Cancelling stops an answer still being made; clearing the output
+        # buffer stops one already made but still playing (a call through
+        # the browser; on a phone line the call ignores it).
+        await self._connection.response.cancel()
+        await self._connection.output_audio_buffer.clear()
+
+    async def stop_listening(self) -> None:
+        await self._connection.session.update(
+            session={"type": "realtime", "audio": {"input": {"turn_detection": None}}}
+        )
 
 
 async def run_call(
