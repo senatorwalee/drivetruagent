@@ -559,9 +559,18 @@ def test_nothing_on_the_real_menu_is_kosher_or_certified() -> None:
 
 
 def test_the_real_menus_meat_and_what_shares_its_oil_are_not_halal() -> None:
-    for code in ("classic_burger", "chicken_burger", "chicken_nuggets", "fries"):
+    for code in ("classic_burger", "chicken_burger", "chicken_nuggets", "onion_rings"):
         assert real_item(code).diets[Diet.HALAL].status is DietStatus.NOT_SUITABLE, code
-    assert "oil" in real_item("fries").diets[Diet.HALAL].note.en
+    assert "oil" in real_item("onion_rings").diets[Diet.HALAL].note.en
+
+
+def test_the_real_menus_fries_have_their_own_fryer() -> None:
+    fries = real_item("fries")
+    assert fries.diets[Diet.HALAL].status is DietStatus.SUITABLE
+    assert "own fryer" in fries.diets[Diet.HALAL].note.en
+    # Nothing picked up from the batter in a shared fryer.
+    assert fries.allergens is not None
+    assert fries.allergens.may_contain == []
 
 
 def test_every_item_on_the_real_menu_is_reviewed_for_halal() -> None:

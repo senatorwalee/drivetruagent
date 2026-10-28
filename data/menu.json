@@ -606,23 +606,14 @@
             }
           ],
           "allergens": {
-            "reviewed_on": "2026-10-01",
-            "may_contain": [
-              {
-                "allergens": ["wheat", "gluten", "milk", "egg"],
-                "because": {
-                  "en": "Fried in the same oil as the onion rings and nuggets.",
-                  "fr": "Frit dans la même huile que les rondelles d'oignon et les croquettes."
-                }
-              }
-            ]
+            "reviewed_on": "2026-10-28"
           },
           "diets": {
             "halal": {
-              "status": "not_suitable",
+              "status": "suitable",
               "note": {
-                "en": "Fried in the same oil as our chicken, which is not certified halal.",
-                "fr": "Frit dans la même huile que notre poulet, qui n'est pas certifié halal."
+                "en": "No meat. Fried in their own fryer, apart from the chicken.",
+                "fr": "Sans viande. Frites dans leur propre friteuse, à part du poulet."
               }
             }
           }

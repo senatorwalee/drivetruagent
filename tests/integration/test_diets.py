@@ -2,9 +2,10 @@
 swap to what the guest can eat happens in one step. Real menu, real database.
 
 For halal every item is reviewed: certified (none), suitable (drinks, desserts,
-the salad, the veggie and fish burgers) or not suitable, with why (beef and
-chicken, and fries and onion rings, which share the chicken's oil). Nothing is
-reviewed for kosher, so nothing can be claimed either way."""
+the salad, the fries in their own fryer, the veggie and fish burgers) or not
+suitable, with why (beef and chicken, and the onion rings, which share the
+chicken's oil). Nothing is reviewed for kosher, so nothing can be claimed either
+way."""
 
 from decimal import Decimal
 from typing import Any
@@ -128,7 +129,7 @@ async def test_a_side_is_offered_a_side_never_a_burger(context: ToolContext) -> 
     """A caller with fries was once offered the fish burger instead."""
     result = await check(context, "halal", "chicken_nuggets")
 
-    assert codes(result["options"]) == ["side_salad"]
+    assert codes(result["options"]) == ["fries", "side_salad"]
 
 
 async def test_nothing_is_offered_as_kosher(context: ToolContext) -> None:
@@ -188,7 +189,7 @@ async def test_every_line_is_answered_and_only_the_unsuitable_ones_are_named(
     assert codes(result["options"]) == ["veggie_burger", "fish_burger"]
 
 
-async def test_fries_and_a_coffee_are_told_apart(context: ToolContext) -> None:
+async def test_fries_and_a_coffee_are_both_suitable(context: ToolContext) -> None:
     """A caller with fries and a coffee asked "are you guys halal?" and heard
     that the coffee was not suitable, and was offered a fish burger."""
     await add(context, "fries", selections=size("large"))
@@ -197,13 +198,22 @@ async def test_fries_and_a_coffee_are_told_apart(context: ToolContext) -> None:
     result = await check(context, "halal")
 
     fries, coffee = result["items"]
-    assert (fries["status"], coffee["status"]) == ("not_suitable", "suitable")
-    assert "same oil as our chicken" in fries["note"]
+    assert (fries["status"], coffee["status"]) == ("suitable", "suitable")
+    assert "own fryer" in fries["note"]
     assert coffee["note"] == "No meat or alcohol."
-    assert result["not_suitable_lines"] == [1]
-    assert result["unreviewed_lines"] == []
-    assert codes(result["options"]) == ["side_salad"]
+    assert (result["not_suitable_lines"], result["unreviewed_lines"]) == ([], [])
     assert "Nothing on the menu is certified halal" in result["message"]
+
+
+async def test_onion_rings_are_offered_the_fries(context: ToolContext) -> None:
+    """The rings share the chicken's oil; the fries, in their own fryer, don't."""
+    await add(context, "onion_rings", selections=size("regular"))
+
+    result = await check(context, "halal")
+
+    assert result["not_suitable_lines"] == [1]
+    assert "same oil as our chicken" in result["items"][0]["note"]
+    assert codes(result["options"]) == ["fries", "side_salad"]
 
 
 async def test_are_you_halal_gets_the_whole_menu(context: ToolContext) -> None:
@@ -213,7 +223,7 @@ async def test_are_you_halal_gets_the_whole_menu(context: ToolContext) -> None:
     menu = result["menu"]
     assert menu["suitable"] == {
         "Burgers": ["Veggie burger", "Fish burger"],
-        "Sides": ["Side salad"],
+        "Sides": ["Fries", "Side salad"],
         "Drinks": [
             "Cola",
             "Lemon-lime soda",
@@ -230,7 +240,6 @@ async def test_are_you_halal_gets_the_whole_menu(context: ToolContext) -> None:
         "cheeseburger",
         "double_cheeseburger",
         "chicken_burger",
-        "fries",
         "onion_rings",
         "chicken_nuggets",
     ]
@@ -261,7 +270,7 @@ async def test_an_empty_order_still_gets_the_options(context: ToolContext) -> No
     result = await check(context, "halal")
 
     assert (result["items"], result["not_suitable_lines"]) == ([], [])
-    assert codes(result["options"]) == ["veggie_burger", "fish_burger", "side_salad"]
+    assert codes(result["options"]) == ["veggie_burger", "fish_burger", "fries"]
 
 
 # --- Swapping ---------------------------------------------------------------

@@ -186,13 +186,14 @@ async def test_the_customers_choices_are_taken_into_account(
 
 
 async def test_a_choice_not_given_counts_as_its_default(context: ToolContext) -> None:
-    """Fries are plain unless asked for seasoned, and seasoning adds milk."""
+    """Fries are plain unless asked for seasoned, and seasoning adds milk. In
+    their own fryer, plain fries pick up nothing from other items' batter."""
     result = await check(context, "fries", ["milk", "peanut"])
 
     (fries,) = result["items"]
     assert "Plain" in fries["options"]
-    assert allergens_of(fries["may_contain"]) == ["milk"]
-    assert fries["not_listed"] == ["peanut"]
+    assert (fries["contains"], fries["may_contain"]) == ([], [])
+    assert sorted(fries["not_listed"]) == ["milk", "peanut"]
     assert [o["option_code"] for o in fries["options_that_add"]] == ["seasoned"]
 
 

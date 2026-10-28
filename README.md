@@ -489,7 +489,8 @@ order, the session state and the tools used, never at the agent's wording.
 | `asks_if_the_veggie_burger_is_vegan` | Answered from the documents (not as served), never "it's vegan" |
 | `asks_for_something_not_on_the_menu` | "Oat milk shake": says it isn't offered and suggests drinks without milk, never the regular shake |
 | `asks_why_it_got_a_combo` | Asked what makes it a combo, the agent looks it up and names the items in the cart, never "you didn't get one" |
-| `asks_if_they_are_halal_with_fries_and_coffee` | "Are you guys halal?" with fries and a coffee: the menu first, the fries for their oil, the coffee fine, no swap |
+| `asks_if_they_are_halal_with_fries_and_coffee` | "Are you guys halal?" with fries and a coffee: the menu first, then both are fine (the fries have their own fryer), no swap |
+| `asks_are_you_halal` | Before ordering: the meat isn't certified, then what a guest eating halal can have, drinks included |
 | `ok_is_not_a_choice` | Asked which flavour, "OK" and "Sure" get the flavours named again; no milkshake is added |
 | `gets_offered_something_similar` | "Spicy nuggets": nuggets don't come spicy, the chicken burger does, and the guest takes it |
 
@@ -1011,7 +1012,8 @@ for, and the code decides what may be offered:
 | "spicy nuggets" | close: nuggets have no "spicy"; the chicken burger does | say so, offer either |
 | "iced coffee" | close: coffee has no "iced"; iced tea does | say so, offer either |
 | "oat milk shake" | close, and the guest **avoids milk**: the milkshake contains it | don't offer the shake; offer drinks not listed as containing milk |
-| "gluten-free bun" | none, and avoids gluten; fries **may contain** gluten (shared fryer) | say so; offer items without gluten, not the fries |
+| "gluten-free bun" | none, and avoids gluten | say so; offer items not listed as containing gluten (the fries, in their own fryer) |
+| "nut-free dessert" | avoids tree nuts; the cookie and sundae **may contain** them | offer neither: "may contain" counts as a no |
 
 - **Leftover words are judged by code.** A word the item offers as a choice
   ("large", "vanilla"), a count ("two") or another item named in the same breath
@@ -1054,10 +1056,10 @@ the agent reads out:
 In the demo menu nothing is certified, and every item is reviewed for halal:
 
 - **Not suitable:** the beef and chicken items ("not certified halal"), and the
-  fries and onion rings ("fried in the same oil as our chicken").
+  onion rings ("fried in the same oil as our chicken").
 - **Suitable:** the drinks ("no meat or alcohol"), the milkshake and desserts
-  ("no meat or gelatin"), the side salad, the fish burger ("fried in its own
-  fryer, apart from the chicken") and the veggie burger, whose note says
+  ("no meat or gelatin"), the side salad, the fries and the fish burger (each
+  "fried in its own fryer, apart from the chicken") and the veggie burger, whose note says
   exactly how it is cooked: on its own side of the grill with its own spatula,
   but the grill is shared with the beef. The guest hears that and decides.
 - **Kosher:** nothing is reviewed, so nothing is claimed either way, and the
@@ -1075,7 +1077,10 @@ pointing at `check_diet`.
 The first version had only two levels, so an item with no entry read as "not
 suitable": a caller with fries and a coffee was told the coffee wasn't suitable
 for halal, and offered a fish burger for the fries. The
-`asks_if_they_are_halal_with_fries_and_coffee` eval now checks that call.
+`asks_if_they_are_halal_with_fries_and_coffee` eval now checks that call. The
+fries were also fried in the chicken's oil then; the kitchen now gives them a
+fryer of their own, like the fish burger, so they are halal-suitable and, plain,
+vegan, with nothing picked up from the batter.
 
 **Mid-order swaps never drop an item silently.** "The fish burger *instead*" is
 the guest's say-so, so `replace_item` swaps the line in one step: the line keeps
