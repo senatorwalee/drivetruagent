@@ -66,23 +66,26 @@ export function HowItWorks() {
   )
 }
 
-/** A draft in the builder's voice, to be rewritten in their own words. */
+/** Why Frontdesk exists, in the builder's words. */
 export function WhyIBuiltThis() {
   return (
     <section className={styles.section} aria-labelledby="why-title">
       <p className={styles.eyebrow}>Why I built this</p>
       <h2 id="why-title" className={styles.sectionTitle}>
-        The model does the talking. The code decides.
+        So the cook can stay in the kitchen.
       </h2>
       <div className={styles.letter}>
         <p>
-          I wanted to understand how a voice agent really works, so I built one without an agent framework: the loop, the
-          tools and the rules are all plain code you can read.
+          I built Frontdesk for a friend who is opening his own small restaurant. He makes every order himself, and he also
+          has to answer the phone and take the orders. At the busiest times of day, that is too much for one person.
         </p>
         <p>
-          A drive-through is a hard place to test that. Guests change their minds, talk over each other and ask for things
-          that aren’t on the menu, and every mistake is a wrong order. Frontdesk keeps the conversation natural and the
-          decisions in code.
+          Frontdesk takes that part off his hands. It answers guests, takes and checks their orders, and passes anything
+          unusual to him with the whole conversation, so he can keep his attention on the food.
+        </p>
+        <p>
+          It is made for small and mid-size restaurants like his, where the team is small and the budget is tight: each
+          conversation costs a few cents.
         </p>
         <p className={styles.signature}>Olawale Tijani · built Frontdesk</p>
       </div>

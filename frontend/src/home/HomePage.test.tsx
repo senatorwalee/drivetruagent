@@ -152,7 +152,7 @@ describe('the two home page designs', () => {
       'The agent takes the order',
       'The code checks every step',
     ])
-    expect(screen.getByRole('region', { name: /The model does the talking/ })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /So the cook can stay in the kitchen/ })).toBeInTheDocument()
     expect(screen.getByText('What happens when it mishears?')).toBeInTheDocument()
     // The cards are still there.
     expect(screen.getByRole('list', { name: 'Parts of Frontdesk' })).toBeInTheDocument()
