@@ -27,6 +27,21 @@ SCENARIOS: tuple[Scenario, ...] = (
         must_use=ORDERING_TOOLS,
     ),
     Scenario(
+        name="ok_is_not_a_choice",
+        # Asked which flavour, the customer only says "OK". On a speakerphone
+        # the agent once took that as vanilla. It must ask again, naming the
+        # flavours, and never add a milkshake nobody chose.
+        customer=(
+            "Can I get a large milkshake?",
+            "OK.",
+            "Sure.",
+        ),
+        final_state=SessionState.GREETING,
+        lines=(),
+        must_say_one_of=("chocolate",),
+        must_not_use=frozenset({"submit_order"}),
+    ),
+    Scenario(
         name="correction_mid_order",
         # Changes of mind must edit the existing lines, not add new ones.
         customer=(
