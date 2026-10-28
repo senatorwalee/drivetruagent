@@ -173,6 +173,24 @@ def test_a_withheld_message_is_not_repeated_to_the_model() -> None:
     ]
 
 
+def test_a_line_the_customer_talked_over_is_marked_as_cut_off() -> None:
+    log = Log()
+    log._add(
+        AgentEventKind.ASSISTANT_MESSAGE, {"text": "Your total is", "response_id": "r1"}
+    )
+    log._add(AgentEventKind.MODEL_CALL, {"response_id": "r1", "status": "cancelled"})
+    log._add(
+        AgentEventKind.ASSISTANT_MESSAGE,
+        {"text": "Anything else?", "response_id": "r2"},
+    )
+    log._add(AgentEventKind.MODEL_CALL, {"response_id": "r2", "status": "completed"})
+
+    assert transcript_of(log.events) == [
+        "Agent: Your total is [cut off]",
+        "Agent: Anything else?",
+    ]
+
+
 def test_the_transcript_keeps_the_most_recent_lines_and_clips_long_ones() -> None:
     log = Log()
     for number in range(5):

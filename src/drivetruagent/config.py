@@ -95,6 +95,13 @@ class Settings(BaseSettings):
     voice_model: str = "gpt-realtime-2.1-mini"
     voice_name: str = "marin"
     voice_transcription_model: str = "gpt-4o-mini-transcribe"
+    # Tuning for the room. The defaults suit a speakerphone; see
+    # VoiceSettings in agent/voice.py for what each one does.
+    voice_noise_reduction: Literal["near_field", "far_field", "off"] = "far_field"
+    voice_turn_detection: Literal["semantic", "server"] = "semantic"
+    voice_eagerness: Literal["low", "medium", "high", "auto"] = "low"
+    voice_vad_threshold: float = Field(default=0.6, ge=0, le=1)
+    voice_interruptions: bool = True
     # Google's Gemini API has a free tier. See agent/gemini_model.py.
     gemini_api_key: SecretStr | None = None
     gemini_text_model: str = "gemini-2.5-flash-lite"
@@ -197,6 +204,13 @@ class Settings(BaseSettings):
             model=self.voice_model,
             voice=self.voice_name,
             transcription_model=self.voice_transcription_model,
+            noise_reduction=None
+            if self.voice_noise_reduction == "off"
+            else self.voice_noise_reduction,
+            turn_detection=self.voice_turn_detection,
+            eagerness=self.voice_eagerness,
+            vad_threshold=self.voice_vad_threshold,
+            interruptions=self.voice_interruptions,
         )
 
     @property
