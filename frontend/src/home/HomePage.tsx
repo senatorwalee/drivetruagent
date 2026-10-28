@@ -51,7 +51,10 @@ export function HomePage() {
 
       <main className={styles.main}>
         <section className={styles.hero} aria-labelledby="home-title">
-          <FrontdeskMark className={styles.heroMark} />
+          <p className={styles.logo}>
+            <FrontdeskMark className={styles.logoMark} />
+            Frontdesk
+          </p>
           <h1 id="home-title" className={styles.title}>
             The agent takes the order.
             <br />

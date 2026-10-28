@@ -58,9 +58,24 @@
   max-width: 760px;
 }
 
-.heroMark {
-  width: 48px;
-  height: 48px;
+/* The logo: the mark beside the name, as drawn for the brand. */
+.logo {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 40px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.035em;
+}
+
+.logoMark {
+  width: 60px;
+  height: 60px;
+  flex: none;
+  /* The drawing starts 8/64 in; line its counter up with the headline. */
+  margin-left: -7.5px;
 }
 
 .title {
