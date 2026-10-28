@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { api, type WebCall } from '../api/client'
-import { IDLE, VoiceCall, type VoiceState } from '../voice/voiceCall'
+import { IDLE, MICROPHONE, VoiceCall, type VoiceState } from '../voice/voiceCall'
 import { describeLineProblem } from './words'
 
 /** The browser parts a call needs. Tests pass stand-ins; jsdom has none. */
@@ -13,7 +13,7 @@ export interface PhoneParts {
 }
 
 const BROWSER: PhoneParts = {
-  getMicrophone: () => navigator.mediaDevices.getUserMedia({ audio: true }),
+  getMicrophone: () => navigator.mediaDevices.getUserMedia(MICROPHONE),
   createConnection: () => new RTCPeerConnection(),
   createSpeaker: () => Object.assign(new Audio(), { autoplay: true }),
 }

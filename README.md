@@ -50,6 +50,7 @@ built piece by piece.
 | 24 | One look across the app, the Frontdesk name, and a home page at `/`; the live screen moves to `/live` | Done; checked in a browser |
 | 25 | Session summaries: a note for staff after each session, the model's words checked against the conversation, at `/conversations` | Done; evals pass against the real model; checked in a browser |
 | 26 | Cost readout: what each conversation, order and day cost in model usage, from logged tokens and a dated price list | Done; checked in a browser |
+| 27 | Speakerphone calls: echo cancellation, noise reduction, a language hint, cut-off lines marked, and "OK" is not a choice | Done; evals pass against the real model |
 | Later | Demo polish: French review, demo script | Planned |
 
 ## Stack
@@ -337,6 +338,34 @@ stopping the timers. Verified with a real call through the page, using a
 recorded voice as the customer. See `agent/voice.py`, `api/voice.py` and
 `frontend/src/voice/`.
 
+### On a speakerphone
+
+A demo on a phone's loudspeaker is the hard case: the agent's own voice comes
+back into the microphone. On the first such call it took itself for the
+customer and stopped mid-sentence, its echo was written down as words in
+Chinese and Korean, and once it took an "OK" as a choice of flavour. What
+handles it now:
+
+- **The browser is asked for echo cancellation**, noise suppression and
+  automatic volume, not just "a microphone".
+- **OpenAI cleans the incoming audio** (`VOICE_NOISE_REDUCTION=far_field`), and
+  the turn detector waits for a finished thought (`VOICE_EAGERNESS=low`).
+- **The transcriber is told to expect English or Canadian French**, so noise is
+  no longer written down in other languages; a line with no English or French
+  letters in it is kept in the record but never judged by the guardrail.
+- **A line the customer talked over is marked "(cut off)"** on the live screen
+  and in the transcript a summary is written from: the words on screen are
+  what was generated, not all of what was heard. Each spoken line and each
+  model call carry the response they belong to, so this is read from the log,
+  never rewritten in it.
+- **"OK" is not a choice.** Asked which flavour, an answer that names none is
+  asked again; the `ok_is_not_a_choice` eval checks it.
+
+If it still interrupts itself in a loud room, `VOICE_TURN_DETECTION=server`
+with `VOICE_VAD_THRESHOLD=0.8` ignores quieter sound, and
+`VOICE_INTERRUPTIONS=false` lets every sentence finish (the customer can then
+not talk over it). A phone at the ear or a headset wants `near_field`.
+
 ### Running it on Gemini, for free
 
 Google's Gemini API has a free tier. Get a key from Google AI Studio, then in
@@ -453,6 +482,7 @@ order, the session state and the tools used, never at the agent's wording.
 | `asks_about_the_fryer_oil` | "Do you fry in peanut oil?" is answered from the approved documents, then the order |
 | `asks_if_the_veggie_burger_is_vegan` | Answered from the documents (not as served), never "it's vegan" |
 | `asks_for_something_not_on_the_menu` | "Oat milk shake": says it isn't offered and suggests drinks without milk, never the regular shake |
+| `ok_is_not_a_choice` | Asked which flavour, "OK" and "Sure" get the flavours named again; no milkshake is added |
 | `gets_offered_something_similar` | "Spicy nuggets": nuggets don't come spicy, the chicken burger does, and the guest takes it |
 
 Every scenario is played on a fixed Monday, so a total never depends on which

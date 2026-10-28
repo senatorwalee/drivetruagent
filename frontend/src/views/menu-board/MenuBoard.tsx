@@ -1,7 +1,7 @@
 import { HomeLink } from '../../app/HomeLink'
 import { INSIGHTS_PATH, MENU_PATH, STAFF_PATH } from '../../app/navigation'
 import { PageLink } from '../../app/PageLink'
-import { clock, emptyConversationHint, progressSteps } from '../../session/presentation'
+import { clock, emptyConversationHint, progressSteps, spokenText } from '../../session/presentation'
 import type { LiveSession } from '../../session/useLiveSession'
 import { CheckIcon, PauseIcon, PlayIcon } from '../shared/icons'
 import { MicButton } from '../shared/MicButton'
@@ -99,7 +99,7 @@ function Conversation({ live }: { live: LiveSession }) {
     <div aria-label="Conversation" aria-live="polite" className={styles.conversation}>
       {lines.map((line, index) => (
         <p key={line.id} className={styles.bubble} data-speaker={line.speaker} data-latest={index === lines.length - 1}>
-          {line.text}
+          {spokenText(line)}
         </p>
       ))}
     </div>

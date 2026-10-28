@@ -5,6 +5,7 @@ import {
   deriveAgentState,
   discountLabel,
   modelCost,
+  spokenText,
   isFinal,
   itemsLabel,
   money,
@@ -231,5 +232,12 @@ describe('modelCost', () => {
   it('says when part of it is an estimate, or has no price', () => {
     expect(modelCost(cost(18_340, 0, 1))).toBe('≈1.8¢')
     expect(modelCost(cost(18_340, 2))).toBe('1.8¢ + 2 unpriced')
+  })
+})
+
+describe('spokenText', () => {
+  it('says when a line was cut off', () => {
+    expect(spokenText({ text: 'Your total is' })).toBe('Your total is')
+    expect(spokenText({ text: 'Your total is', cutOff: true })).toBe('Your total is … (cut off)')
   })
 })

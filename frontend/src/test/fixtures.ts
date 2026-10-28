@@ -38,6 +38,10 @@ export const guardrail = (verdict: string, action: string, strikes: number, sour
   })
 export const said = (text: string) => event('user_message', { text })
 export const replied = (text: string) => event('assistant_message', { text })
+/** On a call: a line the agent said, and how its response ended. */
+export const repliedOnCall = (text: string, responseId: string) => event('assistant_message', { text, response_id: responseId })
+export const responseEnded = (responseId: string, status: 'completed' | 'cancelled') =>
+  event('model_call', { model: 'gpt-realtime-2.1-mini', transport: 'realtime', response_id: responseId, status })
 export const modelCall = () => event('model_call', { model: 'demo-script', latency_ms: 3, tool_calls: 1 })
 
 /** A tool call and its result, as the two events the backend records. */
