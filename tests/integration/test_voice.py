@@ -40,8 +40,9 @@ from openai.types.realtime.realtime_response_usage import RealtimeResponseUsage
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from drivetruagent.agent import events, timekeeper
-from drivetruagent.agent.guard import BLOCKED, ENDED, Guard
+from drivetruagent.agent.guard import BLOCKED, ENDED, Guard, ModelClassifier
 from drivetruagent.agent.loop import AgentConfig
+from drivetruagent.agent.scripted import ScriptedModel
 from drivetruagent.agent.tools import TOOL_DEFINITIONS
 from drivetruagent.agent.voice import (
     TIMER_RESPONSE,
@@ -92,6 +93,8 @@ class FakeCall:
         self.said: list[str] = []
         self.hung_up = 0
         self.transferred: list[str] = []
+        # Everything asked of the call, in order, to check what came first.
+        self.actions: list[str] = []
 
     async def send_function_output(self, call_id: str, output: str) -> None:
         self.outputs.append((call_id, json.loads(output)))
@@ -101,12 +104,21 @@ class FakeCall:
 
     async def say(self, sentence: str) -> None:
         self.said.append(sentence)
+        self.actions.append(f"say: {sentence}")
 
     async def hang_up(self) -> None:
         self.hung_up += 1
+        self.actions.append("hang up")
 
     async def transfer(self, target_uri: str) -> None:
         self.transferred.append(target_uri)
+        self.actions.append(f"transfer: {target_uri}")
+
+    async def stop_talking(self) -> None:
+        self.actions.append("stop talking")
+
+    async def stop_listening(self) -> None:
+        self.actions.append("stop listening")
 
 
 class Pauses:
@@ -213,12 +225,13 @@ def response(
     *,
     output: list[dict[str, Any]] | None = None,
     metadata: dict[str, str] | None = None,
+    status: str = "completed",
 ) -> RealtimeResponse:
     return RealtimeResponse.model_validate(
         {
             "id": response_id,
             "object": "realtime.response",
-            "status": "completed",
+            "status": status,
             "output": output or [],
             "metadata": metadata,
             "usage": RealtimeResponseUsage.model_validate(
@@ -257,11 +270,12 @@ def finished(
     *,
     output: list[dict[str, Any]] | None = None,
     metadata: dict[str, str] | None = None,
+    status: str = "completed",
 ) -> ResponseDoneEvent:
     return ResponseDoneEvent(
         type="response.done",
         event_id="e",
-        response=response(response_id, output=output, metadata=metadata),
+        response=response(response_id, output=output, metadata=metadata, status=status),
     )
 
 
@@ -410,6 +424,7 @@ async def test_each_response_is_recorded_with_its_usage(
     assert event.payload == {
         "model": "gpt-realtime-2.1-mini",
         "transport": "realtime",
+        "response_id": "resp_9",
         "status": "completed",
         "input_tokens": 1500,
         "output_tokens": 80,
@@ -421,6 +436,29 @@ async def test_each_response_is_recorded_with_its_usage(
         "output_audio_tokens": 60,
         "tool_calls": 0,
     }
+
+
+async def test_a_line_talked_over_can_be_told_from_one_heard_in_full(
+    bridge: VoiceBridge, db_session: AsyncSession, session_id: uuid.UUID
+) -> None:
+    await bridge.handle(says("Your total is", response_id="resp_cut"))
+    await bridge.handle(finished("resp_cut", status="cancelled"))
+    await bridge.handle(says("Anything else?", response_id="resp_whole"))
+    await bridge.handle(finished("resp_whole"))
+
+    logged_events = await events.load_events(db_session, session_id)
+    said = {
+        e.payload["text"]: e.payload["response_id"]
+        for e in logged_events
+        if e.kind is AgentEventKind.ASSISTANT_MESSAGE
+    }
+    statuses = {
+        e.payload["response_id"]: e.payload["status"]
+        for e in logged_events
+        if e.kind is AgentEventKind.MODEL_CALL
+    }
+    assert statuses[said["Your total is"]] == "cancelled"
+    assert statuses[said["Anything else?"]] == "completed"
 
 
 async def test_the_same_tool_call_delivered_twice_takes_effect_once(
@@ -682,6 +720,42 @@ async def test_with_no_staff_number_the_caller_is_told_they_will_be_called_back(
     assert (call.transferred, call.hung_up) == ([], 1)
 
 
+async def test_the_handoff_cuts_off_the_agent_and_stops_it_answering_first(
+    db_session: AsyncSession, session_id: uuid.UUID, call: FakeCall, pauses: Pauses
+) -> None:
+    """At the time limit the agent was mid-answer; the rest of that answer
+    played after the handoff sentence, and it could still answer back."""
+    bridge = phone_bridge(
+        db_session, session_id, call, pauses, callback_sentence="We'll call you back."
+    )
+    await bridge.start_watching_timers()
+    await hand_off_at_the_time_limit(db_session, session_id)
+
+    await bridge.check_timers()
+
+    assert call.actions == [
+        "stop listening",
+        "stop talking",
+        f"say: {timekeeper.HANDING_OFF[Language.EN]}",
+        "say: We'll call you back.",
+        "hang up",
+    ]
+
+
+async def test_the_third_insult_cuts_off_the_agent_before_the_goodbye(
+    guarded: VoiceBridge, call: FakeCall
+) -> None:
+    for _ in range(3):
+        await guarded.handle(heard("You're useless."))
+
+    assert call.actions[-4:] == [
+        "stop listening",
+        "stop talking",
+        f"say: {ENDED[Language.EN]}",
+        "hang up",
+    ]
+
+
 async def test_a_placed_phone_order_hangs_up_rather_than_transferring(
     db_session: AsyncSession, session_id: uuid.UUID, call: FakeCall, pauses: Pauses
 ) -> None:
@@ -787,6 +861,42 @@ async def test_ordinary_talk_on_a_call_is_left_to_the_model(
 
     assert call.said == []
     assert (await get_session(db_session, session_id)).abuse_strikes == 0
+
+
+async def test_noise_written_down_in_another_script_is_kept_but_never_judged(
+    call: FakeCall,
+    db_session: AsyncSession,
+    session_id: uuid.UUID,
+    pauses: Pauses,
+) -> None:
+    """On a speakerphone the agent's own voice came back as 意思。 and 아.,
+    and the classifier counted one as off topic."""
+    classifier_model = ScriptedModel([])
+    bridge = VoiceBridge(
+        session_id=session_id,
+        scope=lambda: borrowed(db_session),
+        call=call,
+        config=replace(
+            CONFIG, guard=Guard(classifier=ModelClassifier(classifier_model))
+        ),
+        model_name="gpt-realtime-2.1-mini",
+        sleep=pauses,
+    )
+
+    for noise in ("意思。", "아.", "ありがとう。"):
+        await bridge.handle(heard(noise))
+
+    assert classifier_model.requests == []
+    assert await logged(db_session, session_id) == [
+        ("user_message", "意思。"),
+        ("user_message", "아."),
+        ("user_message", "ありがとう。"),
+    ]
+    customer_session = await get_session(db_session, session_id)
+    assert (customer_session.abuse_strikes, customer_session.confusion_strikes) == (
+        0,
+        0,
+    )
 
 
 # --- Calls in progress ------------------------------------------------------
@@ -945,9 +1055,11 @@ async def test_the_call_is_set_up_like_the_text_agent(
     assert session["instructions"].startswith("You take orders at the drive-through")
     assert len(session["tools"]) == len(TOOL_DEFINITIONS)
     assert {"type", "name", "description", "parameters"} == set(session["tools"][0])
-    assert session["audio"]["input"]["transcription"] == {
-        "model": "gpt-4o-mini-transcribe"
-    }
+    heard = session["audio"]["input"]
+    assert heard["transcription"]["model"] == "gpt-4o-mini-transcribe"
+    # Set up for a speakerphone by default: cleaned audio, a patient ear.
+    assert heard["noise_reduction"] == {"type": "far_field"}
+    assert heard["turn_detection"]["eagerness"] == "low"
     assert session["audio"]["output"] == {"voice": "marin"}
 
 

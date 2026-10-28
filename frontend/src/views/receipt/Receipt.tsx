@@ -1,7 +1,7 @@
 import { HomeLink } from '../../app/HomeLink'
 import { INSIGHTS_PATH, MENU_PATH, STAFF_PATH } from '../../app/navigation'
 import { PageLink } from '../../app/PageLink'
-import { clock, emptyConversationHint, progressSteps } from '../../session/presentation'
+import { clock, emptyConversationHint, progressSteps, spokenText } from '../../session/presentation'
 import type { LiveSession } from '../../session/useLiveSession'
 import { MicButton } from '../shared/MicButton'
 import { ShopBoard } from '../shared/ShopBoard'
@@ -94,7 +94,7 @@ function Script({ live }: { live: LiveSession }) {
       {lines.map((line, index) => (
         <div key={line.id} className={styles.scriptLine} data-speaker={line.speaker} data-latest={index === lines.length - 1}>
           <span className={styles.speaker}>{line.speaker === 'agent' ? 'Agent' : 'Customer'}</span>
-          <p className={styles.spoken}>{line.text}</p>
+          <p className={styles.spoken}>{spokenText(line)}</p>
         </div>
       ))}
     </div>

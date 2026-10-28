@@ -27,6 +27,21 @@ SCENARIOS: tuple[Scenario, ...] = (
         must_use=ORDERING_TOOLS,
     ),
     Scenario(
+        name="ok_is_not_a_choice",
+        # Asked which flavour, the customer only says "OK". On a speakerphone
+        # the agent once took that as vanilla. It must ask again, naming the
+        # flavours, and never add a milkshake nobody chose.
+        customer=(
+            "Can I get a large milkshake?",
+            "OK.",
+            "Sure.",
+        ),
+        final_state=SessionState.GREETING,
+        lines=(),
+        must_say_one_of=("chocolate",),
+        must_not_use=frozenset({"submit_order"}),
+    ),
+    Scenario(
         name="correction_mid_order",
         # Changes of mind must edit the existing lines, not add new ones.
         customer=(
@@ -101,6 +116,29 @@ SCENARIOS: tuple[Scenario, ...] = (
         # The language is set in code from what the customer says, and checked
         # by `language` above, so the model need not call set_language.
         must_use=ORDERING_TOOLS,
+    ),
+    Scenario(
+        name="asks_why_it_got_a_combo",
+        # On a call, asked how the combo came about, the agent said the
+        # customer "didn't actually order a burger combo" and it "can't say
+        # which items triggered it". It must look the combo up and name the
+        # items in the cart that make it.
+        customer=(
+            "A veggie burger, small fries and a medium cola, please.",
+            "Wait, why did I get a discount? What makes it a combo?",
+            "Great, that's all.",
+            "Yes.",
+        ),
+        final_state=SessionState.SUBMITTED,
+        discount_cents=200,
+        must_use=frozenset({"get_todays_specials"}),
+        must_not_say=(
+            "didn't actually",
+            "did not actually",
+            "can't say",
+            # The model often writes a typographic apostrophe.
+            "can’t say",  # noqa: RUF001
+        ),
     ),
     Scenario(
         name="combo_taken_up",

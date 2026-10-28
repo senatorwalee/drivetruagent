@@ -1,7 +1,7 @@
 import { HomeLink } from '../../app/HomeLink'
 import { CALLS_PATH, INSIGHTS_PATH, LIVE_PATH, MENU_PATH, STAFF_PATH } from '../../app/navigation'
 import { PageLink } from '../../app/PageLink'
-import { clock, emptyConversationHint, modelCost } from '../../session/presentation'
+import { clock, emptyConversationHint, modelCost, spokenText } from '../../session/presentation'
 import type { LiveSession } from '../../session/useLiveSession'
 import { MicButton } from '../shared/MicButton'
 import { ShopBoard } from '../shared/ShopBoard'
@@ -105,7 +105,7 @@ function TranscriptLog({ live }: { live: LiveSession }) {
       {lines.map((line, index) => (
         <div key={line.id} className={styles.transcriptLine} data-speaker={line.speaker} data-latest={index === lines.length - 1}>
           <span className={styles.speaker}>{line.speaker === 'agent' ? 'agent' : 'cust'}</span>
-          <p className={styles.spoken}>{line.text}</p>
+          <p className={styles.spoken}>{spokenText(line)}</p>
         </div>
       ))}
     </div>

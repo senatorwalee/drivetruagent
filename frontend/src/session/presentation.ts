@@ -22,6 +22,11 @@ export function modelCost(cost: { micro_usd: number; unpriced_calls: number; est
   return `${about}${amount}${unpriced}`
 }
 
+/** A line as it was said: one the customer talked over says so. */
+export function spokenText(line: { text: string; cutOff?: boolean }): string {
+  return line.cutOff ? `${line.text} … (cut off)` : line.text
+}
+
 /** Seconds as m:ss, the way a timer reads. */
 export function clock(seconds: number): string {
   const whole = Math.max(0, Math.floor(seconds))

@@ -7,7 +7,8 @@ import { CALLERS_PATH, LIVE_PATH, PICKUPS_PATH, STAFF_PATH } from '../app/naviga
 import { PageLink } from '../app/PageLink'
 import list from '../callers/Callers.module.css'
 import { ago, describeProblem } from '../callers/words'
-import { modelCost, money } from '../session/presentation'
+import { modelCost, money, spokenText } from '../session/presentation'
+import { buildTimeline } from '../session/timeline'
 import { useNow } from '../session/useNow'
 import staff from '../staff/Staff.module.css'
 import styles from './Conversations.module.css'
@@ -185,6 +186,15 @@ function Row({ summary, nowMs, open, onToggle }: RowProps) {
 function Details({ id, sessionId }: { id: string; sessionId: string }) {
   const queryClient = useQueryClient()
   const detail = useQuery({ queryKey: ['summary', sessionId], queryFn: () => api.summary(sessionId), retry: false })
+  // The whole conversation, from the event log. The session is over, so it
+  // never changes and is fetched once.
+  const logged = useQuery({
+    queryKey: ['session', sessionId, 'events'],
+    queryFn: () => api.events(sessionId),
+    staleTime: Infinity,
+    retry: false,
+  })
+  const transcript = logged.data ? buildTimeline(logged.data).transcript : []
   const rewriting = useMutation({
     mutationFn: () => api.rewriteSummary(sessionId),
     onSuccess: (written) => {
@@ -225,6 +235,19 @@ function Details({ id, sessionId }: { id: string; sessionId: string }) {
           </div>
         ))}
       </dl>
+      {transcript.length > 0 && (
+        <section className={styles.conversation} aria-label="The whole conversation">
+          <h4 className={styles.conversationTitle}>The whole conversation</h4>
+          <ol className={styles.lines}>
+            {transcript.map((line) => (
+              <li key={line.id} className={styles.line} data-speaker={line.speaker}>
+                <span className={styles.speaker}>{line.speaker === 'agent' ? 'Agent' : 'Customer'}</span>
+                <p className={styles.spoken}>{spokenText(line)}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
       {detail.data.summary_cost && <p className={list.rowMeta}>Writing this note cost {modelCost(detail.data.summary_cost)}.</p>}
       {whyNot && <p className={list.rowMeta}>{whyNot}</p>}
       {problem && (

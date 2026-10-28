@@ -39,6 +39,15 @@ export interface VoiceCallDeps {
   speaker: HTMLAudioElement
 }
 
+/**
+ * What the browser is asked for. Echo cancellation matters most: on a
+ * speakerphone, without it the agent hears its own voice, takes it for the
+ * customer and stops mid-sentence.
+ */
+export const MICROPHONE: MediaStreamConstraints = {
+  audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+}
+
 export const IDLE: VoiceState = { status: 'idle', customerSpeaking: false, agentSpeaking: false, problem: null }
 
 /** The name OpenAI expects for the events channel. */

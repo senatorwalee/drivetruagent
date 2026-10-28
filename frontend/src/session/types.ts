@@ -17,6 +17,8 @@ export interface TranscriptLine {
   id: number
   speaker: 'customer' | 'agent'
   text: string
+  /** On a call, the customer (or the room) was heard over this line, so not all of it was said. */
+  cutOff?: boolean
 }
 
 export interface Decision {

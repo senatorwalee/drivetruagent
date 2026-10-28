@@ -34,15 +34,28 @@ export function buildTimeline(events: readonly AgentEvent[]): Timeline {
   const calls = new Map<string, ToolCallPayload>()
   let pending: PendingItem | null = null
   let order: PlacedOrder | null = null
+  // On a call: which response each agent line came from, and which
+  // responses were cancelled because someone was heard over them.
+  const lineResponses = new Map<TranscriptLine, string>()
+  const cancelled = new Set<string>()
 
   for (const event of events) {
     switch (event.kind) {
       case 'user_message':
         transcript.push({ id: event.seq, speaker: 'customer', text: textOf(event) })
         break
-      case 'assistant_message':
-        transcript.push({ id: event.seq, speaker: 'agent', text: textOf(event) })
+      case 'assistant_message': {
+        const line: TranscriptLine = { id: event.seq, speaker: 'agent', text: textOf(event) }
+        const responseId = event.payload.response_id
+        if (typeof responseId === 'string') lineResponses.set(line, responseId)
+        transcript.push(line)
         break
+      }
+      case 'model_call': {
+        const { response_id: responseId, status } = event.payload
+        if (status === 'cancelled' && typeof responseId === 'string') cancelled.add(responseId)
+        break
+      }
       case 'tool_call': {
         const call = event.payload as unknown as ToolCallPayload
         calls.set(call.call_id, call)
@@ -85,6 +98,9 @@ export function buildTimeline(events: readonly AgentEvent[]): Timeline {
     }
   }
 
+  for (const [line, responseId] of lineResponses) {
+    if (cancelled.has(responseId)) line.cutOff = true
+  }
   return { transcript, decisions, pending, order }
 }
 

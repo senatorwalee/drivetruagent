@@ -190,6 +190,7 @@ def transcript_of(
         and event.payload.get("withheld")
         and event.turn_id is not None
     }
+    cut_off = interrupted_responses(events)
     lines: list[str] = []
     for event in events:
         if event.kind is AgentEventKind.USER_MESSAGE:
@@ -200,8 +201,27 @@ def transcript_of(
             )
             lines.append(f"Customer: {_clip(text)}")
         elif event.kind is AgentEventKind.ASSISTANT_MESSAGE:
-            lines.append(f"Agent: {_clip(str(event.payload.get('text', '')))}")
+            said = _clip(str(event.payload.get("text", "")))
+            if event.payload.get("response_id") in cut_off:
+                said = f"{said} {CUT_OFF}"
+            lines.append(f"Agent: {said}")
     return lines[-limit:]
+
+
+# Marks an agent line the customer talked over, so it was not all heard.
+CUT_OFF = "[cut off]"
+
+
+def interrupted_responses(events: Sequence[LoggedEvent]) -> set[str]:
+    """The voice responses that were cancelled part way: the customer, or
+    the room, was heard over them."""
+    return {
+        str(event.payload["response_id"])
+        for event in events
+        if event.kind is AgentEventKind.MODEL_CALL
+        and event.payload.get("status") == "cancelled"
+        and event.payload.get("response_id")
+    }
 
 
 # --- Code's own words -------------------------------------------------------

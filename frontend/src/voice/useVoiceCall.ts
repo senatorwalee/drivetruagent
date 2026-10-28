@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { api } from '../api/client'
-import { IDLE, VoiceCall, type VoiceState } from './voiceCall'
+import { IDLE, MICROPHONE, VoiceCall, type VoiceState } from './voiceCall'
 
 export interface Voice extends VoiceState {
   /** Voice can be used: the backend has a key for it and the session is open. */
@@ -24,7 +24,7 @@ interface Options {
 
 function browserDeps(sessionId: string, speaker: HTMLAudioElement) {
   return {
-    getMicrophone: () => navigator.mediaDevices.getUserMedia({ audio: true }),
+    getMicrophone: () => navigator.mediaDevices.getUserMedia(MICROPHONE),
     createConnection: () => new RTCPeerConnection(),
     sendOffer: (sdp: string) => api.startVoice(sessionId, sdp),
     hangUp: () => api.endVoice(sessionId),

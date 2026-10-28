@@ -1,6 +1,17 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { eventsUpToHeldCookies, guardrail, replied, resetSeq, said, size, timer, toolRound } from '../test/fixtures'
+import {
+  eventsUpToHeldCookies,
+  guardrail,
+  replied,
+  repliedOnCall,
+  resetSeq,
+  responseEnded,
+  said,
+  size,
+  timer,
+  toolRound,
+} from '../test/fixtures'
 import { buildTimeline, summarise } from './timeline'
 
 beforeEach(resetSeq)
@@ -18,6 +29,17 @@ describe('buildTimeline', () => {
       ['agent', 'Welcome!'],
       ['customer', 'A cookie'],
     ])
+  })
+
+  it('marks a line the customer talked over on a call as cut off', () => {
+    const { transcript } = buildTimeline([
+      repliedOnCall('Today’s special is onion rings and', 'r1'),
+      responseEnded('r1', 'cancelled'),
+      repliedOnCall('Anything else?', 'r2'),
+      responseEnded('r2', 'completed'),
+    ])
+
+    expect(transcript.map((line) => line.cutOff ?? false)).toEqual([true, false])
   })
 
   it('pairs each tool result with its call and reads the decision', () => {

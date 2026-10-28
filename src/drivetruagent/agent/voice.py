@@ -25,6 +25,7 @@ screen, the staff handoff package and the timers work as they do for text.
 import asyncio
 import json
 import logging
+import re
 import uuid
 from collections.abc import (
     AsyncIterator,
@@ -37,11 +38,13 @@ from collections.abc import (
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 import openai
 from openai import AsyncOpenAI
 from openai.types.realtime import (
+    RealtimeAudioConfigInputParam,
+    RealtimeAudioInputTurnDetectionParam,
     RealtimeServerEvent,
     RealtimeSessionCreateRequestParam,
 )
@@ -83,6 +86,15 @@ TIMER_POLL_SECONDS = 1.0
 type SessionScope = Callable[[], AbstractAsyncContextManager[AsyncSession]]
 
 
+# Tells the transcriber what to expect. Without it, room noise or the
+# agent's own voice from a speakerphone came back as words in Chinese or
+# Korean that nobody said.
+TRANSCRIPTION_PROMPT = (
+    "A customer ordering food at a burger restaurant's drive-through or by "
+    "phone, in English or Canadian French."
+)
+
+
 @dataclass(frozen=True)
 class VoiceSettings:
     model: str = "gpt-realtime-2.1-mini"
@@ -90,6 +102,20 @@ class VoiceSettings:
     # Writes down what the customer said. The model answers the audio, not
     # this text; the text is the record.
     transcription_model: str = "gpt-4o-mini-transcribe"
+    # Cleans the incoming audio before the model hears it: "far_field" for a
+    # speakerphone or a laptop, "near_field" for a phone held to the ear or a
+    # headset. None: off.
+    noise_reduction: Literal["near_field", "far_field"] | None = "far_field"
+    # How the end of the customer's turn is found. "semantic" waits for a
+    # finished thought ("eagerness" low waits longest); "server" goes by
+    # loudness, and a higher threshold ignores quieter sound, such as the
+    # agent's own voice coming back from a speaker.
+    turn_detection: Literal["semantic", "server"] = "semantic"
+    eagerness: Literal["low", "medium", "high", "auto"] = "low"
+    vad_threshold: float = 0.6
+    # The customer may talk over the agent and it stops. On a speaker that
+    # echoes badly, False lets every sentence finish.
+    interruptions: bool = True
 
 
 def session_config(
@@ -102,12 +128,7 @@ def session_config(
         "instructions": instructions,
         "output_modalities": ["audio"],
         "audio": {
-            "input": {
-                "transcription": {"model": settings.transcription_model},
-                # Waits for the customer to finish a thought, not just a
-                # pause for breath, before answering.
-                "turn_detection": {"type": "semantic_vad"},
-            },
+            "input": _audio_input(settings),
             "output": {"voice": settings.voice},
         },
         "tools": [
@@ -121,6 +142,34 @@ def session_config(
         ],
         "tool_choice": "auto",
     }
+
+
+def _audio_input(settings: VoiceSettings) -> RealtimeAudioConfigInputParam:
+    turn_detection: RealtimeAudioInputTurnDetectionParam
+    if settings.turn_detection == "server":
+        turn_detection = {
+            "type": "server_vad",
+            "threshold": settings.vad_threshold,
+            "interrupt_response": settings.interruptions,
+        }
+    else:
+        # Waits for the customer to finish a thought, not just a pause for
+        # breath, before answering.
+        turn_detection = {
+            "type": "semantic_vad",
+            "eagerness": settings.eagerness,
+            "interrupt_response": settings.interruptions,
+        }
+    audio: RealtimeAudioConfigInputParam = {
+        "transcription": {
+            "model": settings.transcription_model,
+            "prompt": TRANSCRIPTION_PROMPT,
+        },
+        "turn_detection": turn_detection,
+    }
+    if settings.noise_reduction is not None:
+        audio["noise_reduction"] = {"type": settings.noise_reduction}
+    return audio
 
 
 def refusal_config(settings: VoiceSettings) -> RealtimeSessionCreateRequestParam:
@@ -155,6 +204,15 @@ class CallControl(Protocol):
 
     async def transfer(self, target_uri: str) -> None:
         """Pass a phone call to another number, such as tel:+14165550100."""
+        ...
+
+    async def stop_talking(self) -> None:
+        """Stop whatever the agent is saying, including audio already made
+        and still being played to the caller."""
+        ...
+
+    async def stop_listening(self) -> None:
+        """From now on, nothing the caller says starts an answer."""
         ...
 
 
@@ -231,7 +289,7 @@ class VoiceBridge:
             )
         elif event.type == "response.output_audio_transcript.done":
             if not self._is_timer_response(event.response_id):
-                await self._agent_said(event.transcript)
+                await self._agent_said(event.transcript, event.response_id)
         elif event.type == "response.done":
             await self._response_finished(event.response)
         elif event.type == "error":
@@ -260,6 +318,9 @@ class VoiceBridge:
             # results come back in it.
             await follow_language(db, self.session_id, text)
             await db.commit()
+        if _just_noise(text):
+            # Kept in the record, but not judged: nobody said it.
+            return
         await self._check(text)
 
     async def _check(self, text: str) -> None:
@@ -282,8 +343,11 @@ class VoiceBridge:
             await db.commit()
         if outcome.reply is None:
             return
+        ending = outcome.action in (GuardAction.TERMINATE, GuardAction.HAND_OFF)
+        if ending:
+            await self._wind_down()
         await self._call.say(outcome.reply)
-        if outcome.action in (GuardAction.TERMINATE, GuardAction.HAND_OFF):
+        if ending:
             await self._sleep(speaking_seconds(outcome.reply))
             await self._end_call(handed_off=outcome.action is GuardAction.HAND_OFF)
 
@@ -315,13 +379,21 @@ class VoiceBridge:
             call_id, json.dumps(result, ensure_ascii=False)
         )
 
-    async def _agent_said(self, transcript: str) -> None:
+    async def _agent_said(self, transcript: str, response_id: str) -> None:
         text = transcript.strip()
         if not text:
             return
         async with self._scope() as db:
-            await events.record_message(
-                db, self.session_id, self._turn_id, AssistantMessage(text)
+            # With the response it came from: if the customer talked over it,
+            # that response's model_call says "cancelled", and readers mark
+            # the line as cut off. The words are what was written, not
+            # necessarily all that was heard.
+            await events.record(
+                db,
+                self.session_id,
+                self._turn_id,
+                AgentEventKind.ASSISTANT_MESSAGE,
+                {"text": text, "response_id": response_id},
             )
             await db.commit()
 
@@ -357,6 +429,7 @@ class VoiceBridge:
                 {
                     "model": self._model_name,
                     "transport": "realtime",
+                    "response_id": response.id,
                     "status": response.status,
                     "input_tokens": usage.input_tokens if usage else None,
                     "output_tokens": usage.output_tokens if usage else None,
@@ -417,10 +490,21 @@ class VoiceBridge:
             if action == "abandon":
                 await self._end_call()
             elif sentence:
+                if action == "hand_off":
+                    # The agent may be part way through an answer: the
+                    # handoff replaces it, and nothing said now is answered.
+                    await self._wind_down()
                 await self._call.say(sentence)
                 if action == "hand_off":
                     await self._sleep(speaking_seconds(sentence))
                     await self._end_call(handed_off=True)
+
+    async def _wind_down(self) -> None:
+        """Before the call's last fixed sentence: stop answering, and stop
+        whatever is still being said, so the sentence is not talked over or
+        followed by the rest of an earlier answer."""
+        await self._call.stop_listening()
+        await self._call.stop_talking()
 
     async def _end_call(self, *, handed_off: bool = False) -> None:
         """Hang up; or, when a person is taking over a phone call, put the
@@ -609,6 +693,18 @@ class OpenAICall:
     async def transfer(self, target_uri: str) -> None:
         await self._client.realtime.calls.refer(self._call_id, target_uri=target_uri)
 
+    async def stop_talking(self) -> None:
+        # Cancelling stops an answer still being made; clearing the output
+        # buffer stops one already made but still playing (a call through
+        # the browser; on a phone line the call ignores it).
+        await self._connection.response.cancel()
+        await self._connection.output_audio_buffer.clear()
+
+    async def stop_listening(self) -> None:
+        await self._connection.session.update(
+            session={"type": "realtime", "audio": {"input": {"turn_detection": None}}}
+        )
+
 
 async def run_call(
     client: AsyncOpenAI,
@@ -774,3 +870,15 @@ def _token_details(usage: Any) -> dict[str, int | None]:
         "output_text_tokens": getattr(made, "text_tokens", None),
         "output_audio_tokens": getattr(made, "audio_tokens", None),
     }
+
+
+# A letter of English or French, accented or not.
+_LATIN_LETTER = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿŒœ]")
+
+
+def _just_noise(text: str) -> bool:
+    """True if nothing in a transcript could be English or French. On a
+    speakerphone, the agent's own voice or the room sometimes comes back
+    written down in another script ("意思。"); it was never the customer
+    speaking, so it must not count as a guardrail strike."""
+    return _LATIN_LETTER.search(text) is None
