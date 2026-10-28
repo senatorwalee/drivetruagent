@@ -558,9 +558,17 @@ def test_nothing_on_the_real_menu_is_kosher_or_certified() -> None:
     assert DietStatus.CERTIFIED not in {status for _, status in entries}
 
 
-def test_the_real_menus_meat_is_not_listed_for_halal() -> None:
-    for code in ("classic_burger", "chicken_burger", "chicken_nuggets"):
-        assert real_item(code).diets == {}, code
+def test_the_real_menus_meat_and_what_shares_its_oil_are_not_halal() -> None:
+    for code in ("classic_burger", "chicken_burger", "chicken_nuggets", "fries"):
+        assert real_item(code).diets[Diet.HALAL].status is DietStatus.NOT_SUITABLE, code
+    assert "oil" in real_item("fries").diets[Diet.HALAL].note.en
+
+
+def test_every_item_on_the_real_menu_is_reviewed_for_halal() -> None:
+    loaded = load_menu(MENU_PATH)
+    for category in loaded.categories:
+        for item in category.items:
+            assert Diet.HALAL in item.diets, item.code
 
 
 def test_an_item_needs_no_diets() -> None:

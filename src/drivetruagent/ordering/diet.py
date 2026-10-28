@@ -1,5 +1,7 @@
-"""Reads which items the restaurant has reviewed as certified, or suitable,
-for a diet such as halal. Only what is listed counts."""
+"""Reads how the restaurant has reviewed its items for a diet such as halal:
+certified, suitable but not certified, or not suitable, each with why. An
+item that is not listed has not been reviewed, and nothing about it may be
+claimed either way."""
 
 import uuid
 from decimal import Decimal
@@ -22,9 +24,9 @@ class ItemDiet(BaseModel):
     category_code: str
     # The cart line this is about, when the cart was checked.
     line_no: int | None = None
-    # None: not listed as suitable. Nothing about it may be claimed.
+    # None: not reviewed. Nothing about it may be claimed, either way.
     status: DietStatus | None
-    # Why it is suitable, in words a guest can hear.
+    # Why it is or isn't suitable, in words a guest can hear.
     note: str | None = None
 
 
@@ -101,7 +103,11 @@ async def suitable_items(
         select(MenuItem, DietSuitability)
         .join(DietSuitability, DietSuitability.item_id == MenuItem.id)
         .join(MenuCategory, MenuItem.category_id == MenuCategory.id)
-        .where(MenuItem.is_active, DietSuitability.diet == diet)
+        .where(
+            MenuItem.is_active,
+            DietSuitability.diet == diet,
+            DietSuitability.status.in_((DietStatus.CERTIFIED, DietStatus.SUITABLE)),
+        )
         .order_by(MenuCategory.sort_order, MenuItem.sort_order)
     )
     if category_code is not None:
@@ -122,3 +128,54 @@ async def suitable_items(
         )
         for item, entry in rows[:limit]
     ]
+
+
+class MenuDiet(BaseModel):
+    """The whole menu for a diet, for "are you halal?"."""
+
+    # Suitable or certified items in stock, by part of the menu, in menu order.
+    suitable: dict[str, list[str]]
+    # What was reviewed and isn't suitable, with why, in menu order.
+    not_suitable: list[DietOption]
+
+
+async def menu_diet(db: AsyncSession, diet: Diet, language: Language) -> MenuDiet:
+    rows = (
+        await db.execute(
+            select(MenuItem, MenuCategory, DietSuitability)
+            .join(DietSuitability, DietSuitability.item_id == MenuItem.id)
+            .join(MenuCategory, MenuItem.category_id == MenuCategory.id)
+            .where(MenuItem.is_active, DietSuitability.diet == diet)
+            .order_by(MenuCategory.sort_order, MenuItem.sort_order)
+        )
+    ).all()
+    sold_out = await sold_out_item_ids(db)
+    suitable: dict[str, list[str]] = {}
+    not_suitable: list[DietOption] = []
+    for item, category, entry in rows:
+        name = localize(item.name_i18n, language)
+        if entry.status is DietStatus.NOT_SUITABLE:
+            not_suitable.append(
+                DietOption(
+                    item_code=item.code,
+                    item_name=name,
+                    status=entry.status,
+                    note=localize(entry.note_i18n, language),
+                )
+            )
+        elif item.id not in sold_out:
+            suitable.setdefault(localize(category.name_i18n, language), []).append(name)
+    return MenuDiet(suitable=suitable, not_suitable=not_suitable)
+
+
+async def any_certified(db: AsyncSession, diet: Diet) -> bool:
+    """Whether anything on the menu is certified for the diet."""
+    found = await db.scalar(
+        select(DietSuitability.id)
+        .where(
+            DietSuitability.diet == diet,
+            DietSuitability.status == DietStatus.CERTIFIED,
+        )
+        .limit(1)
+    )
+    return found is not None

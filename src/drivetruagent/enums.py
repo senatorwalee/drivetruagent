@@ -147,6 +147,9 @@ class DietStatus(StrEnum):
     # Nothing the diet forbids, and prepared apart, but not certified. The
     # agent says exactly that, never just "halal".
     SUITABLE = "suitable"
+    # Reviewed, and not suitable: its note says why (the meat isn't
+    # certified, it shares the chicken's frying oil).
+    NOT_SUITABLE = "not_suitable"
 
 
 class Channel(StrEnum):

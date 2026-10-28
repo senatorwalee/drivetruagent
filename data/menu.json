@@ -88,6 +88,15 @@
                 }
               }
             ]
+          },
+          "diets": {
+            "halal": {
+              "status": "not_suitable",
+              "note": {
+                "en": "Our beef is not certified halal.",
+                "fr": "Notre bœuf n'est pas certifié halal."
+              }
+            }
           }
         },
         {
@@ -150,6 +159,15 @@
           "allergens": {
             "reviewed_on": "2026-10-01",
             "contains": ["wheat", "gluten", "sesame", "soy", "milk", "mustard"]
+          },
+          "diets": {
+            "halal": {
+              "status": "not_suitable",
+              "note": {
+                "en": "Our beef is not certified halal.",
+                "fr": "Notre bœuf n'est pas certifié halal."
+              }
+            }
           }
         },
         {
@@ -207,6 +225,15 @@
           "allergens": {
             "reviewed_on": "2026-10-01",
             "contains": ["wheat", "gluten", "sesame", "soy", "milk", "mustard"]
+          },
+          "diets": {
+            "halal": {
+              "status": "not_suitable",
+              "note": {
+                "en": "Our beef is not certified halal.",
+                "fr": "Notre bœuf n'est pas certifié halal."
+              }
+            }
           }
         },
         {
@@ -282,6 +309,15 @@
                 }
               }
             ]
+          },
+          "diets": {
+            "halal": {
+              "status": "not_suitable",
+              "note": {
+                "en": "Our chicken is not certified halal.",
+                "fr": "Notre poulet n'est pas certifié halal."
+              }
+            }
           }
         },
         {
@@ -357,6 +393,15 @@
                 }
               }
             ]
+          },
+          "diets": {
+            "halal": {
+              "status": "suitable",
+              "note": {
+                "en": "No meat. Cooked on its own side of the grill with its own spatula, but the grill is shared with the beef.",
+                "fr": "Sans viande. Cuit sur son propre côté du gril avec sa propre spatule, mais le gril est partagé avec le bœuf."
+              }
+            }
           }
         },
         {
@@ -571,6 +616,15 @@
                 }
               }
             ]
+          },
+          "diets": {
+            "halal": {
+              "status": "not_suitable",
+              "note": {
+                "en": "Fried in the same oil as our chicken, which is not certified halal.",
+                "fr": "Frit dans la même huile que notre poulet, qui n'est pas certifié halal."
+              }
+            }
           }
         },
         {
@@ -626,6 +680,15 @@
           "allergens": {
             "reviewed_on": "2026-10-01",
             "contains": ["wheat", "gluten", "milk", "egg"]
+          },
+          "diets": {
+            "halal": {
+              "status": "not_suitable",
+              "note": {
+                "en": "Fried in the same oil as our chicken, which is not certified halal.",
+                "fr": "Frit dans la même huile que notre poulet, qui n'est pas certifié halal."
+              }
+            }
           }
         },
         {
@@ -745,6 +808,15 @@
                 }
               }
             ]
+          },
+          "diets": {
+            "halal": {
+              "status": "not_suitable",
+              "note": {
+                "en": "Our chicken is not certified halal.",
+                "fr": "Notre poulet n'est pas certifié halal."
+              }
+            }
           }
         },
         {
@@ -812,6 +884,15 @@
           ],
           "allergens": {
             "reviewed_on": "2026-10-01"
+          },
+          "diets": {
+            "halal": {
+              "status": "suitable",
+              "note": {
+                "en": "No meat. The dressings contain no meat.",
+                "fr": "Sans viande. Les vinaigrettes ne contiennent pas de viande."
+              }
+            }
           }
         }
       ]
@@ -886,6 +967,15 @@
           ],
           "allergens": {
             "reviewed_on": "2026-10-01"
+          },
+          "diets": {
+            "halal": {
+              "status": "suitable",
+              "note": {
+                "en": "No meat or alcohol.",
+                "fr": "Sans viande ni alcool."
+              }
+            }
           }
         },
         {
@@ -953,6 +1043,15 @@
           ],
           "allergens": {
             "reviewed_on": "2026-10-01"
+          },
+          "diets": {
+            "halal": {
+              "status": "suitable",
+              "note": {
+                "en": "No meat or alcohol.",
+                "fr": "Sans viande ni alcool."
+              }
+            }
           }
         },
         {
@@ -1041,6 +1140,15 @@
           ],
           "allergens": {
             "reviewed_on": "2026-10-01"
+          },
+          "diets": {
+            "halal": {
+              "status": "suitable",
+              "note": {
+                "en": "No meat or alcohol.",
+                "fr": "Sans viande ni alcool."
+              }
+            }
           }
         },
         {
@@ -1094,6 +1202,15 @@
           ],
           "allergens": {
             "reviewed_on": "2026-10-01"
+          },
+          "diets": {
+            "halal": {
+              "status": "suitable",
+              "note": {
+                "en": "No meat or alcohol.",
+                "fr": "Sans viande ni alcool."
+              }
+            }
           }
         },
         {
@@ -1213,6 +1330,15 @@
           ],
           "allergens": {
             "reviewed_on": "2026-10-01"
+          },
+          "diets": {
+            "halal": {
+              "status": "suitable",
+              "note": {
+                "en": "No meat or alcohol.",
+                "fr": "Sans viande ni alcool."
+              }
+            }
           }
         },
         {
@@ -1240,6 +1366,15 @@
           "option_groups": [],
           "allergens": {
             "reviewed_on": "2026-10-01"
+          },
+          "diets": {
+            "halal": {
+              "status": "suitable",
+              "note": {
+                "en": "No meat or alcohol.",
+                "fr": "Sans viande ni alcool."
+              }
+            }
           }
         },
         {
@@ -1330,6 +1465,15 @@
           "allergens": {
             "reviewed_on": "2026-10-01",
             "contains": ["milk"]
+          },
+          "diets": {
+            "halal": {
+              "status": "suitable",
+              "note": {
+                "en": "Our soft serve blended with a syrup: no meat or gelatin.",
+                "fr": "Notre crème glacée molle mélangée à un sirop : sans viande ni gélatine."
+              }
+            }
           }
         }
       ]
@@ -1375,6 +1519,15 @@
                 }
               }
             ]
+          },
+          "diets": {
+            "halal": {
+              "status": "suitable",
+              "note": {
+                "en": "No meat. The crust is made with vegetable shortening.",
+                "fr": "Sans viande. La pâte est faite de graisse végétale."
+              }
+            }
           }
         },
         {
@@ -1446,6 +1599,15 @@
                 }
               }
             ]
+          },
+          "diets": {
+            "halal": {
+              "status": "suitable",
+              "note": {
+                "en": "Our soft serve with a topping: no meat or gelatin.",
+                "fr": "Notre crème glacée molle avec une garniture : sans viande ni gélatine."
+              }
+            }
           }
         },
         {
@@ -1483,6 +1645,15 @@
                 }
               }
             ]
+          },
+          "diets": {
+            "halal": {
+              "status": "suitable",
+              "note": {
+                "en": "No meat. Made with butter and eggs.",
+                "fr": "Sans viande. Fait avec du beurre et des œufs."
+              }
+            }
           }
         },
         {
@@ -1514,6 +1685,15 @@
           "allergens": {
             "reviewed_on": "2026-10-01",
             "contains": ["milk", "wheat", "gluten", "soy"]
+          },
+          "diets": {
+            "halal": {
+              "status": "suitable",
+              "note": {
+                "en": "Made with milk, cream, sugar and vanilla: no meat or gelatin.",
+                "fr": "Fait de lait, de crème, de sucre et de vanille : sans viande ni gélatine."
+              }
+            }
           }
         }
       ]

@@ -1,5 +1,10 @@
 """Halal and kosher answers come from the reviewed list in the menu file, and a
-swap to what the guest can eat happens in one step. Real menu, real database."""
+swap to what the guest can eat happens in one step. Real menu, real database.
+
+For halal every item is reviewed: certified (none), suitable (drinks, desserts,
+the salad, the veggie and fish burgers) or not suitable, with why (beef and
+chicken, and fries and onion rings, which share the chicken's oil). Nothing is
+reviewed for kosher, so nothing can be claimed either way."""
 
 from decimal import Decimal
 from typing import Any
@@ -77,7 +82,8 @@ async def test_the_menu_files_diets_are_loaded(db_session: AsyncSession) -> None
     summary = await seed_menu(db_session, load_menu(MENU_PATH))
 
     rows = (await db_session.execute(select(func.count(DietSuitability.id)))).scalar()
-    assert summary.diet_entries == rows == 1
+    # Every item, for halal.
+    assert summary.diet_entries == rows == 21
 
 
 async def test_seeding_twice_keeps_one_row_per_item_and_diet(
@@ -87,21 +93,23 @@ async def test_seeding_twice_keeps_one_row_per_item_and_diet(
     await seed_menu(db_session, load_menu(MENU_PATH))
 
     rows = (await db_session.execute(select(func.count(DietSuitability.id)))).scalar()
-    assert rows == 1
+    assert rows == 21
 
 
 # --- Asking about one item --------------------------------------------------
 
 
-async def test_the_chicken_is_not_listed_and_the_fish_burger_is_offered(
+async def test_the_chicken_is_not_suitable_with_why_and_burgers_are_offered(
     context: ToolContext,
 ) -> None:
     result = await check(context, "halal", "chicken_burger")
 
-    assert result["items"][0]["status"] is None
-    assert codes(result["options"]) == ["fish_burger"]
-    assert result["options"][0]["status"] == "suitable"
-    assert "fryer" in result["options"][0]["note"]
+    chicken = result["items"][0]
+    assert chicken["status"] == "not_suitable"
+    assert chicken["note"] == "Our chicken is not certified halal."
+    assert codes(result["options"]) == ["veggie_burger", "fish_burger"]
+    assert {option["status"] for option in result["options"]} == {"suitable"}
+    assert "give its note as the reason" in result["message"]
     assert "not certified" in result["message"]
 
 
@@ -111,16 +119,16 @@ async def test_the_fish_burger_is_suitable_but_never_called_certified(
     result = await check(context, "halal", "fish_burger")
 
     assert result["items"][0]["status"] == "suitable"
-    assert "only if its status is certified" in result["message"]
+    assert result["anything_certified"] is False
+    assert "Nothing on the menu is certified halal" in result["message"]
+    assert "never call anything halal" in result["message"]
 
 
-async def test_a_side_is_answered_with_an_option_from_the_whole_menu(
-    context: ToolContext,
-) -> None:
-    """Nothing among the sides is listed, so the offer comes from anywhere."""
+async def test_a_side_is_offered_a_side_never_a_burger(context: ToolContext) -> None:
+    """A caller with fries was once offered the fish burger instead."""
     result = await check(context, "halal", "chicken_nuggets")
 
-    assert codes(result["options"]) == ["fish_burger"]
+    assert codes(result["options"]) == ["side_salad"]
 
 
 async def test_nothing_is_offered_as_kosher(context: ToolContext) -> None:
@@ -136,8 +144,10 @@ async def test_the_answer_follows_the_session_language(context: ToolContext) -> 
 
     result = await check(context, "halal", "chicken_burger")
 
-    assert result["options"][0]["item_name"] == "Burger au poisson"
-    assert "friteuse" in result["options"][0]["note"]
+    assert result["items"][0]["note"] == "Notre poulet n'est pas certifié halal."
+    fish = next(o for o in result["options"] if o["item_code"] == "fish_burger")
+    assert fish["item_name"] == "Burger au poisson"
+    assert "friteuse" in fish["note"]
 
 
 async def test_an_unknown_item_is_an_error_result(context: ToolContext) -> None:
@@ -154,30 +164,104 @@ async def test_a_sold_out_fish_burger_is_not_offered(
 
     result = await check(context, "halal", "chicken_burger")
 
-    assert result["options"] == []
-    assert "Nothing on the menu is listed for halal" in result["message"]
+    assert codes(result["options"]) == ["veggie_burger"]
 
 
 # --- Asking about the order -------------------------------------------------
 
 
-async def test_every_line_that_is_not_listed_is_named(context: ToolContext) -> None:
+async def test_every_line_is_answered_and_only_the_unsuitable_ones_are_named(
+    context: ToolContext,
+) -> None:
     await add(context, "cheeseburger")
     await add(context, "fish_burger")
     await add(context, "cola", selections=size("large"))
 
     result = await check(context, "halal")
 
-    assert [item["line_no"] for item in result["items"]] == [1, 2, 3]
-    assert result["not_suitable_lines"] == [1, 3]
-    assert codes(result["options"]) == ["fish_burger"]
+    assert [item["status"] for item in result["items"]] == [
+        "not_suitable",
+        "suitable",
+        "suitable",
+    ]
+    assert result["not_suitable_lines"] == [1]
+    assert codes(result["options"]) == ["veggie_burger", "fish_burger"]
+
+
+async def test_fries_and_a_coffee_are_told_apart(context: ToolContext) -> None:
+    """A caller with fries and a coffee asked "are you guys halal?" and heard
+    that the coffee was not suitable, and was offered a fish burger."""
+    await add(context, "fries", selections=size("large"))
+    await add(context, "coffee", selections=size("small"))
+
+    result = await check(context, "halal")
+
+    fries, coffee = result["items"]
+    assert (fries["status"], coffee["status"]) == ("not_suitable", "suitable")
+    assert "same oil as our chicken" in fries["note"]
+    assert coffee["note"] == "No meat or alcohol."
+    assert result["not_suitable_lines"] == [1]
+    assert result["unreviewed_lines"] == []
+    assert codes(result["options"]) == ["side_salad"]
+    assert "Nothing on the menu is certified halal" in result["message"]
+
+
+async def test_are_you_halal_gets_the_whole_menu(context: ToolContext) -> None:
+    """Our meat isn't, and here is what you can have, by part of the menu."""
+    result = await check(context, "halal")
+
+    menu = result["menu"]
+    assert menu["suitable"] == {
+        "Burgers": ["Veggie burger", "Fish burger"],
+        "Sides": ["Side salad"],
+        "Drinks": [
+            "Cola",
+            "Lemon-lime soda",
+            "Iced tea",
+            "Orange juice",
+            "Coffee",
+            "Bottled water",
+            "Milkshake",
+        ],
+        "Desserts": ["Apple pie", "Sundae", "Chocolate chip cookie", "Soft-serve cone"],
+    }
+    assert codes(menu["not_suitable"]) == [
+        "classic_burger",
+        "cheeseburger",
+        "double_cheeseburger",
+        "chicken_burger",
+        "fries",
+        "onion_rings",
+        "chicken_nuggets",
+    ]
+    assert "are you halal?" in result["message"]
+
+
+async def test_one_item_asked_about_does_not_bring_the_whole_menu(
+    context: ToolContext,
+) -> None:
+    assert "menu" not in await check(context, "halal", "coffee")
+
+
+async def test_an_item_never_reviewed_is_never_called_unsuitable(
+    context: ToolContext,
+) -> None:
+    await add(context, "coffee", selections=size("small"))
+
+    result = await check(context, "kosher")
+
+    assert result["items"][0]["status"] is None
+    assert result["unreviewed_lines"] == [1]
+    assert result["not_suitable_lines"] == []
+    assert "can't confirm it either way" in result["message"]
+    assert "Never call it unsuitable" in result["message"]
 
 
 async def test_an_empty_order_still_gets_the_options(context: ToolContext) -> None:
     result = await check(context, "halal")
 
     assert (result["items"], result["not_suitable_lines"]) == ([], [])
-    assert codes(result["options"]) == ["fish_burger"]
+    assert codes(result["options"]) == ["veggie_burger", "fish_burger", "side_salad"]
 
 
 # --- Swapping ---------------------------------------------------------------

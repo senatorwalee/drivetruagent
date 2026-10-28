@@ -51,6 +51,7 @@ built piece by piece.
 | 25 | Session summaries: a note for staff after each session, the model's words checked against the conversation, at `/conversations` | Done; evals pass against the real model; checked in a browser |
 | 26 | Cost readout: what each conversation, order and day cost in model usage, from logged tokens and a dated price list | Done; checked in a browser |
 | 27 | Speakerphone calls: echo cancellation, noise reduction, a language hint, cut-off lines marked, and "OK" is not a choice | Done; evals pass against the real model |
+| 28 | Halal answers: every item reviewed, "not suitable" with a reason, "can't confirm" for what isn't reviewed, and the menu answered first | Done; evals pass against the real model |
 | Later | Demo polish: French review, demo script | Planned |
 
 ## Stack
@@ -488,6 +489,7 @@ order, the session state and the tools used, never at the agent's wording.
 | `asks_if_the_veggie_burger_is_vegan` | Answered from the documents (not as served), never "it's vegan" |
 | `asks_for_something_not_on_the_menu` | "Oat milk shake": says it isn't offered and suggests drinks without milk, never the regular shake |
 | `asks_why_it_got_a_combo` | Asked what makes it a combo, the agent looks it up and names the items in the cart, never "you didn't get one" |
+| `asks_if_they_are_halal_with_fries_and_coffee` | "Are you guys halal?" with fries and a coffee: the menu first, the fries for their oil, the coffee fine, no swap |
 | `ok_is_not_a_choice` | Asked which flavour, "OK" and "Sure" get the flavours named again; no milkshake is added |
 | `gets_offered_something_similar` | "Spicy nuggets": nuggets don't come spicy, the chicken burger does, and the guest takes it |
 
@@ -1039,24 +1041,41 @@ acceptable, and nothing from a kitchen without kosher supervision is kosher, fis
 included. Only the restaurant knows its fryers and certificates, so the answer is
 **data someone reviewed**, like the allergen matrix, not the model's judgement.
 
-Each item can carry a `diets` entry in the menu file, with one of two levels and
-a note the agent reads out:
+Each item can carry a `diets` entry in the menu file, with a level and a note
+the agent reads out:
 
 | Level | Means | The agent may say |
 |---|---|---|
 | `certified` | The restaurant holds a certificate | "It's halal" |
-| `suitable` | No prohibited ingredients, prepared apart, no certificate | "Suitable for guests eating halal, but not certified", plus the note |
-| *(nothing)* | Not listed | That it isn't certified |
+| `suitable` | Nothing the diet forbids, no certificate | "Suitable for guests eating halal, but not certified", plus the note |
+| `not_suitable` | Reviewed, and not suitable | That it isn't, with the note as the reason |
+| *(nothing)* | Not reviewed | That it can't confirm either way, never that it's unsuitable |
 
-In the demo menu nothing is certified, and only the new **fish burger** is listed,
-as halal-suitable ("fried in its own fryer, apart from the chicken"). The veggie
-burger is not: it shares the grill with the beef. Nothing is kosher.
+In the demo menu nothing is certified, and every item is reviewed for halal:
 
-The `check_diet` tool answers for one item or for every line in the order. It
-names the lines that aren't listed and offers in-stock suitable items (from the
-same part of the menu first: a burger for a burger). Its instruction to the agent
-forbids calling anything halal unless it is certified. A halal question sent to
-knowledge search instead comes back pointing at `check_diet`.
+- **Not suitable:** the beef and chicken items ("not certified halal"), and the
+  fries and onion rings ("fried in the same oil as our chicken").
+- **Suitable:** the drinks ("no meat or alcohol"), the milkshake and desserts
+  ("no meat or gelatin"), the side salad, the fish burger ("fried in its own
+  fryer, apart from the chicken") and the veggie burger, whose note says
+  exactly how it is cooked: on its own side of the grill with its own spatula,
+  but the grill is shared with the beef. The guest hears that and decides.
+- **Kosher:** nothing is reviewed, so nothing is claimed either way, and the
+  agent says nothing on the menu is certified kosher.
+
+The `check_diet` tool answers for one item, or with no item for the menu as a
+whole and every line in the order: "Are you guys halal?" gets "nothing on our
+menu is certified halal" first, then each line in the order. It names the lines
+that aren't suitable and offers in-stock suitable items from the same part of
+the menu only: a burger for a burger, a side for fries, never a burger in place
+of fries. Its instruction to the agent forbids calling anything halal unless it
+is certified. A halal question sent to knowledge search instead comes back
+pointing at `check_diet`.
+
+The first version had only two levels, so an item with no entry read as "not
+suitable": a caller with fries and a coffee was told the coffee wasn't suitable
+for halal, and offered a fish burger for the fries. The
+`asks_if_they_are_halal_with_fries_and_coffee` eval now checks that call.
 
 **Mid-order swaps never drop an item silently.** "The fish burger *instead*" is
 the guest's say-so, so `replace_item` swaps the line in one step: the line keeps

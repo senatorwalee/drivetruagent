@@ -18,9 +18,11 @@ severe allergy are welcome to speak to a team member.
 
 ## Is the meat halal
 
-Our beef and chicken are not certified halal. The fish burger has no meat, and its
-pollock fillet is fried in its own fryer, apart from the chicken, so it is suitable
-for guests eating halal. It is not certified halal.
+Our beef and chicken are not certified halal, and the fries and onion rings are
+fried in the same oil as the chicken. The fish burger has no meat, and its pollock
+fillet is fried in its own fryer, apart from the chicken, so it is suitable for
+guests eating halal. It is not certified halal. Nothing on the menu is certified
+halal.
 
 ## Is anything kosher
 
