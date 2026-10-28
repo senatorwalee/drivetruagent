@@ -126,3 +126,57 @@ describe('the home page', () => {
     expect(screen.getByRole('link', { name: /Staff/ })).toHaveAttribute('href', '/staff')
   })
 })
+
+describe('the two home page designs', () => {
+  it('opens on the current design', () => {
+    installBackend()
+    open()
+
+    expect(screen.getByRole('button', { name: 'Current' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('heading', { name: /in three steps/ })).not.toBeInTheDocument()
+    expect(screen.queryByText('Voice AI · Built for restaurants')).not.toBeInTheDocument()
+  })
+
+  it('switches to the new design, which tells the story around the cards', async () => {
+    installBackend()
+    open()
+
+    await userEvent.click(screen.getByRole('button', { name: 'New' }))
+
+    expect(screen.getByRole('button', { name: 'New' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('Voice AI · Built for restaurants')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('The agent takes the order.The backend checks every step.')
+    const steps = within(screen.getByRole('region', { name: /in three steps/ })).getAllByRole('listitem')
+    expect(steps.map((step) => within(step).getByRole('heading').textContent)).toEqual([
+      'A guest arrives',
+      'The agent takes the order',
+      'The code checks every step',
+    ])
+    expect(screen.getByRole('region', { name: /So the cook can stay in the kitchen/ })).toBeInTheDocument()
+    expect(screen.getByText('What happens when it mishears?')).toBeInTheDocument()
+    // The cards are still there.
+    expect(screen.getByRole('list', { name: 'Parts of Frontdesk' })).toBeInTheDocument()
+  })
+
+  it('remembers the choice, and switches back', async () => {
+    installBackend()
+    open()
+    await userEvent.click(screen.getByRole('button', { name: 'New' }))
+
+    expect(window.location.search).toBe('?design=new')
+    expect(window.localStorage.getItem('drivetruagent.home-design')).toBe('new')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Current' }))
+
+    expect(screen.queryByRole('heading', { name: /in three steps/ })).not.toBeInTheDocument()
+    expect(window.localStorage.getItem('drivetruagent.home-design')).toBe('current')
+  })
+
+  it('opens the design the address names', () => {
+    installBackend()
+    open('/?design=new')
+
+    expect(screen.getByRole('button', { name: 'New' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('heading', { name: /in three steps/ })).toBeInTheDocument()
+  })
+})
