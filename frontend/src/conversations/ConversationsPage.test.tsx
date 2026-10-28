@@ -118,6 +118,15 @@ function installBackend(summaries: ConversationSummary[] = [HANDED_OFF, ORDERED]
           prices_source: 'https://example.test/pricing',
         })
       }
+      if (path === `/sessions/${ORDERED.session_id}/events`) {
+        const at = ORDERED.started_at
+        return respond(200, [
+          { seq: 1, turn_id: 't1', kind: 'user_message', payload: { text: 'Two cheeseburgers and fries, please.' }, created_at: at },
+          { seq: 2, turn_id: 't1', kind: 'assistant_message', payload: { text: 'Your total is', response_id: 'r1' }, created_at: at },
+          { seq: 3, turn_id: 't1', kind: 'model_call', payload: { response_id: 'r1', status: 'cancelled' }, created_at: at },
+          { seq: 4, turn_id: 't2', kind: 'assistant_message', payload: { text: 'Sixteen oh seven. Is that right?' }, created_at: at },
+        ])
+      }
       if (path === `/sessions/${ORDERED.session_id}/summary`) {
         if (method === 'POST') detail = { ...detail, gist: 'Two cheeseburgers and fries, quick and easy.' }
         return respond(200, detail)
@@ -181,6 +190,13 @@ describe('the conversations page', () => {
     expect(ordered).toHaveTextContent('1 min 35 s, 3 things said by the customer')
     expect(ordered).toHaveTextContent('oat milk shake')
     expect(ordered).toHaveTextContent('4 calls · 12,000 tokens in, 200 out')
+
+    const conversation = within(ordered).getByRole('region', { name: 'The whole conversation' })
+    expect(within(conversation).getAllByRole('listitem').map((line) => line.textContent)).toEqual([
+      'CustomerTwo cheeseburgers and fries, please.',
+      'AgentYour total is … (cut off)',
+      'AgentSixteen oh seven. Is that right?',
+    ])
 
     await userEvent.click(within(ordered).getByRole('button', { name: 'Write it again' }))
 

@@ -360,6 +360,11 @@ handles it now:
   never rewritten in it.
 - **"OK" is not a choice.** Asked which flavour, an answer that names none is
   asked again; the `ok_is_not_a_choice` eval checks it.
+- **A handoff replaces whatever the agent was saying.** At the time limit (or
+  a third strike) the call stops listening and clears the agent's audio,
+  including an answer already made and still playing, before the fixed
+  sentence. Before this, the rest of an earlier answer played after "A team
+  member will help you finish your order".
 
 If it still interrupts itself in a loud room, `VOICE_TURN_DETECTION=server`
 with `VOICE_VAD_THRESHOLD=0.8` ignores quieter sound, and
@@ -482,6 +487,7 @@ order, the session state and the tools used, never at the agent's wording.
 | `asks_about_the_fryer_oil` | "Do you fry in peanut oil?" is answered from the approved documents, then the order |
 | `asks_if_the_veggie_burger_is_vegan` | Answered from the documents (not as served), never "it's vegan" |
 | `asks_for_something_not_on_the_menu` | "Oat milk shake": says it isn't offered and suggests drinks without milk, never the regular shake |
+| `asks_why_it_got_a_combo` | Asked what makes it a combo, the agent looks it up and names the items in the cart, never "you didn't get one" |
 | `ok_is_not_a_choice` | Asked which flavour, "OK" and "Sure" get the flavours named again; no milkshake is added |
 | `gets_offered_something_similar` | "Spicy nuggets": nuggets don't come spicy, the chicken burger does, and the guest takes it |
 
@@ -1248,7 +1254,9 @@ are logged; `SummarySettings.settle`), a background task writes a note about
 it for staff, the after-call summary a person in a contact centre would
 otherwise write. They are on the Conversations page
 (<http://localhost:8080/conversations>), newest first, filtered by how they
-ended or by whether there is something to follow up.
+ended or by whether there is something to follow up. **Details** shows the
+facts behind a note and the whole conversation, line by line, with any line
+the customer talked over marked "(cut off)".
 
 A note has two parts, and only one comes from the model:
 
