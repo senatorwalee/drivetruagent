@@ -243,9 +243,9 @@ class AllergenDeclaration(UuidPrimaryKey, Timestamps, Base):
 
 
 class DietSuitability(UuidPrimaryKey, Timestamps, Base):
-    """An item the restaurant has reviewed as certified, or suitable, for a
-    diet such as halal. Only what is listed counts: an item with no row is
-    not listed as suitable, and nothing about it may be claimed.
+    """How the restaurant has reviewed an item for a diet such as halal:
+    certified, suitable but not certified, or not suitable, with why. An item
+    with no row has not been reviewed, and nothing about it may be claimed.
     """
 
     __tablename__ = "diet_suitability"

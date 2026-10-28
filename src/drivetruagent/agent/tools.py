@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from drivetruagent.agent import tracing
 from drivetruagent.agent.model import ToolDefinition
-from drivetruagent.enums import Allergen, Diet, Language
+from drivetruagent.enums import Allergen, Diet, DietStatus, Language
 from drivetruagent.knowledge.embedding import EmbeddingUnavailable
 from drivetruagent.knowledge.store import KnowledgeSearch, Retrieval
 from drivetruagent.ordering import allergen_matrix
@@ -571,36 +571,88 @@ async def _check_diet(context: ToolContext, args: DietArgs) -> ToolOutput:
         items = await diet_rules.cart_diet(
             context.db, context.session_id, diet, language, tax_rate=context.tax_rate
         )
-    not_suitable = [item for item in items if item.status is None]
-    # Offer from the same part of the menu as what didn't fit: a burger for a
-    # burger. With nothing named, from the whole menu.
-    category = not_suitable[0].category_code if not_suitable else None
-    options = await diet_rules.suitable_items(
-        context.db, diet, language, category_code=category
-    )
-    if not options and category is not None:
+    not_suitable = [i for i in items if i.status is DietStatus.NOT_SUITABLE]
+    unreviewed = [i for i in items if i.status is None]
+    if not_suitable:
+        # Offer from the same part of the menu as what didn't fit: a burger
+        # for a burger, never a burger in place of fries.
+        options = await diet_rules.suitable_items(
+            context.db, diet, language, category_code=not_suitable[0].category_code
+        )
+    else:
         options = await diet_rules.suitable_items(context.db, diet, language)
+    certified = await diet_rules.any_certified(context.db, diet)
+    # With no item named, the question may be about the restaurant ("are you
+    # halal?"): the whole menu comes back, not only the order.
+    menu = (
+        await diet_rules.menu_diet(context.db, diet, language)
+        if args.item_code is None
+        else None
+    )
     return {
         "diet": diet.value,
+        **({"menu": menu.model_dump(mode="json")} if menu else {}),
         "items": [item.model_dump(mode="json") for item in items],
-        "not_suitable_lines": [item.line_no for item in not_suitable if item.line_no],
+        "not_suitable_lines": [i.line_no for i in not_suitable if i.line_no],
+        "unreviewed_lines": [i.line_no for i in unreviewed if i.line_no],
+        "anything_certified": certified,
         "options": [option.model_dump(mode="json") for option in options],
-        "message": _diet_message(diet, bool(options)),
+        "message": _diet_message(
+            diet,
+            about_menu=menu is not None,
+            certified=certified,
+            has_not_suitable=bool(not_suitable),
+            has_unreviewed=bool(unreviewed),
+            has_options=bool(options),
+        ),
     }
 
 
-def _diet_message(diet: Diet, has_options: bool) -> str:
+def _diet_message(
+    diet: Diet,
+    *,
+    about_menu: bool,
+    certified: bool,
+    has_not_suitable: bool,
+    has_unreviewed: bool,
+    has_options: bool,
+) -> str:
     name = diet.value
     parts = [
-        f"Say plainly which items are not {name}-certified. Call something {name} "
-        f"only if its status is certified. For status suitable, say it is "
-        f"suitable for guests eating {name} but not certified, and give its note."
+        f"Call something {name} only if its status is certified."
+        if certified
+        else f"Nothing on the menu is certified {name}: if asked about the "
+        f"restaurant, say so first, and never call anything {name}.",
+        f"For status suitable, say it is suitable for guests eating {name} but "
+        "not certified, and give its note.",
     ]
+    if about_menu:
+        parts.append(
+            f'If the customer asked about the restaurant ("are you {name}?"), '
+            "use menu: first what isn't suitable and why, in one sentence (\"our "
+            "meat isn't certified\"), then what guests eating "
+            f"{name} can have, by part of the menu, briefly. Then anything in "
+            "the order that isn't suitable."
+        )
+    if has_not_suitable:
+        parts.append(
+            "For status not_suitable, say it is not suitable and give its note "
+            "as the reason."
+        )
+    if has_unreviewed:
+        parts.append(
+            "An item with no status has not been reviewed: say you can't "
+            "confirm it either way. Never call it unsuitable."
+        )
     if has_options:
         parts.append(
             "Offer the options listed, with their note. If the customer clearly "
             "wants one instead of an item in the order, swap it with replace_item. "
             "If it is unclear whether they want it instead or as well, ask."
+        )
+    elif has_not_suitable:
+        parts.append(
+            "Nothing like it is listed as suitable: say so, and offer no swap."
         )
     else:
         parts.append(f"Nothing on the menu is listed for {name}: say so plainly.")
@@ -852,7 +904,8 @@ TOOLS: tuple[Tool[Any], ...] = (
         "Check whether items are halal or kosher, from the restaurant's own "
         "reviewed list, and what to offer instead. Use it for every halal or "
         "kosher question; never answer one from memory. Give an item, or null "
-        "for every line in the order.",
+        'for the menu as a whole and every line in the order ("are you '
+        'halal?").',
         _object(
             {
                 "diet": {

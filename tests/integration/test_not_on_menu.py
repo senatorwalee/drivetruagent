@@ -140,13 +140,25 @@ async def test_what_the_customer_is_avoiding_is_never_suggested(
 async def test_may_contain_counts_as_contains_for_someone_avoiding_it(
     context: ToolContext,
 ) -> None:
-    """Fries share a fryer with breaded items, so they may contain gluten."""
+    """The cookie and the sundae may contain nuts: neither is offered."""
+    result = await ask(context, "a nut-free dessert")
+
+    assert result["avoiding"] == ["tree_nut"]
+    offered = [option["item_code"] for option in result["options_without"]]
+    assert offered
+    assert "cookie" not in offered
+    assert "sundae" not in offered
+
+
+async def test_fries_in_their_own_fryer_are_offered_without_gluten(
+    context: ToolContext,
+) -> None:
+    """They share no oil with the breaded items, so they pick up no gluten."""
     result = await ask(context, "gluten-free bun")
 
     assert (result["match"], result["avoiding"]) == ("none", ["gluten"])
     offered = [option["item_code"] for option in result["options_without"]]
-    assert "fries" not in offered
-    assert offered[0] == "side_salad"
+    assert offered[0] == "fries"
 
 
 async def test_a_sold_out_item_is_not_offered_instead(

@@ -353,6 +353,54 @@ SCENARIOS: tuple[Scenario, ...] = (
         must_not_say=("chicken is halal", "it's halal", "it is halal"),
     ),
     Scenario(
+        name="asks_are_you_halal",
+        # About the restaurant, before ordering: the meat isn't, and here is
+        # what a guest eating halal can have, drinks included.
+        customer=(
+            "Hi, are you guys halal?",
+            "Okay, a fish burger and an iced tea, medium.",
+            "That's all.",
+            "Yes.",
+        ),
+        final_state=SessionState.SUBMITTED,
+        lines=(
+            ExpectedLine("fish_burger", 1),
+            ExpectedLine("iced_tea", 1, {"size": "medium"}),
+        ),
+        must_use=ORDERING_TOOLS | {"check_diet"},
+        must_say_one_of=("drink",),
+        must_not_say=("fish burger is halal", "it's halal", "it is halal"),
+    ),
+    Scenario(
+        name="asks_if_they_are_halal_with_fries_and_coffee",
+        # A caller with fries and a coffee asked "are you guys halal?" and was
+        # told the coffee was not suitable, then offered a fish burger for the
+        # fries. Answered for the menu first; the fries (in their own fryer)
+        # and the coffee are both fine; no swap nobody asked for.
+        customer=(
+            "Large fries and a small coffee, please.",
+            "Are you guys halal?",
+            "Okay, that's all.",
+            "Yes.",
+        ),
+        final_state=SessionState.SUBMITTED,
+        lines=(
+            ExpectedLine("fries", 1, {"size": "large"}),
+            ExpectedLine("coffee", 1, {"size": "small"}),
+        ),
+        must_use=ORDERING_TOOLS | {"check_diet"},
+        must_not_use=frozenset({"replace_item"}),
+        must_say_one_of=("fryer",),
+        must_not_say=(
+            "coffee is not suitable",
+            "coffee isn't suitable",
+            "coffee is also not",
+            "fries aren't suitable",
+            "fries are not suitable",
+            "instead of the fries",
+        ),
+    ),
+    Scenario(
         name="asks_for_kosher",
         # The kitchen isn't kosher, so nothing is offered as kosher, the fish
         # burger included.

@@ -4,7 +4,7 @@ title = "Fryer oil and frying"
 type = "preparation"
 audience = "customer"
 items = ["fries", "onion_rings", "chicken_nuggets", "chicken_burger", "fish_burger"]
-version = "2026-10-01"
+version = "2026-10-28"
 +++
 
 # Fryer oil and frying
@@ -16,18 +16,18 @@ oils or animal fat such as beef tallow in any fryer.
 
 ## Which items share a fryer
 
-Fries, onion rings, chicken nuggets and the crispy chicken patty are cooked in
-the same fryers and the same oil. The fish burger's pollock fillet has a fryer of its
-own and never shares oil with them. The onion ring batter contains wheat, milk
-and egg, and the nugget and chicken breading contains wheat and egg, so fries
-may contain traces of wheat, gluten, milk and egg.
+Onion rings, chicken nuggets and the crispy chicken patty are cooked in the same
+fryers and the same oil. The fries have a fryer of their own, and so does the fish
+burger's pollock fillet; neither shares oil with anything else. The onion ring
+batter contains wheat, milk and egg, and the nugget and chicken breading contains
+wheat and egg.
 
 ## Are the fries gluten-free or vegan
 
-The fries themselves are just potatoes, canola oil and salt. Because they share
-a fryer with breaded and battered items, we cannot call them gluten-free. They
-have no animal ingredients, but the shared oil means they may contain traces of
-milk and egg, so we do not describe them as vegan.
+The fries are just potatoes, canola oil and salt, cooked in their own fryer. Plain
+fries have no animal ingredients and share no oil, so they are vegan; the seasoned
+fries contain milk. Our kitchen is shared, so we do not describe anything as
+gluten-free, the fries included.
 
 ## How often the oil is changed
 

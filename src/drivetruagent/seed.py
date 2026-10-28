@@ -154,8 +154,8 @@ class OptionGroupSeed(SeedModel):
 
 
 class DietSeed(SeedModel):
-    """An item reviewed for a diet: certified, or suitable but not certified,
-    and why, in words a guest can hear."""
+    """An item reviewed for a diet: certified, suitable but not certified, or
+    not suitable, and why, in words a guest can hear."""
 
     status: DietStatus
     note: LocalizedTextSeed
@@ -175,8 +175,8 @@ class MenuItemSeed(SeedModel):
     # Leave it out for an item whose allergens have not been reviewed: the
     # agent then says nothing about them and hands the question to a person.
     allergens: ItemAllergensSeed | None = None
-    # Diets the item has been reviewed for. Leave a diet out and the item is
-    # not listed as suitable for it.
+    # Diets the item has been reviewed for. Leave a diet out and nothing is
+    # claimed about the item for it, either way.
     diets: dict[Diet, DietSeed] = Field(default_factory=dict)
 
     @field_validator("aliases")
