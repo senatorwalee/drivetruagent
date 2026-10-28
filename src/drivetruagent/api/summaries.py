@@ -50,9 +50,11 @@ async def read_summaries(
     responses=NOT_FOUND,
     summary="One session's summary",
 )
-async def read_summary(session_id: uuid.UUID, db: SessionDep) -> SummaryDetail:
+async def read_summary(
+    session_id: uuid.UUID, db: SessionDep, settings: SettingsDep
+) -> SummaryDetail:
     """404 until it has been written, a few seconds after the session ends."""
-    return await summarizer.get_summary(db, session_id)
+    return await summarizer.get_summary(db, session_id, prices=settings.model_prices)
 
 
 @router.post(
@@ -71,4 +73,4 @@ async def rewrite_summary(
     await summarizer.summarize(
         db, session_id, model, settings=settings.summary_settings, rewrite=True
     )
-    return await summarizer.get_summary(db, session_id)
+    return await summarizer.get_summary(db, session_id, prices=settings.model_prices)

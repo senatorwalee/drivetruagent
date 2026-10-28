@@ -1,7 +1,7 @@
 import { HomeLink } from '../../app/HomeLink'
 import { CALLS_PATH, INSIGHTS_PATH, LIVE_PATH, MENU_PATH, STAFF_PATH } from '../../app/navigation'
 import { PageLink } from '../../app/PageLink'
-import { clock, emptyConversationHint } from '../../session/presentation'
+import { clock, emptyConversationHint, modelCost } from '../../session/presentation'
 import type { LiveSession } from '../../session/useLiveSession'
 import { MicButton } from '../shared/MicButton'
 import { ShopBoard } from '../shared/ShopBoard'
@@ -79,6 +79,7 @@ function Readouts({ live }: { live: LiveSession }) {
     { label: 'Language', value: live.cart?.language ?? '—' },
     { label: 'Cart version', value: live.cart ? String(live.cart.version) : '—' },
     { label: 'Model', value: live.agent?.model ?? 'none' },
+    { label: 'Model cost', value: live.cost ? modelCost(live.cost) : '—' },
     { label: 'Session time', value: clock(live.elapsedSeconds) },
     { label: 'Timer', value: live.timerNote ?? '—' },
   ]

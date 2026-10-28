@@ -182,6 +182,13 @@ def test_arguments_that_are_not_a_json_object_are_kept_for_rejection(raw: str) -
     assert turn.tool_calls[0].arguments == {UNPARSEABLE_ARGUMENTS: raw}
 
 
+def test_cached_input_tokens_are_read() -> None:
+    reply = response(text="Hi")
+    reply.usage.input_tokens_details = SimpleNamespace(cached_tokens=100)
+
+    assert from_response(reply).usage == ModelUsage(120, 15, cached_input_tokens=100)
+
+
 def test_missing_usage_is_tolerated() -> None:
     assert from_response(response(text="Hi", usage=None)).usage is None
 

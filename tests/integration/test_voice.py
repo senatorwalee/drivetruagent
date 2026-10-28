@@ -221,8 +221,22 @@ def response(
             "status": "completed",
             "output": output or [],
             "metadata": metadata,
-            "usage": RealtimeResponseUsage(
-                input_tokens=1500, output_tokens=80, total_tokens=1580
+            "usage": RealtimeResponseUsage.model_validate(
+                {
+                    "input_tokens": 1500,
+                    "output_tokens": 80,
+                    "total_tokens": 1580,
+                    "input_token_details": {
+                        "text_tokens": 300,
+                        "audio_tokens": 1200,
+                        "cached_tokens": 1000,
+                        "cached_tokens_details": {
+                            "text_tokens": 200,
+                            "audio_tokens": 800,
+                        },
+                    },
+                    "output_token_details": {"text_tokens": 20, "audio_tokens": 60},
+                }
             ).model_dump(),
         }
     )
@@ -399,6 +413,12 @@ async def test_each_response_is_recorded_with_its_usage(
         "status": "completed",
         "input_tokens": 1500,
         "output_tokens": 80,
+        "input_text_tokens": 300,
+        "input_audio_tokens": 1200,
+        "cached_text_tokens": 200,
+        "cached_audio_tokens": 800,
+        "output_text_tokens": 20,
+        "output_audio_tokens": 60,
         "tool_calls": 0,
     }
 

@@ -8,7 +8,7 @@ here.
 import asyncio
 import uuid
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -24,6 +24,12 @@ from drivetruagent.enums import AgentEventKind, SessionState, SummaryAuthor
 from drivetruagent.ordering.sessions import end_session, open_session
 
 SETTINGS = SummarySettings()
+
+
+def later() -> datetime:
+    """Past the settling time of a session that has just ended."""
+    return datetime.now(UTC) + timedelta(minutes=1)
+
 
 type Sessions = async_sessionmaker[AsyncSession]
 
@@ -76,7 +82,7 @@ async def test_a_pass_summarises_every_waiting_session(
     model = SlowModel()
 
     written = await summarizer.summarize_pending(
-        committing_sessions, model, now=datetime.now(UTC), settings=SETTINGS
+        committing_sessions, model, now=later(), settings=SETTINGS
     )
 
     assert written == 2
@@ -88,7 +94,7 @@ async def test_a_pass_summarises_every_waiting_session(
     # The next pass finds nothing left to do.
     assert (
         await summarizer.summarize_pending(
-            committing_sessions, model, now=datetime.now(UTC), settings=SETTINGS
+            committing_sessions, model, now=later(), settings=SETTINGS
         )
         == 0
     )
@@ -101,15 +107,15 @@ async def test_one_session_that_fails_does_not_stop_the_others(
     fine = await ended_session(committing_sessions, "lane-2", None)
     real_gather = summarizer.gather
 
-    async def gather(db: AsyncSession, session_id: uuid.UUID) -> Any:
+    async def gather(db: AsyncSession, session_id: uuid.UUID, **options: Any) -> Any:
         if session_id == broken:
             raise RuntimeError("bad row")
-        return await real_gather(db, session_id)
+        return await real_gather(db, session_id, **options)
 
     monkeypatch.setattr(summarizer, "gather", gather)
 
     written = await summarizer.summarize_pending(
-        committing_sessions, None, now=datetime.now(UTC), settings=SETTINGS
+        committing_sessions, None, now=later(), settings=SETTINGS
     )
 
     assert written == 1

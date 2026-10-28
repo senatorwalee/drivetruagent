@@ -173,7 +173,18 @@ def from_response(response: Response) -> ModelTurn:
         text=response.output_text or None,
         tool_calls=tool_calls,
         model=response.model,
-        usage=ModelUsage(usage.input_tokens, usage.output_tokens) if usage else None,
+        usage=_usage(usage),
+    )
+
+
+def _usage(usage: Any) -> ModelUsage | None:
+    if usage is None:
+        return None
+    details = getattr(usage, "input_tokens_details", None)
+    return ModelUsage(
+        usage.input_tokens,
+        usage.output_tokens,
+        cached_input_tokens=getattr(details, "cached_tokens", None) or 0,
     )
 
 

@@ -293,3 +293,20 @@ describe.each(VIEWS)('%s view', (viewId, View) => {
     expect(onViewChange).toHaveBeenCalledWith(other === 'Receipt' ? 'receipt' : 'control-room')
   })
 })
+
+describe('the control room', () => {
+  const show = (overrides: Parameters<typeof liveSession>[0] = {}) =>
+    render(<ControlRoom live={liveSession(overrides)} view="control-room" onViewChange={vi.fn()} />)
+
+  it('shows what the session has cost in model calls so far', () => {
+    show()
+
+    expect(screen.getByText('Model cost').nextSibling).toHaveTextContent('0.27¢')
+  })
+
+  it('shows a dash until the cost is known', () => {
+    show({ cost: null })
+
+    expect(screen.getByText('Model cost').nextSibling).toHaveTextContent('—')
+  })
+})

@@ -1,12 +1,14 @@
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal, Self
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from drivetruagent.agent.costs import DEFAULT_PRICES_PATH, PriceList, prices_at
 from drivetruagent.agent.summary import SummarySettings
 from drivetruagent.agent.voice import VoiceSettings
 from drivetruagent.ordering.phone_numbers import normalize_phone
@@ -60,6 +62,8 @@ class Settings(BaseSettings):
     # Ask the model for each summary's words. False: code's own wording from
     # the facts, at no cost.
     summary_uses_model: bool = True
+    # What each model costs per million tokens, for the cost readout.
+    model_prices_path: Path = DEFAULT_PRICES_PATH
 
     # The agent. Without a key the ordering API still works; only the
     # conversation endpoint is unavailable.
@@ -236,7 +240,14 @@ class Settings(BaseSettings):
 
     @property
     def summary_settings(self) -> SummarySettings:
-        return SummarySettings(lookback=timedelta(hours=self.summary_lookback_hours))
+        return SummarySettings(
+            lookback=timedelta(hours=self.summary_lookback_hours),
+            prices=self.model_prices,
+        )
+
+    @property
+    def model_prices(self) -> PriceList | None:
+        return prices_at(self.model_prices_path)
 
 
 @lru_cache

@@ -9,6 +9,19 @@ export function money(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`
 }
 
+/**
+ * A model cost, from micro-dollars: "0.27¢" under a cent, "1.8¢" under a
+ * dollar, "$1.23" above. "≈" when part of it was estimated, and "+ 2
+ * unpriced" when some calls had no price at all.
+ */
+export function modelCost(cost: { micro_usd: number; unpriced_calls: number; estimated_calls: number }): string {
+  const cents = cost.micro_usd / 10_000
+  const amount = cents >= 100 ? `$${(cents / 100).toFixed(2)}` : cents >= 1 ? `${cents.toFixed(1)}¢` : `${cents.toFixed(2)}¢`
+  const about = cost.estimated_calls > 0 ? '≈' : ''
+  const unpriced = cost.unpriced_calls > 0 ? ` + ${cost.unpriced_calls} unpriced` : ''
+  return `${about}${amount}${unpriced}`
+}
+
 /** Seconds as m:ss, the way a timer reads. */
 export function clock(seconds: number): string {
   const whole = Math.max(0, Math.floor(seconds))

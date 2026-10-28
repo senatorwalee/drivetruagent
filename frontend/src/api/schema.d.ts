@@ -195,6 +195,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/costs/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the model cost today
+         * @description Every model call made in the restaurant's day (or `day`), the notes
+         *     written after each session included, with cost per conversation and
+         *     per order.
+         */
+        get: operations["read_day_costs_today_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/handoffs": {
         parameters: {
             query?: never;
@@ -726,6 +748,26 @@ export interface paths {
          *     group: a group that is not named keeps its current choice.
          */
         patch: operations["update_line_sessions__session_id__cart_lines__line_no__patch"];
+        trace?: never;
+    };
+    "/sessions/{session_id}/cost": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What one session's model calls cost
+         * @description So far, for a session still going; the live screen asks after each turn.
+         */
+        get: operations["read_session_sessions__session_id__cost_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/sessions/{session_id}/events": {
@@ -1430,6 +1472,32 @@ export interface components {
             /** Sources */
             sources: string[];
         };
+        /**
+         * Cost
+         * @description What a set of model calls cost, and how sure that figure is.
+         */
+        Cost: {
+            /**
+             * Calls
+             * @default 0
+             */
+            calls: number;
+            /**
+             * Estimated Calls
+             * @default 0
+             */
+            estimated_calls: number;
+            /**
+             * Micro Usd
+             * @default 0
+             */
+            micro_usd: number;
+            /**
+             * Unpriced Calls
+             * @default 0
+             */
+            unpriced_calls: number;
+        };
         /** DaySpecialsView */
         DaySpecialsView: {
             /**
@@ -1445,6 +1513,38 @@ export interface components {
             specials: components["schemas"]["SpecialView"][];
             /** Weekday */
             weekday: number;
+        };
+        /** DaySpend */
+        DaySpend: {
+            /**
+             * Business Date
+             * Format: date
+             */
+            business_date: string;
+            /** By Channel */
+            by_channel: {
+                [key: string]: components["schemas"]["Cost"];
+            };
+            /** By Purpose */
+            by_purpose: {
+                [key: string]: components["schemas"]["Cost"];
+            };
+            /** Conversations */
+            conversations: number;
+            /** Orders */
+            orders: number;
+            /** Per Conversation Micro Usd */
+            per_conversation_micro_usd: number | null;
+            /** Per Order Micro Usd */
+            per_order_micro_usd: number | null;
+            /**
+             * Prices Checked On
+             * Format: date
+             */
+            prices_checked_on: string;
+            /** Prices Source */
+            prices_source: string;
+            total: components["schemas"]["Cost"];
         };
         /**
          * Decision
@@ -2049,6 +2149,7 @@ export interface components {
             channel: components["schemas"]["Channel"];
             /** Confusion Strikes */
             confusion_strikes: number;
+            cost?: components["schemas"]["Cost"] | null;
             /** Customer Turns */
             customer_turns: number;
             /** Duration Seconds */
@@ -2083,6 +2184,16 @@ export interface components {
             started_at: string;
             /** Unmet Requests */
             unmet_requests: string[];
+        };
+        /** SessionSpend */
+        SessionSpend: {
+            conversation: components["schemas"]["Cost"];
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            summary: components["schemas"]["Cost"];
         };
         /**
          * SessionState
@@ -2249,6 +2360,7 @@ export interface components {
          */
         SummaryDetail: {
             channel: components["schemas"]["Channel"];
+            cost: components["schemas"]["Cost"] | null;
             /**
              * Ended At
              * Format: date-time
@@ -2286,6 +2398,7 @@ export interface components {
              * Format: date-time
              */
             started_at: string;
+            summary_cost: components["schemas"]["Cost"] | null;
             /** Total Cents */
             total_cents: number | null;
             /**
@@ -2301,6 +2414,7 @@ export interface components {
          */
         SummaryView: {
             channel: components["schemas"]["Channel"];
+            cost: components["schemas"]["Cost"] | null;
             /**
              * Ended At
              * Format: date-time
@@ -2828,6 +2942,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_day_costs_today_get: {
+        parameters: {
+            query?: {
+                day?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DaySpend"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3902,6 +4056,55 @@ export interface operations {
             };
             /** @description Unprocessable Content */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_session_sessions__session_id__cost_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionSpend"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

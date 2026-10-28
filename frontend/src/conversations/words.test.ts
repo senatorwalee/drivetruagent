@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import type { ConversationSummary, SessionFacts } from '../api/client'
-import { authorNote, duration, factLines, outcomeAsked, outcomeLabel, placeLabel, shown, whyNotTheModel } from './words'
+import type { ConversationSummary, DaySpend, SessionFacts } from '../api/client'
+import { authorNote, dayLine, duration, factLines, noteMeta, outcomeAsked, outcomeLabel, placeLabel, shown, whyNotTheModel } from './words'
 
 const FACTS: SessionFacts = {
   outcome: 'submitted',
@@ -41,6 +41,7 @@ const note = (overrides: Partial<ConversationSummary>): ConversationSummary => (
   total_cents: 1354,
   handoff_title: null,
   written_at: FACTS.ended_at,
+  cost: null,
   ...overrides,
 })
 
@@ -110,5 +111,38 @@ describe('the facts', () => {
     expect(labels).toContainEqual({ label: 'Rules that said no', value: 'extreme quantity' })
     expect(labels).toContainEqual({ label: 'Guardrail', value: '1 message flagged · 1 abuse, 0 confusion strikes' })
     expect(labels).toContainEqual({ label: 'Asked if still there', value: '2 times' })
+  })
+})
+
+describe('costs', () => {
+  const cost = (micro_usd: number) => ({ micro_usd, calls: 4, unpriced_calls: 0, estimated_calls: 0 })
+
+  it('puts what the conversation cost under its note, when known', () => {
+    expect(noteMeta(note({ cost: cost(2_689) }))).toBe('written by the model · pleased · model cost 0.27¢')
+    expect(noteMeta(note({ cost: null }))).toBe('written by the model · pleased')
+  })
+
+  it('adds the cost to the model line of the facts', () => {
+    const model = factLines({ ...FACTS, cost: cost(2_689) }).find((fact) => fact.label === 'Model')
+    expect(model?.value).toBe('4 calls · 12,345 tokens in, 210 out · 0.27¢')
+  })
+
+  it('sums up the day', () => {
+    const day: DaySpend = {
+      business_date: '2026-10-27',
+      conversations: 14,
+      orders: 5,
+      total: cost(58_000),
+      by_purpose: {},
+      by_channel: {},
+      per_conversation_micro_usd: 4_143,
+      per_order_micro_usd: 11_600,
+      prices_checked_on: '2026-10-27',
+      prices_source: 'https://example.test',
+    }
+    expect(dayLine(day)).toBe('14 conversations · 5 orders · 0.41¢ a conversation · 1.2¢ an order · 5.8¢ in all')
+    expect(dayLine({ ...day, conversations: 0, orders: 0, per_conversation_micro_usd: null, per_order_micro_usd: null })).toBe(
+      '0 conversations · 0 orders · — a conversation · — an order · 5.8¢ in all',
+    )
   })
 })

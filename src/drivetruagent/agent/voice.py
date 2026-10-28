@@ -360,6 +360,8 @@ class VoiceBridge:
                     "status": response.status,
                     "input_tokens": usage.input_tokens if usage else None,
                     "output_tokens": usage.output_tokens if usage else None,
+                    # Audio costs many times what text does, so each is kept.
+                    **_token_details(usage),
                     "tool_calls": sum(
                         1
                         for item in response.output or []
@@ -756,3 +758,19 @@ class LiveCalls:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         self._calls.clear()
+
+
+def _token_details(usage: Any) -> dict[str, int | None]:
+    """A realtime response's tokens split into text and audio, cached and
+    not, as the price list needs them. Missing parts are None."""
+    given = getattr(usage, "input_token_details", None)
+    cached = getattr(given, "cached_tokens_details", None)
+    made = getattr(usage, "output_token_details", None)
+    return {
+        "input_text_tokens": getattr(given, "text_tokens", None),
+        "input_audio_tokens": getattr(given, "audio_tokens", None),
+        "cached_text_tokens": getattr(cached, "text_tokens", None),
+        "cached_audio_tokens": getattr(cached, "audio_tokens", None),
+        "output_text_tokens": getattr(made, "text_tokens", None),
+        "output_audio_tokens": getattr(made, "audio_tokens", None),
+    }

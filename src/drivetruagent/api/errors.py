@@ -28,7 +28,7 @@ _NOT_FOUND = {
 # Turned off on this server.
 _FORBIDDEN = {"typed_caller_id_off", "wrong_web_phone_key"}
 # Not set up on this server.
-_UNAVAILABLE = {"web_phone_off"}
+_UNAVAILABLE = {"web_phone_off", "no_prices"}
 # The request is well formed, but the current state does not allow it.
 _CONFLICT = {
     "lane_busy",

@@ -43,6 +43,7 @@ PURE_MODULES = [
     "agent/messages.py",
     "agent/model.py",
     "agent/summary.py",
+    "agent/costs.py",
     "evals/scenario.py",
 ]
 

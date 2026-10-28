@@ -987,6 +987,33 @@
         "title": "ContainsView",
         "type": "object"
       },
+      "Cost": {
+        "description": "What a set of model calls cost, and how sure that figure is.",
+        "properties": {
+          "calls": {
+            "default": 0,
+            "title": "Calls",
+            "type": "integer"
+          },
+          "estimated_calls": {
+            "default": 0,
+            "title": "Estimated Calls",
+            "type": "integer"
+          },
+          "micro_usd": {
+            "default": 0,
+            "title": "Micro Usd",
+            "type": "integer"
+          },
+          "unpriced_calls": {
+            "default": 0,
+            "title": "Unpriced Calls",
+            "type": "integer"
+          }
+        },
+        "title": "Cost",
+        "type": "object"
+      },
       "DaySpecialsView": {
         "properties": {
           "date": {
@@ -1022,6 +1049,88 @@
           "specials"
         ],
         "title": "DaySpecialsView",
+        "type": "object"
+      },
+      "DaySpend": {
+        "properties": {
+          "business_date": {
+            "format": "date",
+            "title": "Business Date",
+            "type": "string"
+          },
+          "by_channel": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Cost"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/Channel"
+            },
+            "title": "By Channel",
+            "type": "object"
+          },
+          "by_purpose": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Cost"
+            },
+            "title": "By Purpose",
+            "type": "object"
+          },
+          "conversations": {
+            "title": "Conversations",
+            "type": "integer"
+          },
+          "orders": {
+            "title": "Orders",
+            "type": "integer"
+          },
+          "per_conversation_micro_usd": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Conversation Micro Usd"
+          },
+          "per_order_micro_usd": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Order Micro Usd"
+          },
+          "prices_checked_on": {
+            "format": "date",
+            "title": "Prices Checked On",
+            "type": "string"
+          },
+          "prices_source": {
+            "title": "Prices Source",
+            "type": "string"
+          },
+          "total": {
+            "$ref": "#/components/schemas/Cost"
+          }
+        },
+        "required": [
+          "business_date",
+          "conversations",
+          "orders",
+          "total",
+          "by_purpose",
+          "by_channel",
+          "per_conversation_micro_usd",
+          "per_order_micro_usd",
+          "prices_checked_on",
+          "prices_source"
+        ],
+        "title": "DaySpend",
         "type": "object"
       },
       "Decision": {
@@ -2563,6 +2672,16 @@
             "title": "Confusion Strikes",
             "type": "integer"
           },
+          "cost": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Cost"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "customer_turns": {
             "title": "Customer Turns",
             "type": "integer"
@@ -2682,6 +2801,28 @@
           "output_tokens"
         ],
         "title": "SessionFacts",
+        "type": "object"
+      },
+      "SessionSpend": {
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/Cost"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/Cost"
+          }
+        },
+        "required": [
+          "session_id",
+          "conversation",
+          "summary"
+        ],
+        "title": "SessionSpend",
         "type": "object"
       },
       "SessionState": {
@@ -3077,6 +3218,16 @@
           "channel": {
             "$ref": "#/components/schemas/Channel"
           },
+          "cost": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Cost"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "ended_at": {
             "format": "date-time",
             "title": "Ended At",
@@ -3203,6 +3354,16 @@
             "title": "Started At",
             "type": "string"
           },
+          "summary_cost": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Cost"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "total_cents": {
             "anyOf": [
               {
@@ -3239,11 +3400,13 @@
           "total_cents",
           "handoff_title",
           "written_at",
+          "cost",
           "facts",
           "model",
           "rejected_reason",
           "input_tokens",
-          "output_tokens"
+          "output_tokens",
+          "summary_cost"
         ],
         "title": "SummaryDetail",
         "type": "object"
@@ -3253,6 +3416,16 @@
         "properties": {
           "channel": {
             "$ref": "#/components/schemas/Channel"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Cost"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "ended_at": {
             "format": "date-time",
@@ -3368,7 +3541,8 @@
           "order_number",
           "total_cents",
           "handoff_title",
-          "written_at"
+          "written_at",
+          "cost"
         ],
         "title": "SummaryView",
         "type": "object"
@@ -4210,6 +4384,67 @@
         "summary": "The combo deals",
         "tags": [
           "offers"
+        ]
+      }
+    },
+    "/costs/today": {
+      "get": {
+        "description": "Every model call made in the restaurant's day (or `day`), the notes\nwritten after each session included, with cost per conversation and\nper order.",
+        "operationId": "read_day_costs_today_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "day",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Day"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaySpend"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "What the model cost today",
+        "tags": [
+          "costs"
         ]
       }
     },
@@ -5821,6 +6056,70 @@
         "summary": "Change a line",
         "tags": [
           "ordering"
+        ]
+      }
+    },
+    "/sessions/{session_id}/cost": {
+      "get": {
+        "description": "So far, for a session still going; the live screen asks after each turn.",
+        "operationId": "read_session_sessions__session_id__cost_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionSpend"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "What one session's model calls cost",
+        "tags": [
+          "costs"
         ]
       }
     },

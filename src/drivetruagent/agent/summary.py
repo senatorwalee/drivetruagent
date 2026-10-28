@@ -19,6 +19,7 @@ from datetime import datetime, timedelta
 
 from pydantic import BaseModel
 
+from drivetruagent.agent.costs import Cost, PriceList, cost_of
 from drivetruagent.agent.messages import UserMessage
 from drivetruagent.agent.model import ModelTurn, ToolDefinition
 from drivetruagent.enums import AgentEventKind, Channel, Language, Mood, SessionState
@@ -38,10 +39,17 @@ class SummarySettings:
     # Sessions that ended longer ago than this are left alone: turning the
     # task on does not send months of conversations to the model.
     lookback: timedelta = timedelta(hours=24)
+    # How long a session must have been over before it is summarised. The
+    # agent's last words, and on a call its last model call, are logged a
+    # moment after the order ends the session; a note written sooner would
+    # miss them.
+    settle: timedelta = timedelta(seconds=15)
     # Sessions summarised per pass, one after another.
     batch: int = 5
     # How long the model has to answer before code's own wording is used.
     timeout_seconds: float = 20.0
+    # To price each conversation. None: costs are left out.
+    prices: PriceList | None = None
 
 
 class OrderLineFact(BaseModel):
@@ -88,6 +96,9 @@ class SessionFacts(BaseModel):
     model_calls: int
     input_tokens: int
     output_tokens: int
+    # What those calls cost at the prices of the day the summary was
+    # written. None: no prices were given (summaries written before costs).
+    cost: Cost | None = None
 
 
 @dataclass(frozen=True)
@@ -110,6 +121,7 @@ def facts_of(
     *,
     order: OrderFact | None,
     handoff: HandoffFact | None,
+    prices: PriceList | None = None,
 ) -> SessionFacts:
     unmet: list[str] = []
     refused: list[str] = []
@@ -157,6 +169,12 @@ def facts_of(
         model_calls=model_calls,
         input_tokens=tokens_in,
         output_tokens=tokens_out,
+        cost=None
+        if prices is None
+        else cost_of(
+            (e.payload for e in events if e.kind is AgentEventKind.MODEL_CALL),
+            prices,
+        ),
     )
 
 

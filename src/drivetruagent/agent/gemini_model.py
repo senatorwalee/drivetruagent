@@ -247,6 +247,7 @@ def from_response(
             usage.prompt_token_count or 0,
             # Thinking is billed as output, so it is counted as output.
             (usage.candidates_token_count or 0) + (usage.thoughts_token_count or 0),
+            cached_input_tokens=usage.cached_content_token_count or 0,
         )
         if usage
         else None,

@@ -44,6 +44,9 @@ export type ConversationSummary = Schemas['SummaryView']
 export type SummaryDetail = Schemas['SummaryDetail']
 export type SessionFacts = Schemas['SessionFacts']
 export type Mood = Schemas['Mood']
+export type Cost = Schemas['Cost']
+export type DaySpend = Schemas['DaySpend']
+export type SessionSpend = Schemas['SessionSpend']
 
 const BASE = '/api'
 
@@ -189,6 +192,11 @@ export const api = {
   summary: (sessionId: string) => request<SummaryDetail>(`/sessions/${sessionId}/summary`),
   /** Writes the note again: the model's words if they pass the checks. */
   rewriteSummary: (sessionId: string) => post<SummaryDetail>(`/sessions/${sessionId}/summary`),
+
+  /** What the model cost in the restaurant's day: total, per conversation, per order. */
+  costsToday: () => request<DaySpend>('/costs/today'),
+  /** What one session's model calls have cost so far. */
+  sessionCost: (sessionId: string) => request<SessionSpend>(`/sessions/${sessionId}/cost`),
 
   /** What guests asked for that the menu couldn't fill, most asked first. */
   unmetRequests: (days: number) => request<UnmetRequest[]>(`/insights/unmet-requests?days=${days}`),

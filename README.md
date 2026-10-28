@@ -49,7 +49,8 @@ built piece by piece.
 | 23d | The web phone: call the agent from a phone's browser at `/call`, answered as a phone call, without a number | Done; tested with a stand-in for OpenAI and checked in a browser |
 | 24 | One look across the app, the Frontdesk name, and a home page at `/`; the live screen moves to `/live` | Done; checked in a browser |
 | 25 | Session summaries: a note for staff after each session, the model's words checked against the conversation, at `/conversations` | Done; evals pass against the real model; checked in a browser |
-| Later | Demo polish: cost readout, French review, demo script | Planned |
+| 26 | Cost readout: what each conversation, order and day cost in model usage, from logged tokens and a dated price list | Done; checked in a browser |
+| Later | Demo polish: French review, demo script | Planned |
 
 ## Stack
 
@@ -1212,7 +1213,8 @@ told a caller's standing, only its consequence.
 
 ## Session summaries: the model writes, code checks
 
-A few seconds after each session ends, a background task writes a note about
+About fifteen seconds after each session ends (once the agent's last words
+are logged; `SummarySettings.settle`), a background task writes a note about
 it for staff, the after-call summary a person in a contact centre would
 otherwise write. They are on the Conversations page
 (<http://localhost:8080/conversations>), newest first, filtered by how they
@@ -1246,6 +1248,39 @@ a turn. No database transaction is held while the model thinks, and two
 servers writing the same note at once leave one row. Only sessions that ended
 within `SUMMARY_LOOKBACK_HOURS` (24) are picked up, so turning it on doesn't
 send old conversations to the model. Staff can have a note written again.
+
+## Cost readout: what a conversation costs
+
+Every model call is logged with its tokens, so what the agent costs is
+worked out, not estimated by anyone: tokens times the price per million in
+`data/model_prices.json` (OpenAI's prices, with the date they were checked
+and where; `MODEL_PRICES_PATH`). Amounts are kept in micro-dollars, which is
+exactly tokens times a price per million, so nothing is rounded until it is
+shown.
+
+- **The live screen** (Control room view) shows the session's model cost as
+  it runs, refreshed as each step is logged.
+- **The Conversations page** opens with the restaurant's day: conversations,
+  orders, cost per conversation, per order and in all. Each note shows what
+  its conversation cost, and its details what writing the note cost.
+- `GET /costs/today` splits the day by purpose (the agent's turns, the
+  guardrail classifier, the notes) and by channel (drive-through or phone).
+
+What makes the figure honest:
+
+- **Cached input** is priced at its own rate (a tenth of the price, or less).
+- **Voice** prices audio and text apart, since audio costs many times more:
+  on `gpt-realtime-2.1-mini`, $10 per million audio tokens in against $0.60
+  for text. Voice calls logged before the split was recorded are priced as
+  text and marked "≈".
+- **The guardrail classifier** runs on most turns and is counted too; it was
+  not logged before this.
+- **A model with no listed price** (Gemini, a new model) is counted as
+  "unpriced", never guessed. Without a price list at all, the costs endpoints
+  say so and nothing else changes.
+
+Not counted: knowledge-search embeddings ($0.02 per million tokens, not
+logged per call), which are a rounding error next to the rest.
 
 ## Policy engine
 
@@ -1329,6 +1364,8 @@ Run `make dev` and open <http://127.0.0.1:8000/docs> to try these.
 | `POST /web-phone/calls/{key}/connected` | The web phone's audio is up: the agent starts talking |
 | `DELETE /web-phone/calls/{key}` | Hang up the web phone |
 | `GET /summaries` | Notes on ended sessions, newest first; `?outcome=` |
+| `GET /costs/today` | What the model cost in the restaurant's day: per conversation, per order, by purpose and channel; `?day=` |
+| `GET /sessions/{id}/cost` | What one session's model calls have cost so far, and its note |
 | `GET /sessions/{id}/summary` | One session's note, with the facts behind it |
 | `POST /sessions/{id}/summary` | Write a session's note again |
 | `GET /pickups` | Phone orders waiting to be collected, then the recently marked |

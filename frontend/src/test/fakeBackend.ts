@@ -132,6 +132,12 @@ export function installFakeBackend() {
       if (resource === '') return respond(200, session)
       if (resource === '/cart') return respond(200, cart)
       if (resource === '/events') return respond(200, events)
+      if (resource === '/cost') {
+        // A made-up 0.27¢ for each thing the agent said.
+        const said = events.filter((event) => event.kind === 'assistant_message').length
+        const conversation = { micro_usd: 2_700 * said, calls: said, unpriced_calls: 0, estimated_calls: 0 }
+        return respond(200, { session_id: session.session_id, conversation, summary: { micro_usd: 0, calls: 0, unpriced_calls: 0, estimated_calls: 0 } })
+      }
       if (resource === '/messages' && method === 'POST') return respond(200, takeTurn(body.text))
       if (resource === '/pause' && method === 'POST') {
         const paused = { paused: true, paused_at: new Date().toISOString(), paused_seconds: 0, nudge_at: null, closes_at: null, hand_off_at: null }

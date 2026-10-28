@@ -4,6 +4,7 @@ import {
   clock,
   deriveAgentState,
   discountLabel,
+  modelCost,
   isFinal,
   itemsLabel,
   money,
@@ -214,5 +215,21 @@ describe('isFinal', () => {
   it('is true only for states a session cannot leave', () => {
     expect((['greeting', 'ordering', 'confirming'] as const).map(isFinal)).toEqual([false, false, false])
     expect((['submitted', 'handed_off', 'abandoned', 'terminated'] as const).map(isFinal)).toEqual([true, true, true, true])
+  })
+})
+
+describe('modelCost', () => {
+  const cost = (micro_usd: number, unpriced_calls = 0, estimated_calls = 0) => ({ micro_usd, unpriced_calls, estimated_calls })
+
+  it('shows fractions of a cent, cents, then dollars', () => {
+    expect(modelCost(cost(0))).toBe('0.00¢')
+    expect(modelCost(cost(2_689))).toBe('0.27¢')
+    expect(modelCost(cost(18_340))).toBe('1.8¢')
+    expect(modelCost(cost(1_234_000))).toBe('$1.23')
+  })
+
+  it('says when part of it is an estimate, or has no price', () => {
+    expect(modelCost(cost(18_340, 0, 1))).toBe('≈1.8¢')
+    expect(modelCost(cost(18_340, 2))).toBe('1.8¢ + 2 unpriced')
   })
 })

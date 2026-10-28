@@ -308,6 +308,15 @@ async def test_waiting_sessions_are_the_recently_ended_unsummarised_ones(
     )
 
     assert waiting == [first]
+    # Not until it has been over a while: its last words may still be coming.
+    too_soon = await summarizer.pending(
+        db_session,
+        now=now + timedelta(seconds=1),
+        lookback=timedelta(hours=24),
+        limit=10,
+        settle=timedelta(seconds=15),
+    )
+    assert too_soon == []
 
 
 # --- Reading, and the API ---------------------------------------------------
