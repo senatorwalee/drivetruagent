@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { api, type WebCall } from '../api/client'
+import { api, type WebCall, type WebPhoneLine } from '../api/client'
 import { IDLE, MICROPHONE, VoiceCall, type VoiceState } from '../voice/voiceCall'
-import { describeLineProblem } from './words'
+import { chooseLine, describeLineProblem } from './words'
 
 /** The browser parts a call needs. Tests pass stand-ins; jsdom has none. */
 export interface PhoneParts {
@@ -11,6 +11,9 @@ export interface PhoneParts {
   createConnection: () => RTCPeerConnection
   createSpeaker: () => HTMLAudioElement
 }
+
+/** How often the page checks which lines are busy, while not on a call. */
+const LINE_CHECK_INTERVAL_MS = 5000
 
 const BROWSER: PhoneParts = {
   getMicrophone: () => navigator.mediaDevices.getUserMedia(MICROPHONE),
@@ -23,6 +26,11 @@ export interface WebPhone {
   restaurantName: string | null
   /** Why the line can't be used: no key, a wrong one, switched off. */
   lineProblem: string | null
+  /** The lines to call on, one per number the server has. */
+  lines: WebPhoneLine[]
+  /** The line a call goes on; kept while a call is going. */
+  line: number
+  chooseLine: (line: number) => void
   voice: VoiceState
   /** Why the call was not put through, if it was turned away. */
   turnedAway: WebCall['turned_away'] | null
@@ -36,19 +44,24 @@ export interface WebPhone {
 }
 
 /**
- * One phone call from the web phone page at a time. The call is a VoiceCall
- * like the mic button's, but rings the web phone's endpoints with the key
- * from the link, and tells the backend when the audio is up so the agent's
- * opening notice is not lost.
+ * One phone call from the web phone page at a time, on the line picked (or
+ * the link's). The call is a VoiceCall like the mic button's, but rings the
+ * web phone's endpoints with the key from the link, and tells the backend
+ * when the audio is up so the agent's opening notice is not lost.
  */
-export function useWebPhone(key: string | null, parts: PhoneParts = BROWSER): WebPhone {
-  const line = useQuery({
+export function useWebPhone(key: string | null, parts: PhoneParts = BROWSER, lineFromLink: number | null = null): WebPhone {
+  const [voice, setVoice] = useState<VoiceState>(IDLE)
+  const onCall = voice.status === 'connecting' || voice.status === 'live'
+  const info = useQuery({
     queryKey: ['web-phone-line', key],
     queryFn: () => api.webPhoneLine(key ?? ''),
     enabled: key !== null,
     retry: false,
+    refetchInterval: onCall ? false : LINE_CHECK_INTERVAL_MS,
   })
-  const [voice, setVoice] = useState<VoiceState>(IDLE)
+  const lines = info.data?.lines ?? []
+  const [picked, setPicked] = useState<number | null>(null)
+  const line = chooseLine(lines, picked, lineFromLink)
   const [turnedAway, setTurnedAway] = useState<WebCall['turned_away'] | null>(null)
   const [liveSince, setLiveSince] = useState<number | null>(null)
   const [lastedMs, setLastedMs] = useState<number | null>(null)
@@ -57,6 +70,8 @@ export function useWebPhone(key: string | null, parts: PhoneParts = BROWSER): We
 
   const call = useCallback(() => {
     if (key === null || current.current) return
+    // Keep the line for the call, even once it shows as busy.
+    setPicked(line)
     // Made, and started playing, inside the tap: phones only play sound a
     // tap has started.
     const speaker = parts.createSpeaker()
@@ -67,7 +82,7 @@ export function useWebPhone(key: string | null, parts: PhoneParts = BROWSER): We
       createConnection: parts.createConnection,
       sendOffer: async (sdp) => {
         try {
-          const answered = await api.callWebPhone(key, sdp)
+          const answered = await api.callWebPhone(key, sdp, line)
           callKey = answered.call_key
           setTurnedAway(answered.turned_away ?? null)
           return answered.answer_sdp
@@ -101,7 +116,7 @@ export function useWebPhone(key: string | null, parts: PhoneParts = BROWSER): We
       }
     })
     void next.start()
-  }, [key, parts])
+  }, [key, parts, line])
 
   const hangUp = useCallback(() => {
     void current.current?.stop()
@@ -117,11 +132,14 @@ export function useWebPhone(key: string | null, parts: PhoneParts = BROWSER): We
   // Leaving the page hangs up.
   useEffect(() => () => void current.current?.stop(), [])
 
-  const lineProblem = key === null ? "This link has no key. Ask for the full link." : line.error ? describeLineProblem(line.error) : null
+  const lineProblem = key === null ? "This link has no key. Ask for the full link." : info.error ? describeLineProblem(info.error) : null
 
   return {
-    restaurantName: line.data?.restaurant_name ?? null,
+    restaurantName: info.data?.restaurant_name ?? null,
     lineProblem,
+    lines,
+    line,
+    chooseLine: setPicked,
     voice,
     turnedAway,
     liveSince,

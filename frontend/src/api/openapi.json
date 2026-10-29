@@ -3864,15 +3864,53 @@
       },
       "WebPhoneInfo": {
         "properties": {
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/WebPhoneLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
           "restaurant_name": {
             "title": "Restaurant Name",
             "type": "string"
           }
         },
         "required": [
-          "restaurant_name"
+          "restaurant_name",
+          "lines"
         ],
         "title": "WebPhoneInfo",
+        "type": "object"
+      },
+      "WebPhoneLine": {
+        "properties": {
+          "busy": {
+            "title": "Busy",
+            "type": "boolean"
+          },
+          "caller_last_four": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caller Last Four"
+          },
+          "line": {
+            "title": "Line",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "line",
+          "caller_last_four",
+          "busy"
+        ],
+        "title": "WebPhoneLine",
         "type": "object"
       },
       "WeekOfSpecialsView": {
@@ -7104,9 +7142,20 @@
     },
     "/web-phone/calls": {
       "post": {
-        "description": "Answered like a phone call from WEB_PHONE_CALLER. Refused while the\nlast web call is still going.",
+        "description": "Answered like a phone call from the line's number in WEB_PHONE_CALLER.\nRefused while the line's last call is still going.",
         "operationId": "start_web_call_web_phone_calls_post",
         "parameters": [
+          {
+            "in": "query",
+            "name": "line",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Line",
+              "type": "integer"
+            }
+          },
           {
             "in": "header",
             "name": "X-Web-Phone-Key",
@@ -7144,6 +7193,16 @@
               }
             },
             "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "409": {
             "content": {
@@ -7339,7 +7398,7 @@
     },
     "/web-phone/line": {
       "get": {
-        "description": "Lets the page show who it calls, and find out a wrong key before\nanyone taps Call.",
+        "description": "Lets the page show who it calls and which lines are free, and find out\na wrong key before anyone taps Call.",
         "operationId": "web_phone_line_web_phone_line_get",
         "parameters": [
           {

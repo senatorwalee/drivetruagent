@@ -1067,8 +1067,8 @@ export interface paths {
         put?: never;
         /**
          * Ring the agent from the web phone
-         * @description Answered like a phone call from WEB_PHONE_CALLER. Refused while the
-         *     last web call is still going.
+         * @description Answered like a phone call from the line's number in WEB_PHONE_CALLER.
+         *     Refused while the line's last call is still going.
          */
         post: operations["start_web_call_web_phone_calls_post"];
         delete?: never;
@@ -1124,8 +1124,8 @@ export interface paths {
         };
         /**
          * Who the web phone calls
-         * @description Lets the page show who it calls, and find out a wrong key before
-         *     anyone taps Call.
+         * @description Lets the page show who it calls and which lines are free, and find out
+         *     a wrong key before anyone taps Call.
          */
         get: operations["web_phone_line_web_phone_line_get"];
         put?: never;
@@ -2566,8 +2566,19 @@ export interface components {
         };
         /** WebPhoneInfo */
         WebPhoneInfo: {
+            /** Lines */
+            lines: components["schemas"]["WebPhoneLine"][];
             /** Restaurant Name */
             restaurant_name: string;
+        };
+        /** WebPhoneLine */
+        WebPhoneLine: {
+            /** Busy */
+            busy: boolean;
+            /** Caller Last Four */
+            caller_last_four: string | null;
+            /** Line */
+            line: number;
         };
         /**
          * WeekOfSpecialsView
@@ -4788,7 +4799,9 @@ export interface operations {
     };
     start_web_call_web_phone_calls_post: {
         parameters: {
-            query?: never;
+            query?: {
+                line?: number;
+            };
             header?: {
                 "X-Web-Phone-Key"?: string | null;
             };
@@ -4808,6 +4821,15 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

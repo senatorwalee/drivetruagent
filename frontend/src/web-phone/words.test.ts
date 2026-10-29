@@ -4,9 +4,12 @@ import { ApiError } from '../api/client'
 import { IDLE } from '../voice/voiceCall'
 import {
   callDuration,
+  chooseLine,
   describeLineProblem,
   initials,
   keyFromHash,
+  lineFromHash,
+  lineLabel,
   speakingLine,
   statusLine,
   turnedAwayLine,
@@ -22,6 +25,49 @@ describe('keyFromHash', () => {
     expect(keyFromHash('')).toBeNull()
     expect(keyFromHash('#key=')).toBeNull()
     expect(keyFromHash('#other=1')).toBeNull()
+  })
+})
+
+describe('lineFromHash', () => {
+  it('reads the line after the #', () => {
+    expect(lineFromHash('#key=abc&line=2')).toBe(2)
+  })
+
+  it('is null with no line, or one that is not a line number', () => {
+    expect(lineFromHash('#key=abc')).toBeNull()
+    expect(lineFromHash('#line=0')).toBeNull()
+    expect(lineFromHash('#line=two')).toBeNull()
+    expect(lineFromHash('#line=1.5')).toBeNull()
+  })
+})
+
+describe('chooseLine', () => {
+  const lines = [
+    { line: 1, caller_last_four: '0123', busy: true },
+    { line: 2, caller_last_four: '0188', busy: false },
+    { line: 3, caller_last_four: '0142', busy: false },
+  ]
+
+  it('takes the pick, then the link, then the first free line', () => {
+    expect(chooseLine(lines, 3, 1)).toBe(3)
+    expect(chooseLine(lines, null, 1)).toBe(1)
+    expect(chooseLine(lines, null, null)).toBe(2)
+  })
+
+  it('passes over a line that is not there', () => {
+    expect(chooseLine(lines, 9, 7)).toBe(2)
+  })
+
+  it('is line 1 before the lines are known, or when all are busy', () => {
+    expect(chooseLine([], null, null)).toBe(1)
+    expect(chooseLine([{ ...lines[0]! }], null, null)).toBe(1)
+  })
+})
+
+describe('lineLabel', () => {
+  it('shows the last four digits, or that the number is withheld', () => {
+    expect(lineLabel({ caller_last_four: '0123' })).toBe('…0123')
+    expect(lineLabel({ caller_last_four: null })).toBe('Withheld')
   })
 })
 
@@ -81,7 +127,8 @@ describe('describeLineProblem', () => {
   it('turns the backend codes into words for the caller', () => {
     expect(describeLineProblem(new ApiError(403, 'wrong_web_phone_key', 'x'))).toMatch(/Ask for a new link/)
     expect(describeLineProblem(new ApiError(503, 'web_phone_off', 'x'))).toMatch(/switched off/)
-    expect(describeLineProblem(new ApiError(409, 'voice_call_in_progress', 'x'))).toMatch(/busy/)
+    expect(describeLineProblem(new ApiError(409, 'web_phone_line_busy', 'x'))).toMatch(/busy/)
+    expect(describeLineProblem(new ApiError(404, 'no_such_web_phone_line', 'x'))).toMatch(/isn't set up/)
     expect(describeLineProblem(new ApiError(503, 'agent_unavailable', 'x'))).toMatch(/can't take calls/)
   })
 
