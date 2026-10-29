@@ -70,7 +70,7 @@ export function HomePage() {
       <header className={styles.topBar}>
         <HomeLink />
         <div className={styles.topEnd}>
-          {restaurant && <span className={styles.restaurant}>{restaurant} · drive-through</span>}
+          {restaurant && <span className={styles.restaurant}>{restaurant} · drive-through and phone</span>}
           <div className={styles.designs} role="group" aria-label="Home page design">
             {HOME_DESIGNS.map((option) => (
               <button
@@ -99,15 +99,15 @@ export function HomePage() {
             <FrontdeskMark className={styles.logoMark} />
             Frontdesk
           </p>
-          {isNew && <p className={styles.chip}>Voice AI · Built for restaurants</p>}
+          {isNew && <p className={styles.chip}>Voice AI · Drive-through and phone orders</p>}
           <h1 id="home-title" className={styles.title}>
             The agent takes the order.
             <br />
             <span className={isNew ? styles.highlight : undefined}>The backend checks every step.</span>
           </h1>
           <p className={styles.lede}>
-            Frontdesk greets each car and takes the order by voice, in English or French. Prices, stock, specials and every
-            rule are decided in code, and anything it can't handle goes to a person with the whole story.
+            Frontdesk takes orders by voice at the drive-through and on the phone, in English or French. Prices, stock,
+            specials and every rule are decided in code, and anything it can't handle goes to a person with the whole story.
           </p>
           <div className={styles.actions}>
             <PageLink to={LIVE_PATH} className={styles.primary}>
