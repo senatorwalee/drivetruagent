@@ -321,9 +321,10 @@
 /* --- Editor -------------------------------------------------------------- */
 
 .editor {
+  /* Sticks just under the staff top bar, which is one 69px row this wide. */
   position: sticky;
-  top: 0;
-  max-height: 100vh;
+  top: 69px;
+  max-height: calc(100vh - 69px);
   overflow-y: auto;
   border-left: 1px solid var(--hairline);
   background: var(--panel);

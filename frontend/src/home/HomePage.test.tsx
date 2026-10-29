@@ -60,7 +60,7 @@ describe('the home page', () => {
     installBackend()
     open()
 
-    expect(await screen.findByText('Maple Lane Burgers · drive-through')).toBeInTheDocument()
+    expect(await screen.findByText('Maple Lane Burgers · drive-through and phone')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('The agent takes the order.')
     expect(screen.getByText('Scripted demo: no API key needed')).toBeInTheDocument()
   })
@@ -134,7 +134,7 @@ describe('the two home page designs', () => {
 
     expect(screen.getByRole('button', { name: 'Current' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.queryByRole('heading', { name: /in three steps/ })).not.toBeInTheDocument()
-    expect(screen.queryByText('Voice AI · Built for restaurants')).not.toBeInTheDocument()
+    expect(screen.queryByText('Voice AI · Drive-through and phone orders')).not.toBeInTheDocument()
   })
 
   it('switches to the new design, which tells the story around the cards', async () => {
@@ -144,7 +144,7 @@ describe('the two home page designs', () => {
     await userEvent.click(screen.getByRole('button', { name: 'New' }))
 
     expect(screen.getByRole('button', { name: 'New' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByText('Voice AI · Built for restaurants')).toBeInTheDocument()
+    expect(screen.getByText('Voice AI · Drive-through and phone orders')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('The agent takes the order.The backend checks every step.')
     const steps = within(screen.getByRole('region', { name: /in three steps/ })).getAllByRole('listitem')
     expect(steps.map((step) => within(step).getByRole('heading').textContent)).toEqual([

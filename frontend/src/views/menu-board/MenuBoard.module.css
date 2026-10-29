@@ -32,6 +32,18 @@
   border-bottom: 1px solid var(--hairline);
 }
 
+/* On a wide screen the top bar stays put while the page scrolls, and the blur
+   quiets what passes under it. On a phone it would cover too much, so it scrolls away. */
+@media (min-width: 720px) {
+  .topBar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: color-mix(in oklch, var(--ground) 85%, transparent);
+    backdrop-filter: blur(12px);
+  }
+}
+
 .brand {
   display: flex;
   align-items: baseline;
