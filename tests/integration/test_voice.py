@@ -725,6 +725,11 @@ async def test_with_no_staff_number_the_caller_is_told_they_will_be_called_back(
 
     assert call.said[-1] == "We'll call you back."
     assert (call.transferred, call.hung_up) == ([], 1)
+    # The goodbye is in the record, after the handoff sentence.
+    assert (await logged(db_session, session_id))[-1] == (
+        "assistant_message",
+        "We'll call you back.",
+    )
 
 
 async def test_the_handoff_cuts_off_the_agent_and_stops_it_answering_first(

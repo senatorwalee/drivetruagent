@@ -27,6 +27,7 @@ from drivetruagent.enums import (
     ACTIVE_SESSION_STATES,
     FINAL_SESSION_STATES,
     AgentEventKind,
+    Channel,
     Language,
 )
 from drivetruagent.ordering.callers import forget_inactive
@@ -48,6 +49,13 @@ HANDING_OFF = {
         "Un membre de l'équipe va vous aider à terminer votre commande. "
         "Un instant, s'il vous plaît."
     ),
+}
+# On the phone nobody is coming to the speaker: the call goes to a person,
+# or the caller is told they will be called back (agent/phone.py). So no
+# "one moment".
+PHONE_HANDING_OFF = {
+    Language.EN: "I'm sorry, this is taking longer than it should.",
+    Language.FR: "Je suis désolé, cela prend plus de temps que prévu.",
 }
 
 
@@ -219,7 +227,10 @@ async def _hand_off(
     turn_id = await _record(
         db, customer_session, TimerAction.HAND_OFF, gateway.TIME_LIMIT, running_for
     )
-    sentence = await _say(db, customer_session, turn_id, HANDING_OFF)
+    sentences = (
+        PHONE_HANDING_OFF if customer_session.channel is Channel.PHONE else HANDING_OFF
+    )
+    sentence = await _say(db, customer_session, turn_id, sentences)
     await gateway.time_out(db, customer_session.id, tax_rate=tax_rate)
     return sentence
 
