@@ -240,6 +240,25 @@ SCENARIOS: tuple[Scenario, ...] = (
         must_not_say=("168", "one hundred sixty-eight"),
     ),
     Scenario(
+        name="asks_for_a_real_person",
+        # Asking for a person is never argued with: the session goes to staff
+        # straight away, with the cart as it stands.
+        customer=(
+            "Hi, can I get a cheeseburger?",
+            "Actually, can you pass me to a real person?",
+        ),
+        final_state=SessionState.HANDED_OFF,
+        must_use=frozenset({"request_human"}),
+        must_not_use=frozenset({"submit_order"}),
+    ),
+    Scenario(
+        name="asks_for_a_real_person_on_the_phone",
+        customer=("I don't want to talk to a robot. Put me through to a human.",),
+        final_state=SessionState.HANDED_OFF,
+        must_use=frozenset({"request_human"}),
+        caller_phone="+16475550199",
+    ),
+    Scenario(
         name="asks_about_dairy",
         # The answer has to come from the allergen tool, and the customer
         # still orders: a classic burger without the cheese.
