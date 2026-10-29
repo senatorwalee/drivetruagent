@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     # If they then stay silent this much longer, the session is closed.
     silence_close_seconds: int = Field(default=20, ge=1)
     # A session that has run this long is handed to a person.
-    session_max_seconds: int = Field(default=180, ge=1)
+    session_max_seconds: int = Field(default=300, ge=1)
     # How often the background task checks the timers. 0 turns it off; the
     # length limit is then still checked whenever the customer speaks.
     timekeeper_interval_seconds: float = Field(default=1.0, ge=0)

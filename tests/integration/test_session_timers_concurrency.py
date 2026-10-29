@@ -24,7 +24,8 @@ from drivetruagent.ordering.sessions import open_session
 from drivetruagent.ordering.timers import TimerSettings
 
 TAX = Decimal("0.13")
-TIMERS = TimerSettings()
+# The tests count in a three-minute limit, whatever the default.
+TIMERS = TimerSettings(max_duration=timedelta(minutes=3))
 
 
 class Car:

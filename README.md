@@ -27,7 +27,7 @@ built piece by piece.
 | 07 | Stock reservations and idempotency keys | Done |
 | 08a | Combos: discounts worked out from the cart, and suggested once | Done |
 | 08b | Today's specials, with a cached read | Done |
-| 09 | Session timers: the silence nudge, the three-minute hand-off, and pause | Done |
+| 09 | Session timers: the silence nudge, the five-minute hand-off, and pause | Done |
 | 10a | Handoff package: what a person taking over is shown, and closing a handoff | Done |
 | 10b | Staff screen: the handoff queue and the package, in the web app | Done |
 | 11 | A second model provider: Gemini, which has a free tier | Done; not yet run against Google's API |
@@ -691,7 +691,7 @@ How it is built:
   that's right" at 2:58 gets their order placed, not a hand-off at 3:00 while
   the model is still answering. A turn marker older than a minute is ignored,
   so a crashed turn cannot freeze a session.
-- **The three-minute rule holds without the background task.** Each customer
+- **The five-minute rule holds without the background task.** Each customer
   turn checks the limit before the model is called.
 - **Pause is the backend's state.** `POST /sessions/{id}/pause` stops the
   clocks for a presenter; paused time counts toward nothing. The screen's
@@ -710,7 +710,7 @@ When presenting, use Pause, or raise `SILENCE_NUDGE_SECONDS` and
 ## Handing a session to a person
 
 A session is handed off in four ways: a very large order the customer
-confirmed, a request for a person, the three-minute limit, and repeated
+confirmed, a request for a person, the five-minute limit, and repeated
 confusion (see [Guardrails](#guardrails-misuse-is-decided-by-code)). Each leaves a
 **handoff**, written in the same transaction that ends the session, so the
 two exist together or not at all.
