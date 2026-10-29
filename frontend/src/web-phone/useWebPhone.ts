@@ -14,6 +14,8 @@ export interface PhoneParts {
 
 /** How often the page checks which lines are busy, while not on a call. */
 const LINE_CHECK_INTERVAL_MS = 5000
+/** On a call, how often the page checks the backend is still on it. */
+const CALL_CHECK_INTERVAL_MS = 2000
 
 const BROWSER: PhoneParts = {
   getMicrophone: () => navigator.mediaDevices.getUserMedia(MICROPHONE),
@@ -66,7 +68,22 @@ export function useWebPhone(key: string | null, parts: PhoneParts = BROWSER, lin
   const [liveSince, setLiveSince] = useState<number | null>(null)
   const [lastedMs, setLastedMs] = useState<number | null>(null)
   const [muted, setMuted] = useState(false)
+  const [callKey, setCallKey] = useState<string | null>(null)
   const current = useRef<VoiceCall | null>(null)
+
+  // When the backend hangs up (after the order, a handoff or a goodbye),
+  // the browser is not always told, and the line would stay open with
+  // nobody on it. So the page asks, and hangs up too.
+  const callState = useQuery({
+    queryKey: ['web-call', key, callKey],
+    queryFn: () => api.webCallState(key ?? '', callKey ?? ''),
+    enabled: key !== null && callKey !== null && voice.status === 'live',
+    refetchInterval: CALL_CHECK_INTERVAL_MS,
+  })
+  const backendHungUp = callState.data?.live === false
+  useEffect(() => {
+    if (backendHungUp) void current.current?.stop()
+  }, [backendHungUp])
 
   const call = useCallback(() => {
     if (key === null || current.current) return
@@ -76,14 +93,15 @@ export function useWebPhone(key: string | null, parts: PhoneParts = BROWSER, lin
     // tap has started.
     const speaker = parts.createSpeaker()
     void speaker.play?.()?.catch(() => undefined)
-    let callKey: string | null = null
+    let answeredKey: string | null = null
     const next = new VoiceCall({
       getMicrophone: parts.getMicrophone,
       createConnection: parts.createConnection,
       sendOffer: async (sdp) => {
         try {
           const answered = await api.callWebPhone(key, sdp, line)
-          callKey = answered.call_key
+          answeredKey = answered.call_key
+          setCallKey(answered.call_key)
           setTurnedAway(answered.turned_away ?? null)
           return answered.answer_sdp
         } catch (error) {
@@ -91,14 +109,15 @@ export function useWebPhone(key: string | null, parts: PhoneParts = BROWSER, lin
         }
       },
       hangUp: async () => {
-        if (callKey) await api.hangUpWebPhone(key, callKey)
+        if (answeredKey) await api.hangUpWebPhone(key, answeredKey)
       },
       connected: async () => {
-        if (callKey) await api.webPhoneConnected(key, callKey)
+        if (answeredKey) await api.webPhoneConnected(key, answeredKey)
       },
       speaker,
     })
     current.current = next
+    setCallKey(null)
     setTurnedAway(null)
     setLiveSince(null)
     setLastedMs(null)

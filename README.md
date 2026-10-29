@@ -1154,6 +1154,9 @@ backend: check the signature -> open a phone session -> accept the call
   that it's an automated assistant, that the call is recorded, why the number
   is kept, and how to stop it ("don't save my number"), with a line in French.
   A withheld number hears the notice without the part about keeping it.
+  Nothing heard while it's said can cut it off or get an answer: on a phone
+  held away from the ear, the microphone hears the notice itself. Listening
+  starts once it has played, and anything heard during it is dropped.
 - **The agent talks about pickup**, not pulling forward: the order number, the
   total, pay at pickup, ready in about `PICKUP_READY_MINUTES`.
 - **When a person is needed**, the call is put through to `STAFF_PHONE_NUMBER`
@@ -1224,6 +1227,9 @@ browser: audio up -> POST .../connected -> the notice is said
 - **No transfer.** There's no line to put a caller through on, so a call that
   needs a person ends with "a team member will call you back", and the
   handoff appears on the staff screen as usual.
+- **It hangs up when the agent does.** After the order, a handoff or a
+  goodbye, the page notices the agent has hung up (it checks every two
+  seconds) and ends the call on the phone too.
 
 To try it:
 

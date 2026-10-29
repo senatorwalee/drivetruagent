@@ -16,7 +16,7 @@ import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import replace
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 from typing import Any
@@ -37,6 +37,7 @@ from openai.types.realtime import (
 from openai.types.realtime.realtime_error import RealtimeError
 from openai.types.realtime.realtime_response import RealtimeResponse
 from openai.types.realtime.realtime_response_usage import RealtimeResponseUsage
+from openai.types.realtime.realtime_server_event import OutputAudioBufferStopped
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from drivetruagent.agent import events, timekeeper
@@ -48,8 +49,11 @@ from drivetruagent.agent.voice import (
     TIMER_RESPONSE,
     LiveCalls,
     NoVoiceCall,
+    OpenAICall,
     VoiceBridge,
     VoiceCallInProgress,
+    VoiceSettings,
+    turn_detection,
 )
 from drivetruagent.api.voice import (
     borrowed,
@@ -119,6 +123,9 @@ class FakeCall:
 
     async def stop_listening(self) -> None:
         self.actions.append("stop listening")
+
+    async def start_listening(self) -> None:
+        self.actions.append("start listening")
 
 
 class Pauses:
@@ -789,6 +796,101 @@ async def test_the_opening_sentence_is_said_and_logged_as_the_agents(
     assert await logged(db_session, session_id) == [
         ("assistant_message", "Hi, thanks for calling.")
     ]
+
+
+def played_out(response_id: str = "resp_greeting") -> OutputAudioBufferStopped:
+    return OutputAudioBufferStopped(
+        type="output_audio_buffer.stopped", event_id="e", response_id=response_id
+    )
+
+
+async def test_nothing_heard_during_the_opening_sentence_cuts_it_off(
+    bridge: VoiceBridge, call: FakeCall
+) -> None:
+    await bridge.greet("Hi, thanks for calling.")
+
+    # Listening stops before the sentence starts, so its own echo can't
+    # interrupt it or be answered.
+    assert call.actions == ["stop listening", "say: Hi, thanks for calling."]
+
+    await bridge.handle(played_out())
+
+    assert call.actions[-1] == "start listening"
+
+
+async def test_listening_starts_again_once_only(
+    bridge: VoiceBridge, call: FakeCall
+) -> None:
+    await bridge.greet("Hi, thanks for calling.")
+
+    await bridge.handle(played_out())
+    await bridge.handle(played_out("resp_later"))
+
+    assert call.actions.count("start listening") == 1
+
+
+async def test_without_word_that_it_played_listening_starts_again_after_a_while(
+    db_session: AsyncSession, session_id: uuid.UUID, call: FakeCall, pauses: Pauses
+) -> None:
+    now = datetime(2026, 10, 29, 13, 0, tzinfo=UTC)
+    clock = SimpleNamespace(now=now)
+    bridge = VoiceBridge(
+        session_id=session_id,
+        scope=lambda: borrowed(db_session),
+        call=call,
+        config=CONFIG,
+        model_name="gpt-realtime-2.1-mini",
+        clock=lambda: clock.now,
+        sleep=pauses,
+    )
+    await bridge.start_watching_timers()
+    await bridge.greet("Hi, thanks for calling.")
+
+    clock.now = now + timedelta(seconds=2)
+    await bridge.check_timers()
+    assert "start listening" not in call.actions
+
+    clock.now = now + timedelta(seconds=10)
+    await bridge.check_timers()
+    assert call.actions[-1] == "start listening"
+
+
+async def test_listening_again_drops_what_was_heard_and_restores_turn_detection() -> (
+    None
+):
+    asked: list[Any] = []
+
+    async def update(*, session: Any) -> None:
+        asked.append(("turn detection", session["audio"]["input"]["turn_detection"]))
+
+    async def clear() -> None:
+        asked.append("clear what was heard")
+
+    connection = SimpleNamespace(
+        session=SimpleNamespace(update=update),
+        input_audio_buffer=SimpleNamespace(clear=clear),
+    )
+    listening = turn_detection(VoiceSettings())
+    call = OpenAICall(
+        openai.AsyncOpenAI(api_key="unused"), "rtc_1", connection, listening
+    )
+
+    await call.stop_listening()
+    await call.start_listening()
+
+    assert asked == [
+        ("turn detection", None),
+        "clear what was heard",
+        ("turn detection", listening),
+    ]
+
+
+async def test_other_speech_finishing_does_not_start_listening_without_a_greeting(
+    bridge: VoiceBridge, call: FakeCall
+) -> None:
+    await bridge.handle(played_out("resp_1"))
+
+    assert call.actions == []
 
 
 async def test_hanging_up_twice_is_hanging_up_once(

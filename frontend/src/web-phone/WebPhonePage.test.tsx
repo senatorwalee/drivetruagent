@@ -58,6 +58,7 @@ beforeEach(() => {
   }
   window.history.replaceState(null, '', '/call#key=demo-key')
   vi.spyOn(api, 'webPhoneLine').mockResolvedValue(ONE_LINE)
+  vi.spyOn(api, 'webCallState').mockResolvedValue({ live: true })
 })
 
 afterEach(() => {
@@ -126,6 +127,23 @@ describe('a call', () => {
 
     expect(hangUp).toHaveBeenCalledWith('demo-key', 'call-1')
     expect(await screen.findByText(/Call ended/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Call again' })).toBeEnabled()
+  })
+
+  it('hangs up by itself once the restaurant has ended the call', async () => {
+    vi.spyOn(api, 'callWebPhone').mockResolvedValue(ANSWERED)
+    vi.spyOn(api, 'webPhoneConnected').mockResolvedValue()
+    vi.mocked(api.webCallState).mockResolvedValue({ live: false })
+    const hangUp = vi.spyOn(api, 'hangUpWebPhone').mockResolvedValue()
+    const user = userEvent.setup()
+    showPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Call' }))
+    act(() => connection.become('connected'))
+
+    expect(await screen.findByText(/Call ended/)).toBeInTheDocument()
+    expect(api.webCallState).toHaveBeenCalledWith('demo-key', 'call-1')
+    expect(hangUp).toHaveBeenCalledWith('demo-key', 'call-1')
     expect(screen.getByRole('button', { name: 'Call again' })).toBeEnabled()
   })
 

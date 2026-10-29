@@ -37,7 +37,7 @@ from collections.abc import (
 )
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, Protocol
 
 import openai
@@ -82,6 +82,9 @@ logger = logging.getLogger(__name__)
 TIMER_RESPONSE = "timer"
 # How often the call looks for something a timer has done.
 TIMER_POLL_SECONDS = 1.0
+# How long past the time a greeting should take to say before listening
+# again anyway, if the call never says its audio has finished playing.
+GREETING_GRACE_SECONDS = 3.0
 
 type SessionScope = Callable[[], AbstractAsyncContextManager[AsyncSession]]
 
@@ -144,28 +147,30 @@ def session_config(
     }
 
 
-def _audio_input(settings: VoiceSettings) -> RealtimeAudioConfigInputParam:
-    turn_detection: RealtimeAudioInputTurnDetectionParam
+def turn_detection(settings: VoiceSettings) -> RealtimeAudioInputTurnDetectionParam:
+    """How the call tells the customer has finished speaking."""
     if settings.turn_detection == "server":
-        turn_detection = {
+        return {
             "type": "server_vad",
             "threshold": settings.vad_threshold,
             "interrupt_response": settings.interruptions,
         }
-    else:
-        # Waits for the customer to finish a thought, not just a pause for
-        # breath, before answering.
-        turn_detection = {
-            "type": "semantic_vad",
-            "eagerness": settings.eagerness,
-            "interrupt_response": settings.interruptions,
-        }
+    # Waits for the customer to finish a thought, not just a pause for
+    # breath, before answering.
+    return {
+        "type": "semantic_vad",
+        "eagerness": settings.eagerness,
+        "interrupt_response": settings.interruptions,
+    }
+
+
+def _audio_input(settings: VoiceSettings) -> RealtimeAudioConfigInputParam:
     audio: RealtimeAudioConfigInputParam = {
         "transcription": {
             "model": settings.transcription_model,
             "prompt": TRANSCRIPTION_PROMPT,
         },
-        "turn_detection": turn_detection,
+        "turn_detection": turn_detection(settings),
     }
     if settings.noise_reduction is not None:
         audio["noise_reduction"] = {"type": settings.noise_reduction}
@@ -215,10 +220,15 @@ class CallControl(Protocol):
         """From now on, nothing the caller says starts an answer."""
         ...
 
+    async def start_listening(self) -> None:
+        """Listen again after stop_listening, dropping anything heard in
+        between, so it is never answered."""
+        ...
 
-def speaking_seconds(text: str) -> float:
+
+def speaking_seconds(text: str, *, longest: float = 12.0) -> float:
     """Roughly how long a sentence takes to say, so a goodbye is not cut off."""
-    return min(12.0, 1.5 + len(text) * 0.06)
+    return min(longest, 1.5 + len(text) * 0.06)
 
 
 class VoiceBridge:
@@ -260,17 +270,36 @@ class VoiceBridge:
         # failing that a sentence said before hanging up ("we'll call you back").
         self._transfer_to = transfer_to
         self._callback_sentence = callback_sentence
+        # While the opening sentence is said: when to listen again at the
+        # latest. None once listening.
+        self._greeting_until: datetime | None = None
         self.ended = False
 
     async def greet(self, sentence: str) -> None:
         """Say the opening sentence: fixed words, written to the log as the
-        agent's, so the screen and the record show exactly what was said."""
+        agent's, so the screen and the record show exactly what was said.
+
+        Nothing heard while it is said can cut it off or be answered. On a
+        phone held away from the ear, the microphone hears the sentence
+        itself, and would otherwise answer it ("Thanks for calling").
+        Listening starts again once it has played.
+        """
         async with self._scope() as db:
             await events.record_message(
                 db, self.session_id, self._turn_id, AssistantMessage(sentence)
             )
             await db.commit()
+        await self._call.stop_listening()
         await self._call.say(sentence)
+        self._greeting_until = self._clock() + timedelta(
+            seconds=speaking_seconds(sentence, longest=60.0) + GREETING_GRACE_SECONDS
+        )
+
+    async def _greeting_over(self) -> None:
+        if self._greeting_until is None or self.ended:
+            return
+        self._greeting_until = None
+        await self._call.start_listening()
 
     # --- Events from the call -------------------------------------------
 
@@ -292,6 +321,9 @@ class VoiceBridge:
                 await self._agent_said(event.transcript, event.response_id)
         elif event.type == "response.done":
             await self._response_finished(event.response)
+        elif event.type == "output_audio_buffer.stopped":
+            # The caller has heard everything said so far.
+            await self._greeting_over()
         elif event.type == "error":
             logger.warning(
                 "Realtime error on session %s: %s", self.session_id, event.error.message
@@ -466,6 +498,8 @@ class VoiceBridge:
         the customer should hear to the log. On a call nothing is heard until
         the model says it, so the sentence is passed on to be said.
         """
+        if self._greeting_until is not None and self._clock() >= self._greeting_until:
+            await self._greeting_over()
         async with self._scope() as db:
             rows = (
                 await db.execute(
@@ -661,10 +695,18 @@ async def say_and_hang_up(
 class OpenAICall:
     """CallControl over the sideband connection to a live call."""
 
-    def __init__(self, client: AsyncOpenAI, call_id: str, connection: Any) -> None:
+    def __init__(
+        self,
+        client: AsyncOpenAI,
+        call_id: str,
+        connection: Any,
+        listening: RealtimeAudioInputTurnDetectionParam | None = None,
+    ) -> None:
         self._client = client
         self._call_id = call_id
         self._connection = connection
+        # How to listen again after stop_listening.
+        self._listening = listening
 
     async def send_function_output(self, call_id: str, output: str) -> None:
         await self._connection.conversation.item.create(
@@ -705,6 +747,17 @@ class OpenAICall:
             session={"type": "realtime", "audio": {"input": {"turn_detection": None}}}
         )
 
+    async def start_listening(self) -> None:
+        # Without turn detection, what was heard waits in the input buffer.
+        await self._connection.input_audio_buffer.clear()
+        if self._listening is not None:
+            await self._connection.session.update(
+                session={
+                    "type": "realtime",
+                    "audio": {"input": {"turn_detection": self._listening}},
+                }
+            )
+
 
 async def run_call(
     client: AsyncOpenAI,
@@ -712,15 +765,17 @@ async def run_call(
     bridge_for: Callable[[CallControl], VoiceBridge],
     *,
     greeting: str | None = None,
+    listening: RealtimeAudioInputTurnDetectionParam | None = None,
 ) -> None:
     """Join a live call and handle it until it ends.
 
     Two things run side by side: reading the call's events, and checking
     once a second for anything a timer has done. `greeting`: said first, for
-    a phone call, where the caller is waiting to hear something.
+    a phone call, where the caller is waiting to hear something; `listening`
+    is the turn detection to go back to once it has been said.
     """
     async with client.realtime.connect(call_id=call_id) as connection:
-        bridge = bridge_for(OpenAICall(client, call_id, connection))
+        bridge = bridge_for(OpenAICall(client, call_id, connection, listening))
         await bridge.start_watching_timers()
         if greeting is not None:
             await bridge.greet(greeting)

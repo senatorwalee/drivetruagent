@@ -55,6 +55,8 @@ class StandInOpenAI:
         self.created: list[dict[str, Any]] = []
         self.joined: list[str] = []
         self.said: list[str] = []
+        # Each change to the call's turn detection, in order.
+        self.listening: list[Any] = []
         self.hung_up: list[str] = []
         self.calls = LiveCalls()
         self._stays_open = call_stays_open
@@ -81,6 +83,7 @@ class StandInOpenAI:
     def _connect(self, *, call_id: str) -> Any:
         self.joined.append(call_id)
         said = self.said
+        listening = self.listening
         stays_open = self._stays_open
 
         async def create(**request: Any) -> None:
@@ -88,9 +91,17 @@ class StandInOpenAI:
 
         @asynccontextmanager
         async def joined() -> AsyncIterator[Any]:
+            async def update(*, session: Any) -> None:
+                listening.append(session["audio"]["input"]["turn_detection"])
+
+            async def clear() -> None:
+                return None
+
             class Connection:
                 response = SimpleNamespace(create=create)
                 conversation = SimpleNamespace(item=SimpleNamespace(create=create))
+                session = SimpleNamespace(update=update)
+                input_audio_buffer = SimpleNamespace(clear=clear)
 
                 def __aiter__(self) -> "Connection":
                     return self
@@ -439,6 +450,24 @@ async def test_hanging_up_ends_the_call_at_openai(
     assert response.status_code == 204
     assert stand_in.hung_up == [CALL_ID]
     await stand_in.calls.close_all()
+
+
+async def test_the_page_can_tell_when_the_backend_has_finished_with_a_call(
+    client: httpx.AsyncClient, stand_in: StandInOpenAI
+) -> None:
+    call_key = (await ring(client)).json()["call_key"]
+    headers = {"X-Web-Phone-Key": KEY}
+
+    going = await client.get(f"/web-phone/calls/{call_key}", headers=headers)
+    await connect(stand_in, client, call_key)
+    over = await client.get(f"/web-phone/calls/{call_key}", headers=headers)
+    unknown = await client.get(f"/web-phone/calls/{uuid.uuid4()}", headers=headers)
+    keyless = await client.get(f"/web-phone/calls/{call_key}")
+
+    assert going.json() == {"live": True}
+    assert over.json() == {"live": False}
+    assert unknown.json() == {"live": False}
+    assert keyless.status_code == 403
 
 
 async def test_hanging_up_a_call_that_is_not_going_is_not_found(

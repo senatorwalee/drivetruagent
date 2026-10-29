@@ -41,6 +41,7 @@ export type Standing = Schemas['Standing']
 export type WebPhoneInfo = Schemas['WebPhoneInfo']
 export type WebPhoneLine = Schemas['WebPhoneLine']
 export type WebCall = Schemas['WebCall']
+export type WebCallState = Schemas['WebCallState']
 export type ConversationSummary = Schemas['SummaryView']
 export type SummaryDetail = Schemas['SummaryDetail']
 export type SessionFacts = Schemas['SessionFacts']
@@ -149,6 +150,12 @@ export const api = {
     })
     if (!response.ok) throw await toApiError(response)
     return (await response.json()) as WebCall
+  },
+  /** Whether the backend is still handling the call; false once it has hung up. */
+  webCallState: async (key: string, callKey: string): Promise<WebCallState> => {
+    const response = await fetch(`${BASE}/web-phone/calls/${callKey}`, { headers: { 'X-Web-Phone-Key': key } })
+    if (!response.ok) throw await toApiError(response)
+    return (await response.json()) as WebCallState
   },
   webPhoneConnected: async (key: string, callKey: string): Promise<void> => {
     const response = await fetch(`${BASE}/web-phone/calls/${callKey}/connected`, {
