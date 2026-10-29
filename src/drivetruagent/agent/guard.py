@@ -24,7 +24,12 @@ from drivetruagent.agent import events, tracing
 from drivetruagent.agent.messages import AssistantMessage, Message, UserMessage
 from drivetruagent.agent.model import ModelClient, ModelUsage, ToolDefinition
 from drivetruagent.db.models import CustomerSession
-from drivetruagent.enums import FINAL_SESSION_STATES, AgentEventKind, Language
+from drivetruagent.enums import (
+    FINAL_SESSION_STATES,
+    AgentEventKind,
+    Channel,
+    Language,
+)
 from drivetruagent.ordering.sessions import lock_session
 from drivetruagent.ordering.views import DEFAULT_LANGUAGE
 from drivetruagent.policy import gateway
@@ -79,6 +84,16 @@ HANDED_OFF = {
         "Je fais venir un membre de l'équipe pour vous aider. "
         "Un instant, s'il vous plaît."
     ),
+}
+# On the phone there is no window, and nobody comes to the speaker: a call
+# handed off goes to a person or is called back (agent/phone.py).
+PHONE_ENDED = {
+    Language.EN: "I'm ending this call now. Goodbye.",
+    Language.FR: "Je mets fin à cet appel. Au revoir.",
+}
+PHONE_HANDED_OFF = {
+    Language.EN: "I'm sorry I couldn't help with that.",
+    Language.FR: "Je suis désolé de ne pas avoir pu vous aider.",
 }
 
 CLASSIFIER_INSTRUCTIONS = """\
@@ -359,14 +374,15 @@ async def _apply(
     )
     await db.flush()
     language = customer_session.language or DEFAULT_LANGUAGE
+    on_phone = customer_session.channel is Channel.PHONE
 
     if decision.action is GuardAction.BLOCK:
         reply = BLOCKED[found.verdict][language]
     elif decision.action is GuardAction.TERMINATE:
-        reply = ENDED[language]
+        reply = (PHONE_ENDED if on_phone else ENDED)[language]
         await gateway.terminate(db, session_id, tax_rate=tax_rate)
     elif decision.action is GuardAction.HAND_OFF:
-        reply = HANDED_OFF[language]
+        reply = (PHONE_HANDED_OFF if on_phone else HANDED_OFF)[language]
         await gateway.hand_off_for_confusion(
             db, session_id, decision.strikes.confusion, tax_rate=tax_rate
         )

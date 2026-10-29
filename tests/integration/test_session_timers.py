@@ -27,11 +27,17 @@ from drivetruagent.agent.loop import AgentConfig, run_turn
 from drivetruagent.agent.messages import AssistantMessage, Message
 from drivetruagent.agent.model import ModelTurn, ModelUnavailable, ToolDefinition
 from drivetruagent.agent.scripted import ScriptedModel, call, say
-from drivetruagent.agent.timekeeper import HANDING_OFF, STILL_THERE, SweepReport
+from drivetruagent.agent.timekeeper import (
+    HANDING_OFF,
+    PHONE_HANDING_OFF,
+    STILL_THERE,
+    SweepReport,
+)
 from drivetruagent.config import Settings, get_settings
 from drivetruagent.db.models import CustomerSession, PendingAction, Reservation
 from drivetruagent.enums import (
     AgentEventKind,
+    Channel,
     Language,
     PendingActionStatus,
     ReservationStatus,
@@ -283,6 +289,18 @@ async def test_the_handoff_is_said_in_the_customers_language(
     await enforce(db_session, car, 180)
 
     assert await said(db_session, car) == [HANDING_OFF[Language.FR]]
+
+
+async def test_on_the_phone_the_handoff_promises_no_one_will_come_in_a_moment(
+    db_session: AsyncSession, menu: None
+) -> None:
+    call = Car(await open_session(db_session, channel=Channel.PHONE))
+    await db_session.commit()
+    await talk(db_session, call, started=170, ended=175)
+
+    await enforce(db_session, call, 180)
+
+    assert await said(db_session, call) == [PHONE_HANDING_OFF[Language.EN]]
 
 
 async def test_a_handed_off_session_keeps_its_cart_and_its_stock(

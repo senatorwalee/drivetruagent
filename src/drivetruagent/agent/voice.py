@@ -550,6 +550,15 @@ class VoiceBridge:
             await self._call.transfer(self._transfer_to)
             return
         if handed_off and self._callback_sentence is not None:
+            # Logged like every fixed sentence, so the record shows the goodbye.
+            async with self._scope() as db:
+                await events.record_message(
+                    db,
+                    self.session_id,
+                    self._turn_id,
+                    AssistantMessage(self._callback_sentence),
+                )
+                await db.commit()
             await self._call.say(self._callback_sentence)
             await self._sleep(speaking_seconds(self._callback_sentence))
         await self._call.hang_up()

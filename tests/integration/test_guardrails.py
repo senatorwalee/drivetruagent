@@ -20,6 +20,8 @@ from drivetruagent.agent.guard import (
     BLOCKED,
     ENDED,
     HANDED_OFF,
+    PHONE_ENDED,
+    PHONE_HANDED_OFF,
     Guard,
     ModelClassifier,
 )
@@ -28,7 +30,7 @@ from drivetruagent.agent.messages import ToolCall, UserMessage
 from drivetruagent.agent.model import ModelTurn, ModelUnavailable, ModelUsage
 from drivetruagent.agent.scripted import ScriptedModel, call, say
 from drivetruagent.db.models import Handoff
-from drivetruagent.enums import AgentEventKind, Language, SessionState
+from drivetruagent.enums import AgentEventKind, Channel, Language, SessionState
 from drivetruagent.ordering.cart import add_item
 from drivetruagent.ordering.errors import SessionEnded
 from drivetruagent.ordering.inventory import set_on_hand
@@ -190,6 +192,21 @@ async def test_the_third_abuse_strike_ends_the_session_and_gives_its_stock_back(
     # The cookie it held is free for the next car.
     cart = await add_item(db_session, other, "cookie", tax_rate=TAX)
     assert cart.item_count == 1
+
+
+async def test_on_the_phone_the_session_ends_without_sending_anyone_to_a_window(
+    db_session: AsyncSession, menu: None
+) -> None:
+    session_id = (await open_session(db_session, channel=Channel.PHONE)).id
+    await db_session.commit()
+
+    replies = [
+        (await turn(db_session, session_id, INSULT, ScriptedModel([]))).text
+        for _ in range(3)
+    ]
+
+    assert replies[-1] == PHONE_ENDED[Language.EN]
+    assert "window" not in replies[-1]
 
 
 async def test_a_session_ended_for_abuse_takes_no_more_messages(
@@ -441,3 +458,22 @@ async def test_together_a_failing_model_still_fails_the_turn_when_it_passes(
 ) -> None:
     with pytest.raises(ModelUnavailable):
         await turn(db_session, session_id, "A cookie please", BrokenModel(), TOGETHER)  # pyright: ignore[reportArgumentType]
+
+
+async def test_on_the_phone_a_handoff_promises_no_one_will_come_in_a_moment(
+    db_session: AsyncSession, menu: None
+) -> None:
+    session_id = (await open_session(db_session, channel=Channel.PHONE)).id
+    await db_session.commit()
+    config = classified_as("off_topic", "off_topic", "off_topic")
+    agent = ScriptedModel([say("I can only help with your order.")] * 2)
+
+    replies = [
+        (await turn(db_session, session_id, TRIVIA, agent, config)).text
+        for _ in range(3)
+    ]
+
+    # The phone call then puts the caller through, or says they'll be
+    # called back (agent/phone.py).
+    assert replies[-1] == PHONE_HANDED_OFF[Language.EN]
+    assert (await get_session(db_session, session_id)).state is SessionState.HANDED_OFF
