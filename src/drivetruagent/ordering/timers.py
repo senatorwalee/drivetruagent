@@ -29,7 +29,7 @@ class TimerSettings:
     # Further silence, after asking, before the session is closed.
     close_after: timedelta = timedelta(seconds=20)
     # How long a session may run before a person takes over.
-    max_duration: timedelta = timedelta(minutes=3)
+    max_duration: timedelta = timedelta(minutes=5)
     # A turn that started longer ago than this is taken to have crashed, and
     # no longer holds the clocks. It must outlast the slowest real turn.
     turn_grace: timedelta = timedelta(seconds=60)

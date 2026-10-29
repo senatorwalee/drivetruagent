@@ -58,7 +58,8 @@ from drivetruagent.policy.actions import AddItem
 from drivetruagent.policy.decisions import Decision, PolicyLimits
 
 TAX = Decimal("0.13")
-TIMERS = TimerSettings()
+# The tests count in a three-minute limit, whatever the default.
+TIMERS = TimerSettings(max_duration=timedelta(minutes=3))
 LIMITS = PolicyLimits(
     line_quantity_confirm_above=10,
     line_quantity_escalate_above=25,
@@ -735,7 +736,7 @@ async def test_a_new_session_says_when_its_timers_will_fire(
     assert timers["paused"] is False
     assert timers["closes_at"] is None
     assert seconds_between(http_session["started_at"], timers["nudge_at"]) == 20
-    assert seconds_between(http_session["started_at"], timers["hand_off_at"]) == 180
+    assert seconds_between(http_session["started_at"], timers["hand_off_at"]) == 300
 
 
 async def test_pausing_stops_every_countdown(
@@ -853,7 +854,7 @@ async def test_the_timer_intervals_come_from_the_settings(
     assert seconds_between(opened["started_at"], opened["timers"]["hand_off_at"]) == 60
 
 
-async def test_a_message_after_three_minutes_gets_the_handoff_reply(
+async def test_a_message_after_five_minutes_gets_the_handoff_reply(
     app: FastAPI, client: httpx.AsyncClient, db_session: AsyncSession, menu: None
 ) -> None:
     """End to end through the API, with the scripted demo model standing in:
@@ -866,7 +867,7 @@ async def test_a_message_after_three_minutes_gets_the_handoff_reply(
     opened = (await client.post("/sessions")).json()
     await db_session.execute(
         update(CustomerSession).values(
-            started_at=CustomerSession.started_at - timedelta(seconds=181)
+            started_at=CustomerSession.started_at - timedelta(seconds=301)
         )
     )
     await db_session.commit()

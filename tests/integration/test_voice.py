@@ -71,7 +71,8 @@ from drivetruagent.policy.decisions import PolicyLimits
 from drivetruagent.policy.guardrails import Verdict
 
 TAX = Decimal("0.13")
-TIMERS = TimerSettings()
+# The tests count in a three-minute limit, whatever the default.
+TIMERS = TimerSettings(max_duration=timedelta(minutes=3))
 CONFIG = AgentConfig(
     restaurant_name="Maple Lane Burgers",
     tax_rate=TAX,

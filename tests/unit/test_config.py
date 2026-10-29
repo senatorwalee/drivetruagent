@@ -80,12 +80,12 @@ def test_the_specials_cache_lasts_a_minute_by_default() -> None:
 # --- Session timers ---------------------------------------------------------
 
 
-def test_the_timers_default_to_what_the_brief_asks_for() -> None:
+def test_the_timers_default_to_a_twenty_second_nudge_and_five_minutes() -> None:
     timers = make_settings().session_timers
 
     assert timers.nudge_after == timedelta(seconds=20)
     assert timers.close_after == timedelta(seconds=20)
-    assert timers.max_duration == timedelta(minutes=3)
+    assert timers.max_duration == timedelta(minutes=5)
     assert make_settings().timekeeper_interval_seconds == 1.0
 
 

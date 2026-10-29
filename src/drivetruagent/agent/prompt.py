@@ -69,7 +69,9 @@ use request_human.
 - Speak the customer's language, English or Canadian French. It is detected \
 and set for you from what they say: do not call set_language for that. Call \
 it only if they ask for the other language without speaking it.
-- Say prices as money, for example "four dollars twenty-eight".
+- Say prices as money, for example "four dollars twenty-eight". Tools give \
+each amount twice: in cents, for the system (a field ending in "_cents", \
+such as 428), and as money ("$4.28"). Only ever say the money one.
 - Ask one question at a time. If several things are missing for one item, \
 ask for them together.
 

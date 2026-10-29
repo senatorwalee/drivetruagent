@@ -48,7 +48,8 @@ from drivetruagent.policy.handoff_package import HandoffPackage
 
 TAX = Decimal("0.13")
 NOW = datetime(2026, 10, 13, 12, 0, tzinfo=UTC)
-TIMERS = TimerSettings()
+# The tests count in a three-minute limit, whatever the default.
+TIMERS = TimerSettings(max_duration=timedelta(minutes=3))
 LIMITS = PolicyLimits(
     line_quantity_confirm_above=10,
     line_quantity_escalate_above=25,

@@ -1169,7 +1169,7 @@ async def run_tool(
         input_value=arguments,
         attributes={SpanAttributes.TOOL_NAME: name},
     ) as tool_span:
-        output = await _run_tool(context, name, arguments)
+        output = with_money(await _run_tool(context, name, arguments))
         tracing.set_output(tool_span, output)
         error = output.get("error")
         tool_span.set_attributes(
@@ -1182,6 +1182,38 @@ async def run_tool(
             )
         )
         return output
+
+
+_CENTS = "_cents"
+
+
+def with_money(value: Any) -> Any:
+    """Every amount in cents also written as money: beside `total_cents:
+    1690`, `total: "$16.90"`. A voice model given only 1690 has read it out
+    as "one thousand six hundred ninety"; the prompt has it say the money.
+    The cents stay, for the code and the screen that read them."""
+    if isinstance(value, list):
+        return [with_money(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    out: dict[str, Any] = {}
+    for key, item in value.items():
+        out[key] = with_money(item)
+        if (
+            isinstance(key, str)
+            and key.endswith(_CENTS)
+            and isinstance(item, int)
+            and not isinstance(item, bool)
+        ):
+            out.setdefault(key.removesuffix(_CENTS), money(item))
+    return out
+
+
+def money(cents: int) -> str:
+    """Cents as dollars: 1690 → "$16.90", -150 → "-$1.50"."""
+    sign = "-" if cents < 0 else ""
+    dollars, rest = divmod(abs(cents), 100)
+    return f"{sign}${dollars}.{rest:02d}"
 
 
 async def _run_tool(
