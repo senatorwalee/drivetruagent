@@ -94,6 +94,8 @@ class StandInOpenAI:
     def __init__(self, *, refuse: bool = False) -> None:
         self.accepted: list[tuple[str, dict[str, Any]]] = []
         self.said: list[str] = []
+        # Each change to the call's turn detection, in order.
+        self.listening: list[Any] = []
         self.joined: list[str] = []
         self.hung_up: list[str] = []
         self.calls = LiveCalls()
@@ -121,6 +123,7 @@ class StandInOpenAI:
     def _connect(self, *, call_id: str) -> Any:
         self.joined.append(call_id)
         said = self.said
+        listening = self.listening
 
         async def create(**request: Any) -> None:
             instructions = request.get("response", {}).get("instructions", "")
@@ -128,9 +131,17 @@ class StandInOpenAI:
 
         @asynccontextmanager
         async def joined() -> AsyncIterator[Any]:
+            async def update(*, session: Any) -> None:
+                listening.append(session["audio"]["input"]["turn_detection"])
+
+            async def clear() -> None:
+                return None
+
             class Connection:
                 response = SimpleNamespace(create=create)
                 conversation = SimpleNamespace(item=SimpleNamespace(create=create))
+                session = SimpleNamespace(update=update)
+                input_audio_buffer = SimpleNamespace(clear=clear)
 
                 def __aiter__(self) -> "Connection":
                     return self
@@ -232,6 +243,8 @@ async def test_the_caller_hears_the_notice_first_and_it_is_logged(
     notice = greeting("Maple Lane Burgers", number_known=True)
     assert stand_in.joined == [CALL_ID]
     assert len(stand_in.said) == 1 and stand_in.said[0].endswith(notice)
+    # Nothing the caller says can cut the notice off.
+    assert stand_in.listening == [None]
     logged = (
         await db_session.execute(
             select(AgentEvent).where(

@@ -1084,7 +1084,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Whether a web call is still going
+         * @description For the page to hang up when the backend has: a browser is not
+         *     always told promptly that OpenAI ended the call. An unknown call is
+         *     not going.
+         */
+        get: operations["web_call_state_web_phone_calls__call_key__get"];
         put?: never;
         post?: never;
         /** Hang up the web phone */
@@ -2563,6 +2569,11 @@ export interface components {
             /** Session Id */
             session_id: string | null;
             turned_away?: components["schemas"]["TurnAway"] | null;
+        };
+        /** WebCallState */
+        WebCallState: {
+            /** Live */
+            live: boolean;
         };
         /** WebPhoneInfo */
         WebPhoneInfo: {
@@ -4853,6 +4864,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    web_call_state_web_phone_calls__call_key__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Web-Phone-Key"?: string | null;
+            };
+            path: {
+                call_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebCallState"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
             /** @description Service Unavailable */

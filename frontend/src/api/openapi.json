@@ -3862,6 +3862,19 @@
         "title": "WebCall",
         "type": "object"
       },
+      "WebCallState": {
+        "properties": {
+          "live": {
+            "title": "Live",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "live"
+        ],
+        "title": "WebCallState",
+        "type": "object"
+      },
       "WebPhoneInfo": {
         "properties": {
           "lines": {
@@ -7318,6 +7331,84 @@
           }
         },
         "summary": "Hang up the web phone",
+        "tags": [
+          "web phone"
+        ]
+      },
+      "get": {
+        "description": "For the page to hang up when the backend has: a browser is not\nalways told promptly that OpenAI ended the call. An unknown call is\nnot going.",
+        "operationId": "web_call_state_web_phone_calls__call_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "call_key",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Call Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Web-Phone-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Web-Phone-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebCallState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Whether a web call is still going",
         "tags": [
           "web phone"
         ]

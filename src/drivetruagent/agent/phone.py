@@ -38,6 +38,7 @@ from drivetruagent.agent.voice import (
     say_and_hang_up,
     session_config,
     turn_away,
+    turn_detection,
 )
 from drivetruagent.enums import Channel, SessionState
 from drivetruagent.ordering.callers import record_call
@@ -322,6 +323,7 @@ def handle_phone_call(
                 call_id,
                 bridge_for,
                 greeting=greeting(config.restaurant_name, number_known=number_known),
+                listening=turn_detection(voice),
             ),
         ),
     )

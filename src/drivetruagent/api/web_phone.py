@@ -2,6 +2,7 @@
 
     GET    /web-phone/line                   who answers, and the lines; checks the key
     POST   /web-phone/calls?line=N           the browser's SDP offer in, the call out
+    GET    /web-phone/calls/{key}            whether the call is still going
     POST   /web-phone/calls/{key}/connected  the browser's audio is up
     DELETE /web-phone/calls/{key}            hang up
 
@@ -247,6 +248,25 @@ async def start_web_call(
         session_id=outcome.session_id,
         turned_away=outcome.turned_away,
     )
+
+
+class WebCallState(BaseModel):
+    # False once the backend has finished with the call: it hung up after
+    # an order, a handoff or a goodbye, or the call failed.
+    live: bool
+
+
+@router.get(
+    "/web-phone/calls/{call_key}",
+    dependencies=Keyed,
+    responses=FORBIDDEN | UNAVAILABLE,
+    summary="Whether a web call is still going",
+)
+async def web_call_state(call_key: uuid.UUID, calls: LiveCallsDep) -> WebCallState:
+    """For the page to hang up when the backend has: a browser is not
+    always told promptly that OpenAI ended the call. An unknown call is
+    not going."""
+    return WebCallState(live=calls.is_live(call_key))
 
 
 @router.post(
