@@ -9,7 +9,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { api, ApiError, type AgentInfo, type Cart, type Cost, type Menu, type Session, type WeekOfSpecials } from '../api/client'
+import { api, ApiError, type AgentInfo, type Cart, type Cost, type Menu, type PhoneCall, type Session, type WeekOfSpecials } from '../api/client'
 import { deriveAgentState, isFinal, runningSeconds, speakingMilliseconds, timerNote } from './presentation'
 import { useVoiceCall, type Voice } from '../voice/useVoiceCall'
 import { stockGroups, type StockGroup } from './board'
@@ -45,6 +45,11 @@ export interface LiveSession {
   status: 'starting' | 'ready' | 'waiting' | 'failed'
   /** Following phone calls: the screen watches, the caller talks on their phone. */
   following: boolean
+  /** Following phone calls: the calls in progress, newest first. */
+  calls: PhoneCall[]
+  /** Following phone calls: the call picked to stay on screen; null follows the newest. */
+  watching: string | null
+  watch: (sessionId: string | null) => void
   /** Something the viewer should be told, in plain words. */
   problem: string | null
   agent: AgentInfo | null
@@ -113,17 +118,29 @@ export function useLiveSession(options: { follow?: 'phone' } = {}): LiveSession 
   const [speaking, setSpeaking] = useState(false)
   const speakingTimer = useRef<number | undefined>(undefined)
 
+  // Following phone calls, several can be going at once: the screen shows the
+  // newest unless one is picked.
+  const [watching, setWatching] = useState<string | null>(null)
+
   const agentQuery = useQuery({ queryKey: ['agent'], queryFn: api.agentInfo, staleTime: Infinity })
-  const openedKey = ['live-session', following ? 'phone' : 'lane', generation]
+  const callsQuery = useQuery({
+    queryKey: ['phone-calls'],
+    queryFn: api.phoneCalls,
+    enabled: following,
+    refetchInterval: CALL_LOOKUP_INTERVAL_MS,
+  })
+  const openedKey = ['live-session', following ? 'phone' : 'lane', generation, watching]
   const opened = useQuery({
     queryKey: openedKey,
-    queryFn: following
-      ? () => newestCall(queryClient.getQueryData<Session | null>(openedKey))
-      : resumeOrOpen,
+    queryFn: !following
+      ? resumeOrOpen
+      : watching
+        ? () => api.session(watching)
+        : () => newestCall(queryClient.getQueryData<Session | null>(openedKey)),
     staleTime: Infinity,
     gcTime: Infinity,
     retry: false,
-    refetchInterval: following ? CALL_LOOKUP_INTERVAL_MS : false,
+    refetchInterval: following && !watching ? CALL_LOOKUP_INTERVAL_MS : false,
   })
   const sessionId = opened.data?.session_id
 
@@ -252,12 +269,16 @@ export function useLiveSession(options: { follow?: 'phone' } = {}): LiveSession 
     setSpeaking(false)
     voice.stop()
     message.reset()
+    setWatching(null)
     setGeneration((current) => current + 1)
   }, [following, message, voice])
 
   return {
     status: opened.isError ? 'failed' : sessionId ? 'ready' : following && opened.isSuccess ? 'waiting' : 'starting',
     following,
+    calls: callsQuery.data ?? [],
+    watching,
+    watch: setWatching,
     problem:
       following && opened.isSuccess && !sessionId
         ? NO_CALL

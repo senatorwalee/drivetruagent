@@ -1,6 +1,8 @@
 /**
  * A tiny in-memory stand-in for the backend, for testing the page as a whole.
- * It answers the same paths the real API does and keeps one session's state.
+ * It answers the same paths the real API does and keeps one session's state
+ * at a time; phone calls ringing at once are set aside and swapped back in
+ * when the page asks for them.
  */
 import { vi } from 'vitest'
 
@@ -28,11 +30,28 @@ export function installFakeBackend() {
   const requests: Request[] = []
   let sessionCount = 0
   let session: Session | null = null
-  // Phone calls ring in by themselves; this page only watches them.
-  let phoneCall: Session | null = null
   let events: AgentEvent[] = []
   let cart: Cart | null = null
   let seq = 1
+  // Phone calls ring in by themselves; this page only watches them. Newest last.
+  const phoneCalls: { sessionId: string; lastFour: string }[] = []
+  // The sessions not being looked at right now, by id.
+  const setAside = new Map<string, { session: Session; events: AgentEvent[]; cart: Cart | null }>()
+
+  const setCurrentAside = () => {
+    if (session) setAside.set(session.session_id, { session, events, cart })
+  }
+  /** Makes the session asked for the current one; false if there is none. */
+  const switchTo = (sessionId: string): boolean => {
+    if (session?.session_id === sessionId) return true
+    const other = setAside.get(sessionId)
+    if (!other) return false
+    setCurrentAside()
+    setAside.delete(sessionId)
+    ;({ session, events, cart } = other)
+    return true
+  }
+  const stateOf = (sessionId: string) => (session?.session_id === sessionId ? session : setAside.get(sessionId)?.session)
 
   const record = (kind: AgentEvent['kind'], payload: Record<string, unknown>) => {
     events.push({ seq: seq++, turn_id: 'turn', kind, payload, created_at: new Date().toISOString() })
@@ -119,15 +138,18 @@ export function installFakeBackend() {
       if (path === '/specials/week') return respond(200, week)
       if (path === '/sessions' && method === 'POST') return respond(201, openSession(body.lane))
       if (path === '/phone/calls') {
-        const live = phoneCall && phoneCall.ended_at === null ? [phoneCall] : []
+        const live = phoneCalls
+          .map((call) => ({ call, state: stateOf(call.sessionId) }))
+          .filter(({ state }) => state && state.ended_at === null)
+          .reverse()
         return respond(
           200,
-          live.map((call) => ({ session_id: call.session_id, started_at: call.started_at, caller_last_four: '0123' })),
+          live.map(({ call, state }) => ({ session_id: call.sessionId, started_at: state!.started_at, caller_last_four: call.lastFour })),
         )
       }
 
       const match = /^\/sessions\/([^/]+)(\/\w+)?$/.exec(path)
-      if (!match || !session || match[1] !== session.session_id) return notFound()
+      if (!match || !switchTo(match[1]!) || !session) return notFound()
       const resource = match[2] ?? ''
       if (resource === '') return respond(200, session)
       if (resource === '/cart') return respond(200, cart)
@@ -165,13 +187,15 @@ export function installFakeBackend() {
       session = { ...session!, state: 'abandoned', ended_at: new Date().toISOString(), end_reason: 'silence_timeout' }
       cart = { ...cart!, state: 'abandoned' }
     },
-    /** Someone rings the restaurant: a phone session opens and the notice is said. */
-    ring: () => {
-      const call = openSession('phone-1')
-      phoneCall = { ...call, channel: 'phone', session_id: `call-${sessionCount}` }
-      session = phoneCall
-      cart = { ...cart!, session_id: phoneCall.session_id }
-      record('assistant_message', { text: 'Hi, thanks for calling Maple Lane Burgers.' })
+    /** Someone rings the restaurant: a phone session opens and the notice is
+     *  said. A call already going carries on beside it. */
+    ring: ({ lastFour = '0123', said = 'Hi, thanks for calling Maple Lane Burgers.' } = {}) => {
+      setCurrentAside()
+      const call = openSession(`phone-${sessionCount + 1}`)
+      session = { ...call, channel: 'phone', session_id: `call-${sessionCount}` }
+      cart = { ...cart!, session_id: session.session_id }
+      phoneCalls.push({ sessionId: session.session_id, lastFour })
+      record('assistant_message', { text: said })
     },
     sessionsOpened: () => requests.filter((request) => request.method === 'POST' && request.path === '/sessions').length,
   }

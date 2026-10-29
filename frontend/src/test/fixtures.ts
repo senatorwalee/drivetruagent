@@ -236,6 +236,9 @@ export function liveSession(overrides: Partial<LiveSession> = {}): LiveSession {
   return {
     status: 'ready',
     following: false,
+    calls: [],
+    watching: null,
+    watch: () => {},
     problem: null,
     agent: agentInfo,
     session,
