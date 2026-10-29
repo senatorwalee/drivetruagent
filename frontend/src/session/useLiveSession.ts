@@ -12,7 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, ApiError, type AgentInfo, type Cart, type Cost, type Menu, type PhoneCall, type Session, type WeekOfSpecials } from '../api/client'
 import { deriveAgentState, isFinal, runningSeconds, speakingMilliseconds, timerNote } from './presentation'
 import { useVoiceCall, type Voice } from '../voice/useVoiceCall'
-import { stockGroups, type StockGroup } from './board'
+import { comboStates, stockGroups, type ComboState, type StockGroup } from './board'
 import { buildTimeline } from './timeline'
 import { useNow } from './useNow'
 import type { AgentState, Timeline } from './types'
@@ -71,8 +71,8 @@ export interface LiveSession {
   paused: boolean
   /** The voice call, if one is on, and how to start or end one. */
   voice: Voice
-  /** The week's specials and the stock, for the board under the session. */
-  board: { week: WeekOfSpecials | null; stock: StockGroup[] }
+  /** The week's specials, the combos with what the cart has toward them, and the stock, for the board under the session. */
+  board: { week: WeekOfSpecials | null; combos: ComboState[]; stock: StockGroup[] }
   canSend: boolean
   send: (text: string) => void
   startNewSession: () => void
@@ -223,10 +223,19 @@ export function useLiveSession(options: { follow?: 'phone' } = {}): LiveSession 
     queryFn: () => api.weekOfSpecials(language),
     refetchInterval: SPECIALS_INTERVAL_MS,
   })
+  const combosQuery = useQuery({
+    queryKey: ['combos', language],
+    queryFn: () => api.combos(language),
+    refetchInterval: SPECIALS_INTERVAL_MS,
+  })
   const week = weekQuery.data ?? null
   const board = useMemo(
-    () => ({ week, stock: stockGroups(menuQuery.data, stockQuery.data ?? [], week) }),
-    [week, menuQuery.data, stockQuery.data],
+    () => ({
+      week,
+      combos: comboStates(combosQuery.data ?? [], menuQuery.data, cart),
+      stock: stockGroups(menuQuery.data, stockQuery.data ?? [], week),
+    }),
+    [week, combosQuery.data, menuQuery.data, stockQuery.data, cart],
   )
 
   const timeline = useMemo(() => (eventsQuery.data ? buildTimeline(eventsQuery.data) : EMPTY_TIMELINE), [eventsQuery.data])

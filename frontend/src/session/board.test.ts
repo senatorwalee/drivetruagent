@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import type { Menu } from '../api/client'
+import type { Cart, Combo, Menu } from '../api/client'
 import { stockLevels, week } from '../test/fixtures'
-import { isLow, stockGroups, todaysSpecials } from './board'
+import { comboStates, isLow, stockGroups, todaysSpecials } from './board'
 
 const item = (item_code: string, item_name: string) => ({
   item_code,
@@ -68,5 +68,71 @@ describe('todaysSpecials', () => {
 describe('isLow', () => {
   it('is true at five or fewer', () => {
     expect([6, 5, 0].map((available) => isLow({ available }))).toEqual([false, true, true])
+  })
+})
+
+describe('comboStates', () => {
+  const combo: Combo = {
+    code: 'burger_combo',
+    name: 'Burger combo',
+    saves_cents: 200,
+    slots: [
+      { category_code: 'burgers', category_name: 'Burgers' },
+      { category_code: 'sides', category_name: 'Sides' },
+      { category_code: 'drinks', category_name: 'Drinks' },
+    ],
+  }
+  const line = (line_no: number, item_code: string, item_name: string, quantity = 1) => ({
+    line_no,
+    item_code,
+    item_name,
+    quantity,
+    options: [],
+    unit_price_cents: 100,
+    line_total_cents: 100 * quantity,
+  })
+  const cartOf = (lines: Cart['lines'], discounts: Cart['discounts'] = []): Cart => ({
+    session_id: 's',
+    state: 'ordering',
+    language: 'en',
+    version: 1,
+    item_count: lines.length,
+    subtotal_cents: 0,
+    discounts,
+    discount_cents: 0,
+    tax_cents: 0,
+    total_cents: 0,
+    lines,
+  })
+
+  it('fills each slot with an item of its category from the cart', () => {
+    const [state] = comboStates([combo], menu, cartOf([line(1, 'cola', 'Cola'), line(2, 'cheeseburger', 'Cheeseburger')]))
+
+    expect(state?.slots).toEqual([
+      { categoryName: 'Burgers', itemName: 'Cheeseburger' },
+      { categoryName: 'Sides', itemName: null },
+      { categoryName: 'Drinks', itemName: 'Cola' },
+    ])
+    expect(state?.times).toBe(0)
+  })
+
+  it('takes whether it applies from the cart the backend priced, never from the slots', () => {
+    const full = [line(1, 'cheeseburger', 'Cheeseburger'), line(2, 'fries', 'Fries'), line(3, 'cola', 'Cola')]
+    const priced = [{ kind: 'combo' as const, code: 'burger_combo', name: 'Burger combo', times: 1, amount_cents: 200 }]
+
+    expect(comboStates([combo], menu, cartOf(full))[0]?.times).toBe(0)
+    expect(comboStates([combo], menu, cartOf(full, priced))[0]?.times).toBe(1)
+  })
+
+  it('counts each unit once, so a slot needing two takes two', () => {
+    const twoDrinks = { ...combo, slots: [...combo.slots, { category_code: 'drinks', category_name: 'Drinks' }] }
+
+    const [state] = comboStates([twoDrinks], menu, cartOf([line(1, 'cola', 'Cola', 2)]))
+
+    expect(state?.slots.map((slot) => slot.itemName)).toEqual([null, null, 'Cola', 'Cola'])
+  })
+
+  it('shows empty slots with no cart or menu yet', () => {
+    expect(comboStates([combo], undefined, null)[0]?.slots.every((slot) => slot.itemName === null)).toBe(true)
   })
 })

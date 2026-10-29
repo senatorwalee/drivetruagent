@@ -67,7 +67,7 @@ export function MenuBoard({ live, view, onViewChange }: LiveSessionViewProps) {
         </section>
         <OrderPanel live={live} />
         <DecisionStrip decisions={live.timeline.decisions} />
-        <ShopBoard week={live.board.week} stock={live.board.stock} className={styles.board} />
+        <ShopBoard week={live.board.week} combos={live.board.combos} stock={live.board.stock} className={styles.board} />
       </main>
     </div>
   )
