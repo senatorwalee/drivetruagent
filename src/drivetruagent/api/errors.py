@@ -24,6 +24,7 @@ _NOT_FOUND = {
     "no_photo",
     "caller_not_found",
     "summary_not_found",
+    "no_such_web_phone_line",
 }
 # Turned off on this server.
 _FORBIDDEN = {"typed_caller_id_off", "wrong_web_phone_key"}
@@ -40,6 +41,7 @@ _CONFLICT = {
     "handoff_resolved",
     "session_not_handed_off",
     "voice_call_in_progress",
+    "web_phone_line_busy",
     "duplicate_item_name",
     "not_a_pickup_order",
     "session_in_progress",

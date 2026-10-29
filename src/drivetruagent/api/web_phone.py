@@ -1,7 +1,7 @@
 """The web phone: ring the agent from a phone's browser, without a number.
 
-    GET    /web-phone/line                   who answers; also checks the key
-    POST   /web-phone/calls                  the browser's SDP offer in, the call out
+    GET    /web-phone/line                   who answers, and the lines; checks the key
+    POST   /web-phone/calls?line=N           the browser's SDP offer in, the call out
     POST   /web-phone/calls/{key}/connected  the browser's audio is up
     DELETE /web-phone/calls/{key}            hang up
 
@@ -9,7 +9,9 @@ For demos where there is no phone line. The call is a phone call in every
 way but how it arrives: the same notice, session, rules and log. Every
 request carries WEB_PHONE_KEY, since these endpoints are reachable through
 the tunnel and each call spends the OpenAI key. The caller's number comes
-from WEB_PHONE_CALLER, never from the browser. See agent/phone.py.
+from WEB_PHONE_CALLER, never from the browser: the browser only picks a line,
+and each number set there is a line of its own, taking one call at a time.
+See agent/phone.py.
 """
 
 import asyncio
@@ -18,13 +20,13 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Annotated
 
-from fastapi import Depends, Header, Request, Response, status
+from fastapi import Depends, Header, Query, Request, Response, status
 from fastapi.routing import APIRouter
 from pydantic import BaseModel
 
 from drivetruagent.agent.factory import agent_config
 from drivetruagent.agent.phone import answer_web_call
-from drivetruagent.agent.voice import VoiceCallInProgress
+from drivetruagent.agent.voice import LiveCalls
 from drivetruagent.api.deps import (
     BusinessDateDep,
     SessionDep,
@@ -60,6 +62,23 @@ class WrongWebPhoneKey(OrderingError):
         super().__init__("This link's key is missing or out of date.")
 
 
+class NoSuchLine(OrderingError):
+    code = "no_such_web_phone_line"
+
+    def __init__(self, line: int) -> None:
+        super().__init__(f"The web phone has no line {line}.", line=line)
+
+
+class LineBusy(OrderingError):
+    code = "web_phone_line_busy"
+
+    def __init__(self, line: int) -> None:
+        super().__init__(
+            f"Line {line} is already on a call. Pick another, or wait for it to end.",
+            line=line,
+        )
+
+
 class NotAnOffer(OrderingError):
     code = "not_an_offer"
 
@@ -68,21 +87,43 @@ class NotAnOffer(OrderingError):
 
 
 @dataclass
-class WebPhoneLine:
-    """The web phone's one line: a call at a time, which also caps what a
-    leaked link can spend."""
+class WebPhoneLines:
+    """The web phone's lines, one per number: a call at a time on each, which
+    also caps what a leaked link can spend."""
 
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
-    current: uuid.UUID | None = None
+    # The call on each line, by line number (from 1).
+    current: dict[int, uuid.UUID] = field(default_factory=dict)
     connected: dict[uuid.UUID, asyncio.Event] = field(default_factory=dict)
 
+    def busy(self, line: int, calls: LiveCalls) -> bool:
+        call_key = self.current.get(line)
+        return call_key is not None and calls.is_live(call_key)
 
-def get_web_phone_line(request: Request) -> WebPhoneLine:
-    line: WebPhoneLine | None = getattr(request.app.state, "web_phone_line", None)
-    if line is None:
-        line = WebPhoneLine()
-        request.app.state.web_phone_line = line
-    return line
+
+def get_web_phone_lines(request: Request) -> WebPhoneLines:
+    lines: WebPhoneLines | None = getattr(request.app.state, "web_phone_lines", None)
+    if lines is None:
+        lines = WebPhoneLines()
+        request.app.state.web_phone_lines = lines
+    return lines
+
+
+def caller_numbers(setting: str | None) -> list[str | None]:
+    """The number each line calls from, from WEB_PHONE_CALLER: one number, or
+    several separated by commas. Unset: one line, from a withheld number."""
+    if setting is None:
+        return [None]
+    numbers: list[str | None] = []
+    for written in filter(None, (part.strip() for part in setting.split(","))):
+        number = normalize_phone(written)
+        if number is None:
+            raise WebPhoneOff("WEB_PHONE_CALLER holds something that is not a number.")
+        if number not in numbers:
+            numbers.append(number)
+    if not numbers:
+        return [None]
+    return numbers
 
 
 def require_key(
@@ -96,13 +137,22 @@ def require_key(
         raise WrongWebPhoneKey()
 
 
-LineDep = Annotated[WebPhoneLine, Depends(get_web_phone_line)]
+LinesDep = Annotated[WebPhoneLines, Depends(get_web_phone_lines)]
 Keyed = [Depends(require_key)]
+
+
+class WebPhoneLine(BaseModel):
+    line: int
+    # The last four digits of the number it calls from, to tell the lines
+    # apart; None for a withheld number. The page never gets the whole number.
+    caller_last_four: str | None
+    busy: bool
 
 
 class WebPhoneInfo(BaseModel):
     # Who the call goes to, for the page to show before it rings.
     restaurant_name: str
+    lines: list[WebPhoneLine]
 
 
 @router.get(
@@ -111,10 +161,23 @@ class WebPhoneInfo(BaseModel):
     responses=FORBIDDEN | UNAVAILABLE,
     summary="Who the web phone calls",
 )
-async def web_phone_line(settings: SettingsDep) -> WebPhoneInfo:
-    """Lets the page show who it calls, and find out a wrong key before
-    anyone taps Call."""
-    return WebPhoneInfo(restaurant_name=settings.restaurant_name)
+async def web_phone_line(
+    settings: SettingsDep, calls: LiveCallsDep, lines: LinesDep
+) -> WebPhoneInfo:
+    """Lets the page show who it calls and which lines are free, and find out
+    a wrong key before anyone taps Call."""
+    numbers = caller_numbers(settings.web_phone_caller)
+    return WebPhoneInfo(
+        restaurant_name=settings.restaurant_name,
+        lines=[
+            WebPhoneLine(
+                line=line,
+                caller_last_four=None if number is None else number[-4:],
+                busy=lines.busy(line, calls),
+            )
+            for line, number in enumerate(numbers, start=1)
+        ],
+    )
 
 
 class WebCall(BaseModel):
@@ -131,7 +194,7 @@ class WebCall(BaseModel):
     "/web-phone/calls",
     status_code=status.HTTP_201_CREATED,
     dependencies=Keyed,
-    responses=FORBIDDEN | CONFLICT | REFUSED | UNAVAILABLE,
+    responses=FORBIDDEN | NOT_FOUND | CONFLICT | REFUSED | UNAVAILABLE,
     summary="Ring the agent from the web phone",
 )
 async def start_web_call(
@@ -143,21 +206,25 @@ async def start_web_call(
     calls: LiveCallsDep,
     scope: ScopeDep,
     specials_cache: SpecialsCacheDep,
-    line: LineDep,
+    lines: LinesDep,
+    line: Annotated[int, Query(ge=1)] = 1,
 ) -> WebCall:
-    """Answered like a phone call from WEB_PHONE_CALLER. Refused while the
-    last web call is still going."""
+    """Answered like a phone call from the line's number in WEB_PHONE_CALLER.
+    Refused while the line's last call is still going."""
     offer = (await request.body()).decode("utf-8", errors="replace")
     if not offer.startswith("v="):
         raise NotAnOffer()
-    caller_phone = None
-    if settings.web_phone_caller is not None:
-        caller_phone = normalize_phone(settings.web_phone_caller)
-        if caller_phone is None:
-            raise WebPhoneOff("WEB_PHONE_CALLER is not a phone number.")
-    async with line.lock:
-        if line.current is not None and calls.is_live(line.current):
-            raise VoiceCallInProgress()
+    numbers = caller_numbers(settings.web_phone_caller)
+    if line > len(numbers):
+        raise NoSuchLine(line)
+    caller_phone = numbers[line - 1]
+    async with lines.lock:
+        if lines.busy(line, calls):
+            raise LineBusy(line)
+        # Forget the calls that are over.
+        lines.connected = {
+            key: event for key, event in lines.connected.items() if calls.is_live(key)
+        }
         connected = asyncio.Event()
         outcome = await answer_web_call(
             db,
@@ -172,8 +239,8 @@ async def start_web_call(
             business_date=today,
             caller_limits=settings.caller_limits,
         )
-        line.current = outcome.call_key
-        line.connected = {outcome.call_key: connected}
+        lines.current[line] = outcome.call_key
+        lines.connected[outcome.call_key] = connected
     return WebCall(
         call_key=outcome.call_key,
         answer_sdp=outcome.answer_sdp,
@@ -189,10 +256,10 @@ async def start_web_call(
     responses=FORBIDDEN | UNAVAILABLE,
     summary="The web phone's audio is connected",
 )
-async def web_call_connected(call_key: uuid.UUID, line: LineDep) -> Response:
+async def web_call_connected(call_key: uuid.UUID, lines: LinesDep) -> Response:
     """The agent starts talking now. A call that is over, or unknown, is
     already done with: nothing to do."""
-    event = line.connected.get(call_key)
+    event = lines.connected.get(call_key)
     if event is not None:
         event.set()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

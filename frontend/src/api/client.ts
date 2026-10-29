@@ -39,6 +39,7 @@ export type Caller = Schemas['CallerView']
 export type CallerStatus = Schemas['CallerStatus']
 export type Standing = Schemas['Standing']
 export type WebPhoneInfo = Schemas['WebPhoneInfo']
+export type WebPhoneLine = Schemas['WebPhoneLine']
 export type WebCall = Schemas['WebCall']
 export type ConversationSummary = Schemas['SummaryView']
 export type SummaryDetail = Schemas['SummaryDetail']
@@ -139,9 +140,9 @@ export const api = {
     if (!response.ok) throw await toApiError(response)
     return (await response.json()) as WebPhoneInfo
   },
-  /** Ring the agent: our WebRTC offer in, the call (with OpenAI's answer) out. */
-  callWebPhone: async (key: string, sdp: string): Promise<WebCall> => {
-    const response = await fetch(`${BASE}/web-phone/calls`, {
+  /** Ring the agent on a line: our WebRTC offer in, the call (with OpenAI's answer) out. */
+  callWebPhone: async (key: string, sdp: string, line = 1): Promise<WebCall> => {
+    const response = await fetch(`${BASE}/web-phone/calls?line=${line}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/sdp', 'X-Web-Phone-Key': key },
       body: sdp,

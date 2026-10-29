@@ -29,7 +29,7 @@ from drivetruagent.api.voice import (
     get_realtime_client,
     get_session_scope,
 )
-from drivetruagent.api.web_phone import WebPhoneLine, get_web_phone_line
+from drivetruagent.api.web_phone import WebPhoneLines, get_web_phone_lines
 from drivetruagent.config import Settings, get_settings
 from drivetruagent.db.models import Caller, CustomerSession
 from drivetruagent.enums import CallerStatus, Channel, SessionState
@@ -45,6 +45,7 @@ OFFER = "v=0\r\no=- 1 2 IN IP4 127.0.0.1\r\ns=-\r\n"
 ANSWER = "v=0\r\no=- 3 4 IN IP4 127.0.0.1\r\ns=answer\r\n"
 CALL_ID = "rtc_web123"
 CALLER = "+16475550123"
+OTHER_CALLER = "+14165550188"
 
 
 class StandInOpenAI:
@@ -110,8 +111,8 @@ def use(
     app.dependency_overrides[get_realtime_client] = lambda: stand_in
     app.dependency_overrides[get_live_calls] = lambda: stand_in.calls
     app.dependency_overrides[get_session_scope] = lambda: lambda: borrowed(db_session)
-    line = WebPhoneLine()
-    app.dependency_overrides[get_web_phone_line] = lambda: line
+    lines = WebPhoneLines()
+    app.dependency_overrides[get_web_phone_lines] = lambda: lines
     app.dependency_overrides[get_settings] = lambda: Settings(
         database_url="postgresql+psycopg://unused",
         tax_rate=TEST_TAX_RATE,
@@ -135,12 +136,19 @@ def quick_goodbyes(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 async def ring(
-    client: httpx.AsyncClient, *, key: str | None = KEY, offer: str = OFFER
+    client: httpx.AsyncClient,
+    *,
+    key: str | None = KEY,
+    offer: str = OFFER,
+    line: int | None = None,
 ) -> httpx.Response:
     headers = {"Content-Type": "application/sdp"}
     if key is not None:
         headers["X-Web-Phone-Key"] = key
-    return await client.post("/web-phone/calls", content=offer, headers=headers)
+    params = {} if line is None else {"line": line}
+    return await client.post(
+        "/web-phone/calls", content=offer, headers=headers, params=params
+    )
 
 
 async def connect(
@@ -202,7 +210,10 @@ async def test_the_page_can_check_its_key_and_learn_who_it_calls(
 
     assert (right.status_code, right.json()) == (
         200,
-        {"restaurant_name": "Maple Lane Burgers"},
+        {
+            "restaurant_name": "Maple Lane Burgers",
+            "lines": [{"line": 1, "caller_last_four": "0123", "busy": False}],
+        },
     )
     assert wrong.status_code == 403
 
@@ -305,15 +316,18 @@ async def test_without_a_set_number_the_call_is_from_a_withheld_number(
     assert "keep your number" not in stand_in.said[0]
 
 
+@pytest.mark.parametrize("setting", ["my cell", f"{CALLER},my cell"])
 async def test_a_set_number_that_is_not_a_number_turns_the_web_phone_off(
-    app: FastAPI, client: httpx.AsyncClient, db_session: AsyncSession
+    app: FastAPI, client: httpx.AsyncClient, db_session: AsyncSession, setting: str
 ) -> None:
-    use(app, db_session, StandInOpenAI(), web_phone_caller="my cell")
+    use(app, db_session, StandInOpenAI(), web_phone_caller=setting)
 
     response = await ring(client)
+    info = await client.get("/web-phone/line", headers={"X-Web-Phone-Key": KEY})
 
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "web_phone_off"
+    assert info.status_code == 503
 
 
 async def test_a_call_openai_will_not_take_closes_its_session(
@@ -331,10 +345,10 @@ async def test_a_call_openai_will_not_take_closes_its_session(
     )
 
 
-# --- One call at a time, and hanging up -------------------------------------
+# --- A call at a time on each line, and hanging up --------------------------
 
 
-async def test_a_second_call_while_the_first_is_going_is_refused(
+async def test_a_second_call_on_a_line_in_use_is_refused(
     app: FastAPI, client: httpx.AsyncClient, db_session: AsyncSession
 ) -> None:
     stand_in = StandInOpenAI(call_stays_open=True)
@@ -345,9 +359,58 @@ async def test_a_second_call_while_the_first_is_going_is_refused(
 
     assert first.status_code == 201
     assert second.status_code == 409
-    assert second.json()["error"]["code"] == "voice_call_in_progress"
+    assert second.json()["error"]["code"] == "web_phone_line_busy"
     assert len(stand_in.created) == 1
     await stand_in.calls.close_all()
+
+
+async def test_each_number_is_a_line_and_the_page_sees_which_are_busy(
+    app: FastAPI, client: httpx.AsyncClient, db_session: AsyncSession
+) -> None:
+    stand_in = StandInOpenAI(call_stays_open=True)
+    use(app, db_session, stand_in, web_phone_caller=f"{CALLER}, 416 555 0188")
+
+    await ring(client, line=2)
+    info = await client.get("/web-phone/line", headers={"X-Web-Phone-Key": KEY})
+
+    assert info.json()["lines"] == [
+        {"line": 1, "caller_last_four": "0123", "busy": False},
+        {"line": 2, "caller_last_four": "0188", "busy": True},
+    ]
+    await stand_in.calls.close_all()
+
+
+async def test_calls_on_different_lines_go_on_at_once_from_their_own_numbers(
+    app: FastAPI, client: httpx.AsyncClient, db_session: AsyncSession
+) -> None:
+    stand_in = StandInOpenAI(call_stays_open=True)
+    use(app, db_session, stand_in, web_phone_caller=f"{CALLER},{OTHER_CALLER}")
+
+    first = await ring(client, line=1)
+    second = await ring(client, line=2)
+
+    assert (first.status_code, second.status_code) == (201, 201)
+    sessions = {session.id: session for session in await sessions_in(db_session)}
+    numbers = []
+    for response in (first, second):
+        session = sessions[uuid.UUID(response.json()["session_id"])]
+        caller = await db_session.get(Caller, session.caller_id)
+        assert caller is not None
+        numbers.append(caller.phone_e164)
+    assert numbers == [CALLER, OTHER_CALLER]
+    listed = (await client.get("/phone/calls")).json()
+    assert {call["caller_last_four"] for call in listed} == {"0123", "0188"}
+    await stand_in.calls.close_all()
+
+
+async def test_a_line_that_is_not_set_up_is_not_found(
+    client: httpx.AsyncClient, stand_in: StandInOpenAI
+) -> None:
+    response = await ring(client, line=2)
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "no_such_web_phone_line"
+    assert stand_in.created == []
 
 
 async def test_once_the_first_call_is_over_the_line_is_free(

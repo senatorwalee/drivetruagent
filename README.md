@@ -1216,8 +1216,11 @@ browser: audio up -> POST .../connected -> the notice is said
   change the key after a demo.
 - **The number is the server's.** A web call comes from `WEB_PHONE_CALLER`,
   never from anything the page sends; unset, it is a withheld number.
-- **One call at a time.** A second call while one is going is told the line
-  is busy, which also limits what a leaked link can spend.
+- **One line per number, one call per line.** Set several numbers,
+  separated by commas, and the page offers a line for each (shown by its
+  last four digits), so two or three phones can call at once, each as a
+  different caller with its own past orders. A second call on a line that is
+  in use is told it's busy, which also limits what a leaked link can spend.
 - **No transfer.** There's no line to put a caller through on, so a call that
   needs a person ends with "a team member will call you back", and the
   handoff appears on the staff screen as usual.
@@ -1226,11 +1229,14 @@ To try it:
 
 1. In `.env`, set `WEB_PHONE_KEY` (for example `openssl rand -hex 16`) and
    `WEB_PHONE_CALLER` (the number to treat the calls as coming from, so caller
-   memory works), then `make demo`.
+   memory works; several, separated by commas, for calls at once), then
+   `make demo`.
 2. Run `make tunnel`. The web phone needs HTTPS, because phones only let a
    page use the microphone over HTTPS; the tunnel gives it that.
 3. On your phone, open `https://words.trycloudflare.com/call#key=<your key>`
-   and tap **Call**. Watch on <http://localhost:8080/calls>.
+   and tap **Call**. Watch on <http://localhost:8080/calls>. For calls at
+   once, open the same link on each phone and pick a different line on each;
+   `#key=<your key>&line=2` opens a phone on line 2.
 
 On the computer itself, <http://localhost:8080/call#key=…> works without the
 tunnel. The tunnel serves only the webhook and the web phone (the page and

@@ -4,7 +4,7 @@ import { useNow } from '../session/useNow'
 import { MicrophoneIcon } from '../views/shared/icons'
 import { type PhoneParts, useWebPhone } from './useWebPhone'
 import styles from './WebPhone.module.css'
-import { initials, keyFromHash, speakingLine, statusLine, turnedAwayLine } from './words'
+import { initials, keyFromHash, lineFromHash, lineLabel, speakingLine, statusLine, turnedAwayLine } from './words'
 
 function PhoneIcon() {
   return (
@@ -20,7 +20,7 @@ function PhoneIcon() {
  * a link that carries the key: /call#key=….
  */
 export function WebPhonePage({ parts }: { parts?: PhoneParts }) {
-  const phone = useWebPhone(keyFromHash(window.location.hash), parts)
+  const phone = useWebPhone(keyFromHash(window.location.hash), parts, lineFromHash(window.location.hash))
   const now = useNow()
   const { voice } = phone
   const active = voice.status === 'connecting' || voice.status === 'live'
@@ -48,6 +48,30 @@ export function WebPhonePage({ parts }: { parts?: PhoneParts }) {
         {turnedAway && <p className={styles.problem}>{turnedAway}</p>}
         {speaking && <p className={styles.speaking}>{speaking}</p>}
       </section>
+
+      {phone.lines.length > 1 && (
+        <fieldset className={styles.lines} disabled={active}>
+          <legend className={styles.linesLabel}>Call as</legend>
+          {phone.lines.map((each) => {
+            const mine = each.line === phone.line
+            const taken = each.busy && !(mine && active)
+            return (
+              <label key={each.line} className={`${styles.line} ${mine ? styles.lineChosen : ''}`}>
+                <input
+                  type="radio"
+                  name="line"
+                  value={each.line}
+                  checked={mine}
+                  disabled={taken}
+                  onChange={() => phone.chooseLine(each.line)}
+                />
+                <span className={styles.lineNumber}>{lineLabel(each)}</span>
+                <span className={styles.lineState}>{taken ? 'On a call' : mine && active ? 'You' : 'Free'}</span>
+              </label>
+            )
+          })}
+        </fieldset>
+      )}
 
       <div className={styles.controls}>
         {active ? (
