@@ -183,4 +183,32 @@ describe('following phone calls', () => {
     expect(await screen.findByLabelText('What the customer says')).toBeDisabled()
     expect(backend.sessionsOpened()).toBe(0)
   })
+
+  it('shows no switcher with only one call', async () => {
+    backend.ring()
+    render(<App />)
+
+    await screen.findByText('Hi, thanks for calling Maple Lane Burgers.')
+    expect(screen.queryByRole('navigation', { name: 'Calls in progress' })).not.toBeInTheDocument()
+  })
+
+  it('with calls at once, shows the newest and lets another be picked', async () => {
+    backend.ring({ lastFour: '0123', said: 'First caller’s call.' })
+    backend.ring({ lastFour: '0188', said: 'Second caller’s call.' })
+    render(<App />)
+
+    expect(await screen.findByText('Second caller’s call.')).toBeInTheDocument()
+    const calls = await screen.findByRole('navigation', { name: 'Calls in progress' })
+    expect(within(calls).getByRole('button', { name: 'Newest' })).toHaveAttribute('aria-pressed', 'true')
+
+    await userEvent.click(within(calls).getByRole('button', { name: /…0123/ }))
+
+    expect(await screen.findByText('First caller’s call.')).toBeInTheDocument()
+    expect(screen.queryByText('Second caller’s call.')).not.toBeInTheDocument()
+    expect(within(calls).getByRole('button', { name: /…0123/ })).toHaveAttribute('aria-pressed', 'true')
+
+    await userEvent.click(within(calls).getByRole('button', { name: 'Newest' }))
+
+    expect(await screen.findByText('Second caller’s call.')).toBeInTheDocument()
+  })
 })

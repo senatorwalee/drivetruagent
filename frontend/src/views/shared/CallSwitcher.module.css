@@ -1,0 +1,76 @@
+/* Floats over the bottom of whichever view is open, like a call bar on a
+   phone: the views keep their own layouts. Colours and fonts: theme.css. */
+
+.switcher {
+  position: fixed;
+  left: 50%;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 20;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 32px);
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  overflow-x: auto;
+  border-radius: 999px;
+  border: 1px solid var(--hairline);
+  background: color-mix(in oklch, var(--raised) 92%, transparent);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+  font-family: var(--font);
+}
+
+.option {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.option:hover {
+  color: var(--text);
+}
+
+.option:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.option[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+.dot[data-on-screen='true'] {
+  background: var(--allow);
+}
+
+.option[aria-pressed='true'] .dot[data-on-screen='true'] {
+  background: var(--on-accent);
+}
+
+.number,
+.duration {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.duration {
+  opacity: 0.75;
+}
