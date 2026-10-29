@@ -65,7 +65,7 @@ export function ControlRoom({ live, view, onViewChange }: LiveSessionViewProps) 
         </section>
         <DecisionLog decisions={live.timeline.decisions} />
         <CartTable live={live} />
-        <ShopBoard week={live.board.week} stock={live.board.stock} className={styles.board} />
+        <ShopBoard week={live.board.week} combos={live.board.combos} stock={live.board.stock} className={styles.board} />
       </main>
     </div>
   )

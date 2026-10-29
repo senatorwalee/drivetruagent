@@ -14,6 +14,20 @@ import { MenuBoard } from './menu-board/MenuBoard'
 import { Receipt } from './receipt/Receipt'
 import type { LiveSessionViewProps, ViewId } from './shared/viewTypes'
 
+function comboState(times: number, burger: string | null, side: string | null, drink: string | null) {
+  return {
+    code: 'burger_combo',
+    name: 'Burger combo',
+    savesCents: 200,
+    times,
+    slots: [
+      { categoryName: 'Burgers', itemName: burger },
+      { categoryName: 'Sides', itemName: side },
+      { categoryName: 'Drinks', itemName: drink },
+    ],
+  }
+}
+
 const VIEWS: [ViewId, ComponentType<LiveSessionViewProps>][] = [
   ['menu-board', MenuBoard],
   ['receipt', Receipt],
@@ -239,6 +253,22 @@ describe.each(VIEWS)('%s view', (viewId, View) => {
     expect(within(board).getByLabelText('4 available')).toBeInTheDocument()
   })
 
+  it('shows each combo with the cart items filling it, and what it still needs', () => {
+    show({ board: { week: null, combos: [comboState(0, 'Classic burger', 'Fries', null)], stock: [] } })
+
+    const card = screen.getByRole('listitem', { name: 'Burger combo' })
+    expect(card).toHaveTextContent('save $2.00')
+    expect(card).toHaveTextContent('Classic burger')
+    expect(card).toHaveTextContent('Fries')
+    expect(card).toHaveTextContent('Still needs: Drinks')
+  })
+
+  it('shows a combo the cart has earned, as the backend priced it', () => {
+    show({ board: { week: null, combos: [comboState(2, 'Classic burger', 'Fries', 'Cola')], stock: [] } })
+
+    expect(screen.getByRole('listitem', { name: 'Burger combo' })).toHaveTextContent('In this cart ×2 · −$4.00')
+  })
+
   it('says when a special has sold out', () => {
     const soldOut = {
       ...liveSession().board.week!,
@@ -247,7 +277,7 @@ describe.each(VIEWS)('%s view', (viewId, View) => {
         specials: day.specials.map((special) => ({ ...special, in_stock: !day.is_today })),
       })),
     }
-    show({ board: { week: soldOut, stock: [] } })
+    show({ board: { week: soldOut, combos: [], stock: [] } })
 
     expect(screen.getByText('sold out')).toBeInTheDocument()
   })

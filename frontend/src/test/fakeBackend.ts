@@ -136,6 +136,7 @@ export function installFakeBackend() {
       if (path === '/handoffs') return respond(200, [])
       if (path === '/inventory') return respond(200, stockLevels)
       if (path === '/specials/week') return respond(200, week)
+      if (path === '/combos') return respond(200, [])
       if (path === '/sessions' && method === 'POST') return respond(201, openSession(body.lane))
       if (path === '/phone/calls') {
         const live = phoneCalls

@@ -38,6 +38,7 @@ export type PickupMark = Schemas['MarkPickupRequest']['status']
 export type Caller = Schemas['CallerView']
 export type CallerStatus = Schemas['CallerStatus']
 export type Standing = Schemas['Standing']
+export type Combo = Schemas['ComboView']
 export type WebPhoneInfo = Schemas['WebPhoneInfo']
 export type WebPhoneLine = Schemas['WebPhoneLine']
 export type WebCall = Schemas['WebCall']
@@ -113,6 +114,8 @@ export const api = {
   inventory: () => request<StockLevel[]>('/inventory'),
   /** Monday to Sunday of this week, with today marked. */
   weekOfSpecials: (language: Language) => request<WeekOfSpecials>(`/specials/week?language=${language}`),
+  /** The combo deals: one item from each slot's category, bought together. */
+  combos: (language: Language) => request<Combo[]>(`/combos?language=${language}`),
   sendMessage: (sessionId: string, text: string) =>
     post<MessageReply>(`/sessions/${sessionId}/messages`, { text }),
   /** Stop the session's timers, for a presenter who wants to talk. */

@@ -63,7 +63,7 @@ export function Receipt({ live, view, onViewChange }: LiveSessionViewProps) {
         </section>
         <ReceiptTape live={live} />
         <Ledger decisions={live.timeline.decisions} />
-        <ShopBoard week={live.board.week} stock={live.board.stock} className={styles.board} />
+        <ShopBoard week={live.board.week} combos={live.board.combos} stock={live.board.stock} className={styles.board} />
       </main>
     </div>
   )

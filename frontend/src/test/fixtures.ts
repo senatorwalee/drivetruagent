@@ -252,7 +252,7 @@ export function liveSession(overrides: Partial<LiveSession> = {}): LiveSession {
     itemName: (code) => ITEM_NAMES[code] ?? code,
     paused: false,
     voice: noVoice,
-    board: { week, stock },
+    board: { week, combos: [], stock },
     canSend: true,
     send: () => {},
     startNewSession: () => {},
