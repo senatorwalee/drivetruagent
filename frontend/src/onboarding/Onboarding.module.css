@@ -1,5 +1,21 @@
-/* The onboarding page. It uses the staff screen's frame and the menu page's
-   fields, and adds one thing of its own: a calm, one-idea-per-screen flow. */
+/* Restaurant setup inherits the shared Business palette from the staff frame.
+   Its step layout and progress styling stay specific to onboarding. */
+
+.screen {
+  color-scheme: light;
+}
+
+.screen .topBar {
+  padding: 18px 32px;
+  background: var(--ground);
+}
+
+.screen .titleSub {
+  font-family: var(--font);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+}
 
 .topEnd {
   display: flex;
@@ -9,7 +25,7 @@
 
 .saved {
   color: var(--faint);
-  font-family: var(--mono);
+  font-family: var(--font);
   font-size: 12px;
 }
 
@@ -34,8 +50,9 @@
 /* --- Steps --------------------------------------------------------------- */
 
 .railWrap {
-  padding: 16px 24px;
+  padding: 20px 24px;
   border-bottom: 1px solid var(--hairline);
+  background: var(--raised);
 }
 
 .rail {
@@ -72,7 +89,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 36px;
+  min-height: 44px;
   padding: 0 8px 0 0;
   border: 0;
   border-radius: 999px;
@@ -91,16 +108,17 @@
 .railNumber {
   display: inline-grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
   border: 1px solid var(--hairline);
-  font-family: var(--mono);
+  font-family: var(--font);
   font-size: 12px;
 }
 
 .railStep[data-state='done'] .railNumber {
   border-color: var(--accent);
+  background: var(--panel);
   color: var(--accent);
 }
 
@@ -123,17 +141,28 @@
   width: 100%;
   max-width: 1040px;
   margin: 0 auto;
-  padding: 32px 24px 40px;
+  padding: 42px 24px 48px;
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
+.stepEyebrow {
+  margin: 0 0 -6px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
 .stepTitle {
   margin: 0;
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: -0.015em;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(32px, 4vw, 42px);
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
   outline: none;
 }
 
@@ -141,13 +170,15 @@
   margin: -14px 0 4px;
   max-width: 62ch;
   color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
 }
 
 .narrow {
   width: 100%;
-  max-width: 480px;
+  max-width: 540px;
   display: grid;
-  gap: 20px;
+  gap: 24px;
 }
 
 .suffixed {
@@ -705,9 +736,9 @@
   position: sticky;
   bottom: 0;
   z-index: 5;
-  padding: 12px 24px;
+  padding: 16px 24px;
   border-top: 1px solid var(--hairline);
-  background: color-mix(in oklch, var(--ground) 90%, transparent);
+  background: var(--ground);
   backdrop-filter: blur(12px);
 }
 
@@ -761,8 +792,11 @@
 
 .doneTitle {
   margin: 0;
-  font-size: 30px;
-  letter-spacing: -0.02em;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 42px;
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
   overflow-wrap: anywhere;
 }
 
@@ -821,6 +855,30 @@
 }
 
 @media (max-width: 560px) {
+  .screen .topBar {
+    padding: 14px 16px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+  }
+
+  .topBar > div:first-child {
+    display: contents;
+  }
+
+  .screen .topBar h1 {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    padding-left: 0;
+    border-left: 0;
+    font-size: 14px;
+  }
+
+  .topEnd {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
   .railWrap {
     padding: 12px 16px;
   }

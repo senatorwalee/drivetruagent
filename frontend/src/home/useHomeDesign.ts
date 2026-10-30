@@ -1,15 +1,16 @@
 import { useCallback, useState } from 'react'
 
-/** The home page's two designs: the current one, and the new one that tells the story. */
+/** Independent home page options; keep the original designs available. */
 export const HOME_DESIGNS = [
   { id: 'current', label: 'Current' },
   { id: 'new', label: 'New' },
+  { id: 'business', label: 'Business' },
 ] as const
 
 export type HomeDesign = (typeof HOME_DESIGNS)[number]['id']
 
 const STORAGE_KEY = 'drivetruagent.home-design'
-const DEFAULT_DESIGN: HomeDesign = 'current'
+const DEFAULT_DESIGN: HomeDesign = 'business'
 
 function isHomeDesign(value: string | null): value is HomeDesign {
   return HOME_DESIGNS.some((design) => design.id === value)

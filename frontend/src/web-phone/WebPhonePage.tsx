@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import theme from '../app/BusinessTheme.module.css'
 
 import { useNow } from '../session/useNow'
 import { MicrophoneIcon } from '../views/shared/icons'
@@ -36,73 +37,75 @@ export function WebPhonePage({ parts }: { parts?: PhoneParts }) {
   }, [name])
 
   return (
-    <main className={styles.page}>
-      <p className={styles.brand}>Frontdesk web phone</p>
+    <div className={theme.surface}>
+      <main className={styles.page}>
+        <p className={styles.brand}>Frontdesk web phone</p>
 
-      <section className={styles.contact} aria-live="polite">
-        <div className={`${styles.avatar} ${voice.agentSpeaking ? styles.avatarSpeaking : ''}`} aria-hidden="true">
-          {initials(name)}
-        </div>
-        <h1 className={styles.name}>{name}</h1>
-        <p className={`${styles.status} ${voice.status === 'failed' || phone.lineProblem ? styles.problem : ''}`}>{status}</p>
-        {turnedAway && <p className={styles.problem}>{turnedAway}</p>}
-        {speaking && <p className={styles.speaking}>{speaking}</p>}
-      </section>
+        <section className={styles.contact} aria-live="polite">
+          <div className={`${styles.avatar} ${voice.agentSpeaking ? styles.avatarSpeaking : ''}`} aria-hidden="true">
+            {initials(name)}
+          </div>
+          <h1 className={styles.name}>{name}</h1>
+          <p className={`${styles.status} ${voice.status === 'failed' || phone.lineProblem ? styles.problem : ''}`}>{status}</p>
+          {turnedAway && <p className={styles.problem}>{turnedAway}</p>}
+          {speaking && <p className={styles.speaking}>{speaking}</p>}
+        </section>
 
-      {phone.lines.length > 1 && (
-        <fieldset className={styles.lines} disabled={active}>
-          <legend className={styles.linesLabel}>Call as</legend>
-          {phone.lines.map((each) => {
-            const mine = each.line === phone.line
-            const taken = each.busy && !(mine && active)
-            return (
-              <label key={each.line} className={`${styles.line} ${mine ? styles.lineChosen : ''}`}>
-                <input
-                  type="radio"
-                  name="line"
-                  value={each.line}
-                  checked={mine}
-                  disabled={taken}
-                  onChange={() => phone.chooseLine(each.line)}
-                />
-                <span className={styles.lineNumber}>{lineLabel(each)}</span>
-                <span className={styles.lineState}>{taken ? 'On a call' : mine && active ? 'You' : 'Free'}</span>
-              </label>
-            )
-          })}
-        </fieldset>
-      )}
+        {phone.lines.length > 1 && (
+          <fieldset className={styles.lines} disabled={active}>
+            <legend className={styles.linesLabel}>Call as</legend>
+            {phone.lines.map((each) => {
+              const mine = each.line === phone.line
+              const taken = each.busy && !(mine && active)
+              return (
+                <label key={each.line} className={`${styles.line} ${mine ? styles.lineChosen : ''}`}>
+                  <input
+                    type="radio"
+                    name="line"
+                    value={each.line}
+                    checked={mine}
+                    disabled={taken}
+                    onChange={() => phone.chooseLine(each.line)}
+                  />
+                  <span className={styles.lineNumber}>{lineLabel(each)}</span>
+                  <span className={styles.lineState}>{taken ? 'On a call' : mine && active ? 'You' : 'Free'}</span>
+                </label>
+              )
+            })}
+          </fieldset>
+        )}
 
-      <div className={styles.controls}>
-        {active ? (
-          <>
-            <button
-              type="button"
-              className={`${styles.control} ${styles.mute} ${phone.muted ? styles.muteOn : ''}`}
-              onClick={phone.toggleMute}
-              aria-pressed={phone.muted}
-            >
-              <span className={styles.circle}>
-                <MicrophoneIcon />
-              </span>
-              <span className={styles.label}>Mute</span>
-            </button>
-            <button type="button" className={`${styles.control} ${styles.end}`} onClick={phone.hangUp}>
+        <div className={styles.controls}>
+          {active ? (
+            <>
+              <button
+                type="button"
+                className={`${styles.control} ${styles.mute} ${phone.muted ? styles.muteOn : ''}`}
+                onClick={phone.toggleMute}
+                aria-pressed={phone.muted}
+              >
+                <span className={styles.circle}>
+                  <MicrophoneIcon />
+                </span>
+                <span className={styles.label}>Mute</span>
+              </button>
+              <button type="button" className={`${styles.control} ${styles.end}`} onClick={phone.hangUp}>
+                <span className={styles.circle}>
+                  <PhoneIcon />
+                </span>
+                <span className={styles.label}>End</span>
+              </button>
+            </>
+          ) : (
+            <button type="button" className={`${styles.control} ${styles.call}`} onClick={phone.call} disabled={!canCall}>
               <span className={styles.circle}>
                 <PhoneIcon />
               </span>
-              <span className={styles.label}>End</span>
+              <span className={styles.label}>{voice.status === 'idle' ? 'Call' : 'Call again'}</span>
             </button>
-          </>
-        ) : (
-          <button type="button" className={`${styles.control} ${styles.call}`} onClick={phone.call} disabled={!canCall}>
-            <span className={styles.circle}>
-              <PhoneIcon />
-            </span>
-            <span className={styles.label}>{voice.status === 'idle' ? 'Call' : 'Call again'}</span>
-          </button>
-        )}
-      </div>
-    </main>
+          )}
+        </div>
+      </main>
+    </div>
   )
 }

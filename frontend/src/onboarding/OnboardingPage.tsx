@@ -92,12 +92,12 @@ export function OnboardingPage() {
   const steps = { draft, today, update }
 
   return (
-    <div className={staff.screen}>
-      <header className={staff.topBar}>
+    <div className={`${staff.screen} ${styles.screen}`}>
+      <header className={`${staff.topBar} ${styles.topBar}`}>
         <div className={staff.titleGroup}>
           <HomeLink />
           <h1 className={staff.title}>
-            Onboarding <span className={staff.titleSub}>New restaurant</span>
+            Onboarding <span className={`${staff.titleSub} ${styles.titleSub}`}>New restaurant</span>
           </h1>
         </div>
         {!finished && (
@@ -134,6 +134,7 @@ export function OnboardingPage() {
           </nav>
 
           <main className={styles.main}>
+            <p className={styles.stepEyebrow}>Restaurant setup · Step {position + 1} of {STEPS.length}</p>
             <h2 ref={heading} tabIndex={-1} className={styles.stepTitle}>
               {HEADINGS[draft.step].title}
             </h2>
