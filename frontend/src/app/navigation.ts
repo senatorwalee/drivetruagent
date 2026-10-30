@@ -14,6 +14,8 @@ export const CALLERS_PATH = '/callers'
 export const CONVERSATIONS_PATH = '/conversations'
 export const INSIGHTS_PATH = '/insights'
 export const MENU_PATH = '/menu'
+/** A restaurant's first visit: who it is, its menu, and going live. */
+export const ONBOARDING_PATH = '/onboarding'
 export const LIVE_PATH = '/live'
 /** The live views, following the newest phone call instead of a lane. */
 export const CALLS_PATH = '/calls'

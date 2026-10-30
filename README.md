@@ -52,6 +52,7 @@ built piece by piece.
 | 26 | Cost readout: what each conversation, order and day cost in model usage, from logged tokens and a dated price list | Done; checked in a browser |
 | 27 | Speakerphone calls: echo cancellation, noise reduction, a language hint, cut-off lines marked, and "OK" is not a choice | Done; evals pass against the real model |
 | 28 | Halal answers: every item reviewed, "not suitable" with a reason, "can't confirm" for what isn't reviewed, and the menu answered first | Done; evals pass against the real model |
+| 29 | Onboarding: a restaurant's details, menu, halal and kosher reviews, and combos, entered step by step and saved in one go, at `/onboarding` | Done; checked in a browser |
 | Later | Demo polish: French review, demo script | Planned |
 
 ## Stack
@@ -178,8 +179,11 @@ database (`seed --if-empty`), so a restart keeps every edit.
   `data/photos/` (credits in `data/photos/CREDITS.md`). An item with no photo
   shows a placeholder drawn for its category, and a "No photo" flag.
 - **Add, edit, take off, put back.** Names and descriptions in both languages,
-  category, price and stock are edited here. Choices, aliases and allergens
+  category, price and quantity are edited here. Choices, aliases and allergens
   stay in `data/menu.json` and are shown read-only.
+- **Quantity is unlimited, counted or sold out.** Unlimited has no count and
+  stays available until someone marks it sold out. Counted goes down with every
+  order and sells out at zero.
 - **Taking an item off never deletes it.** Past orders point at it. It
   disappears for guests, the agent and the specials, and can be put back.
 - **Codes never change.** A new item's code is made from its English name
@@ -195,6 +199,32 @@ database (`seed --if-empty`), so a restart keeps every edit.
   new photo is a new URL.
 - Changes reach the agent from the next session, whose instructions are built
   from the menu when it starts.
+
+### Onboarding a restaurant
+
+The menu page changes a menu that exists. <http://localhost:5174/onboarding> is
+for a restaurant's first visit: five steps, one idea on each screen.
+
+1. **Restaurant.** Its name, pickup address and pickup time. All three change
+   what the agent says, and override the settings. `make seed` goes back to them.
+2. **Menu.** One item at a time: section, name, price, and unlimited or counted.
+   A section that doesn't exist yet is created. If the restaurant already has a
+   menu, it chooses to add to it or start fresh.
+3. **Halal and kosher.** One list per diet, each item not reviewed, not suitable,
+   suitable or certified. Certified needs who certified it, because the agent
+   repeats the claim to guests. Not reviewed claims nothing either way.
+4. **Combos.** A name, its parts, and what the guest saves. A part is a section,
+   and the guest picks any item from it; the first is the main item, which is
+   what makes the agent offer it. The page shows what the cheapest set comes to,
+   and refuses a saving that would make it free. The backend checks the same.
+5. **Go live.** Everything is saved in one transaction, `POST /admin/onboarding`.
+   Until then it stays in the browser, so a half-entered menu never reaches a
+   guest, and a refusal leaves everything as it was.
+
+Starting fresh takes the old items off and retires the old combos; nothing is
+deleted. `make seed` puts the file's menu back. Allergens, photos and choices
+are not part of this: new items start with allergens unreviewed, so the agent
+sends those questions to a person.
 
 ## Carts store choices; orders store frozen prices
 
@@ -1434,6 +1464,7 @@ Run `make dev` and open <http://127.0.0.1:8000/docs> to try these.
 | `PATCH /admin/menu/items/{code}` | Change an item; `is_active: false` takes it off the menu |
 | `PUT /admin/menu/items/{code}/photo` | Set or replace its photo (the image is the body) |
 | `DELETE /admin/menu/items/{code}/photo` | Remove its photo |
+| `POST /admin/onboarding` | Go live: the restaurant's details, items, diet reviews and combos, saved together |
 | `GET /insights/unmet-requests?days=7` | What guests asked for that the menu couldn't fill, most asked first |
 | `POST /phone/incoming` | OpenAI's signed webhook: answer a phone call, or turn it away |
 | `GET /phone/calls` | Phone calls in progress, newest first |

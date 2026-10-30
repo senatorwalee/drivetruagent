@@ -32,6 +32,10 @@ export type AdminItem = Schemas['AdminItemView']
 export type AdminCategory = Schemas['AdminCategoryView']
 export type NewItem = Schemas['NewItem']
 export type ItemChanges = Schemas['ItemChanges']
+export type Onboarding = Schemas['Onboarding']
+export type OnboardingResult = Schemas['OnboardingResult']
+export type Diet = Schemas['Diet']
+export type DietStatus = Schemas['DietStatus']
 export type PhoneCall = Schemas['ActiveCall']
 export type Pickup = Schemas['Pickup']
 export type PickupMark = Schemas['MarkPickupRequest']['status']
@@ -228,6 +232,8 @@ export const api = {
     return (await response.json()) as AdminItem
   },
   removePhoto: (itemCode: string) => request<AdminItem>(`/admin/menu/items/${itemCode}/photo`, { method: 'DELETE' }),
+  /** The whole setup, saved together: any refusal leaves everything as it was. */
+  goLive: (setup: Onboarding) => post<OnboardingResult>('/admin/onboarding', setup),
   /** Where an item's photo is. The version makes a new photo a new URL. */
   photoUrl: (itemCode: string, version: string) => `${BASE}/menu/items/${itemCode}/photo?v=${version}`,
 }

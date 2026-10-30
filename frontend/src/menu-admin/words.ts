@@ -26,6 +26,7 @@ export type StockMode = 'unlimited' | 'counted' | 'sold_out'
 export type FormProblems = Partial<Record<keyof ItemForm, string>>
 
 const MAX_PRICE_CENTS = 100_000
+const MAX_STOCK = 100_000
 
 export function emptyForm(categoryCode: string): ItemForm {
   return { nameEn: '', nameFr: '', descriptionEn: '', descriptionFr: '', categoryCode, price: '', stockMode: 'unlimited', stock: '' }
@@ -71,7 +72,9 @@ export function checkForm(form: ItemForm): FormProblems {
   const cents = parsePrice(form.price)
   if (cents === null) problems.price = 'Enter a price, like 5.49.'
   else if (cents > MAX_PRICE_CENTS) problems.price = 'That is more than $1,000. Check the price.'
-  if (stockFrom(form) === undefined) problems.stock = 'Enter how many you have, as a whole number.'
+  const stock = stockFrom(form)
+  if (stock === undefined) problems.stock = 'Enter how many you have, as a whole number.'
+  else if (stock !== null && stock > MAX_STOCK) problems.stock = 'That is more than 100,000. Check the count.'
   if (form.descriptionFr.trim() && !form.descriptionEn.trim()) {
     problems.descriptionEn = 'Add an English description; it is used when French is missing.'
   }

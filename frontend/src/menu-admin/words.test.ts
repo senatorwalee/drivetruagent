@@ -83,6 +83,11 @@ describe('words for an item', () => {
     expect(stockFrom({ stockMode: 'counted', stock: 'lots' })).toBeUndefined()
   })
 
+  it('catches a count too big to be real', () => {
+    expect(checkForm({ ...emptyForm('sides'), nameEn: 'Fries', price: '2', stockMode: 'counted', stock: '100001' }).stock).toMatch(/more than 100,000/)
+    expect(checkForm({ ...emptyForm('sides'), nameEn: 'Fries', price: '2', stockMode: 'counted', stock: '100000' }).stock).toBeUndefined()
+  })
+
   it('opens an item on the quantity choice it has now', () => {
     expect(formFromItem(FRIES)).toMatchObject({ stockMode: 'counted', stock: '100' })
     expect(formFromItem({ ...FRIES, stock: null })).toMatchObject({ stockMode: 'unlimited', stock: '' })

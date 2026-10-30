@@ -1,13 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 
-import { CALL_PATH, CALLERS_PATH, CALLS_PATH, CONVERSATIONS_PATH, INSIGHTS_PATH, LIVE_PATH, MENU_PATH, PICKUPS_PATH, STAFF_PATH, usePath } from './app/navigation'
+import { CALL_PATH, CALLERS_PATH, CALLS_PATH, CONVERSATIONS_PATH, INSIGHTS_PATH, LIVE_PATH, MENU_PATH, ONBOARDING_PATH, PICKUPS_PATH, STAFF_PATH, usePath } from './app/navigation'
 import { CallersPage } from './callers/CallersPage'
 import { PickupsPage } from './callers/PickupsPage'
 import { ConversationsPage } from './conversations/ConversationsPage'
 import { HomePage } from './home/HomePage'
 import { InsightsPage } from './insights/InsightsPage'
 import { MenuPage } from './menu-admin/MenuPage'
+import { OnboardingPage } from './onboarding/OnboardingPage'
 import { StaffPage } from './staff/StaffPage'
 import { LiveSessionPage } from './views/LiveSessionPage'
 import { WebPhonePage } from './web-phone/WebPhonePage'
@@ -43,6 +44,8 @@ export function App() {
         <InsightsPage />
       ) : path === MENU_PATH ? (
         <MenuPage />
+      ) : path === ONBOARDING_PATH ? (
+        <OnboardingPage />
       ) : path === CALLS_PATH ? (
         <LiveSessionPage follow="phone" />
       ) : path === CALL_PATH ? (
