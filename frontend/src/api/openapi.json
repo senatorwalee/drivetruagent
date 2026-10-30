@@ -1143,6 +1143,62 @@
         "title": "Decision",
         "type": "string"
       },
+      "Diet": {
+        "description": "Religious dietary rules a guest may ask about.",
+        "enum": [
+          "halal",
+          "kosher"
+        ],
+        "title": "Diet",
+        "type": "string"
+      },
+      "DietReview": {
+        "additionalProperties": false,
+        "description": "How the restaurant reviewed an item for a diet. An item with no review\nhas none on file, and nothing is claimed about it.",
+        "properties": {
+          "certified_by": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Certified By"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DietStatus"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "DietReview",
+        "type": "object"
+      },
+      "DietStatus": {
+        "enum": [
+          "certified",
+          "suitable",
+          "not_suitable"
+        ],
+        "title": "DietStatus",
+        "type": "string"
+      },
       "DiscountKind": {
         "description": "Why an amount came off an order.",
         "enum": [
@@ -2152,8 +2208,8 @@
         },
         "required": [
           "name_en",
-          "category_code",
-          "base_price_cents"
+          "base_price_cents",
+          "category_code"
         ],
         "title": "NewItem",
         "type": "object"
@@ -2180,6 +2236,219 @@
           "item_name"
         ],
         "title": "OfferedElsewhere",
+        "type": "object"
+      },
+      "Onboarding": {
+        "additionalProperties": false,
+        "properties": {
+          "combos": {
+            "items": {
+              "$ref": "#/components/schemas/OnboardingCombo"
+            },
+            "title": "Combos",
+            "type": "array"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OnboardingItem"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "replace_menu": {
+            "default": false,
+            "title": "Replace Menu",
+            "type": "boolean"
+          },
+          "restaurant": {
+            "$ref": "#/components/schemas/RestaurantDetails"
+          }
+        },
+        "required": [
+          "restaurant",
+          "items"
+        ],
+        "title": "Onboarding",
+        "type": "object"
+      },
+      "OnboardingCombo": {
+        "additionalProperties": false,
+        "description": "One item from each part, bought together, costs less.",
+        "properties": {
+          "discount_cents": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 100000.0,
+            "title": "Discount Cents",
+            "type": "integer"
+          },
+          "name_en": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name En",
+            "type": "string"
+          },
+          "name_fr": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Fr"
+          },
+          "slots": {
+            "items": {
+              "maxLength": 40,
+              "minLength": 1,
+              "type": "string"
+            },
+            "minItems": 2,
+            "title": "Slots",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name_en",
+          "discount_cents",
+          "slots"
+        ],
+        "title": "OnboardingCombo",
+        "type": "object"
+      },
+      "OnboardingItem": {
+        "additionalProperties": false,
+        "properties": {
+          "base_price_cents": {
+            "maximum": 100000.0,
+            "minimum": 0.0,
+            "title": "Base Price Cents",
+            "type": "integer"
+          },
+          "description_en": {
+            "anyOf": [
+              {
+                "maxLength": 240,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description En"
+          },
+          "description_fr": {
+            "anyOf": [
+              {
+                "maxLength": 240,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description Fr"
+          },
+          "diets": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DietReview"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/Diet"
+            },
+            "title": "Diets",
+            "type": "object"
+          },
+          "name_en": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name En",
+            "type": "string"
+          },
+          "name_fr": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Fr"
+          },
+          "section": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Section",
+            "type": "string"
+          },
+          "stock": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock"
+          }
+        },
+        "required": [
+          "name_en",
+          "base_price_cents",
+          "section"
+        ],
+        "title": "OnboardingItem",
+        "type": "object"
+      },
+      "OnboardingResult": {
+        "properties": {
+          "combos": {
+            "title": "Combos",
+            "type": "integer"
+          },
+          "combos_retired": {
+            "title": "Combos Retired",
+            "type": "integer"
+          },
+          "diet_reviews": {
+            "title": "Diet Reviews",
+            "type": "integer"
+          },
+          "items": {
+            "title": "Items",
+            "type": "integer"
+          },
+          "items_taken_off": {
+            "title": "Items Taken Off",
+            "type": "integer"
+          },
+          "restaurant_name": {
+            "title": "Restaurant Name",
+            "type": "string"
+          },
+          "sections_added": {
+            "title": "Sections Added",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "restaurant_name",
+          "items",
+          "sections_added",
+          "combos",
+          "diet_reviews",
+          "items_taken_off",
+          "combos_retired"
+        ],
+        "title": "OnboardingResult",
         "type": "object"
       },
       "OpenSessionRequest": {
@@ -2623,6 +2892,43 @@
           "outcome"
         ],
         "title": "ResolveRequest",
+        "type": "object"
+      },
+      "RestaurantDetails": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "pattern": "^[^\\r\\n]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "pattern": "^[^\\r\\n]*$",
+            "title": "Name",
+            "type": "string"
+          },
+          "pickup_minutes": {
+            "maximum": 240.0,
+            "minimum": 1.0,
+            "title": "Pickup Minutes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "pickup_minutes"
+        ],
+        "title": "RestaurantDetails",
         "type": "object"
       },
       "SelectedOptionView": {
@@ -4228,6 +4534,58 @@
         "summary": "Set or replace an item's photo",
         "tags": [
           "menu admin"
+        ]
+      }
+    },
+    "/admin/onboarding": {
+      "post": {
+        "description": "The restaurant's details, its menu, its halal and kosher reviews and\nits combos, saved together: any refusal leaves everything as it was. With\n`replace_menu`, what is on the menu now comes off first. The agent sees\nit all from the next session.",
+        "operationId": "go_live_admin_onboarding_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Onboarding"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "summary": "Go live with everything the restaurant entered",
+        "tags": [
+          "onboarding"
         ]
       }
     },

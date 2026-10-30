@@ -340,6 +340,43 @@ class DuplicateItemName(OrderingError):
         )
 
 
+class DuplicateComboName(OrderingError):
+    """Another combo already has this English name."""
+
+    code = "duplicate_combo_name"
+
+    def __init__(self, name: str) -> None:
+        super().__init__(f"There is already a combo called '{name}'.", name=name)
+
+
+class ComboNeedsItems(OrderingError):
+    """A combo is made of one item from each part, so each part needs some."""
+
+    code = "combo_needs_items"
+
+    def __init__(self, combo: str, section: str) -> None:
+        super().__init__(
+            f"Combo '{combo}' takes an item from '{section}', which has none.",
+            combo=combo,
+            section=section,
+        )
+
+
+class ComboSavingTooLarge(OrderingError):
+    """A saving as large as the cheapest set would make food free."""
+
+    code = "combo_saving_too_large"
+
+    def __init__(self, combo: str, saving_cents: int, cheapest_set_cents: int) -> None:
+        super().__init__(
+            f"Combo '{combo}' saves {saving_cents} cents, but its cheapest set "
+            f"costs {cheapest_set_cents}.",
+            combo=combo,
+            saving_cents=saving_cents,
+            cheapest_set_cents=cheapest_set_cents,
+        )
+
+
 class PriceBelowSpecial(OrderingError):
     """A price no larger than a special's discount would make the item free."""
 

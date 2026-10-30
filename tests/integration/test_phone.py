@@ -35,7 +35,12 @@ from drivetruagent.api.voice import (
     get_session_scope,
 )
 from drivetruagent.config import Settings, get_settings
-from drivetruagent.db.models import AgentEvent, Caller, CustomerSession
+from drivetruagent.db.models import (
+    AgentEvent,
+    Caller,
+    CustomerSession,
+    RestaurantProfile,
+)
 from drivetruagent.enums import AgentEventKind, CallerStatus, Channel, SessionState
 from drivetruagent.ordering.callers import set_status
 from drivetruagent.ordering.sessions import open_session
@@ -253,6 +258,26 @@ async def test_the_caller_hears_the_notice_first_and_it_is_logged(
         )
     ).scalars()
     assert [event.payload["text"] for event in logged] == [notice]
+
+
+async def test_the_notice_and_the_call_use_what_the_restaurant_registered(
+    client: httpx.AsyncClient, stand_in: StandInOpenAI, db_session: AsyncSession
+) -> None:
+    db_session.add(
+        RestaurantProfile(
+            name="Harbour Grill", address="12 Water St", pickup_minutes=30
+        )
+    )
+    await db_session.commit()
+
+    await deliver(stand_in, client, *signed(ringing()))
+
+    ((_, session),) = stand_in.accepted
+    assert "pickup at Harbour Grill" in session["instructions"]
+    assert "ready in about 30 minutes" in session["instructions"]
+    assert "it is at 12 Water St." in session["instructions"]
+    notice = greeting("Harbour Grill", number_known=True)
+    assert stand_in.said[0].endswith(notice)
 
 
 @pytest.mark.parametrize(

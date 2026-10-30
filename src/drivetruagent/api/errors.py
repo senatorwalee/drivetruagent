@@ -43,6 +43,7 @@ _CONFLICT = {
     "voice_call_in_progress",
     "web_phone_line_busy",
     "duplicate_item_name",
+    "duplicate_combo_name",
     "not_a_pickup_order",
     "session_in_progress",
 }

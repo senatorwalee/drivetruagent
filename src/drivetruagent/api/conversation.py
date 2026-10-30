@@ -14,6 +14,7 @@ from drivetruagent.agent.model import ModelClient
 from drivetruagent.api.deps import SessionDep, SettingsDep, SpecialsCacheDep
 from drivetruagent.api.errors import CONFLICT, NOT_FOUND, UNAVAILABLE
 from drivetruagent.enums import AgentEventKind
+from drivetruagent.ordering.restaurant import registered_name
 from drivetruagent.ordering.sessions import get_session as get_customer_session
 from drivetruagent.ordering.views import CartSnapshot
 
@@ -121,10 +122,10 @@ async def read_events(
 
 
 @router.get("/agent", summary="Which model the agent uses")
-async def read_agent_info(settings: SettingsDep) -> AgentInfoResponse:
+async def read_agent_info(db: SessionDep, settings: SettingsDep) -> AgentInfoResponse:
     info = agent_info(settings)
     return AgentInfoResponse(
-        restaurant_name=settings.restaurant_name,
+        restaurant_name=await registered_name(db, settings.restaurant_name),
         available=info.available,
         model=info.model,
         scripted=info.scripted,
