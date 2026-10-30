@@ -115,7 +115,7 @@ export function ItemsStep({ draft, today, update }: ItemsStepProps) {
         <form className={styles.composer} onSubmit={submit} noValidate aria-label={editing ? 'Edit item' : 'Add an item'}>
           <SectionPicker sections={sections} chosen={form.categoryCode} onChoose={edit('categoryCode')} onAdd={addSection} />
 
-          <div className={styles.nameAndPrice}>
+          <div className={form.sizes ? undefined : styles.nameAndPrice}>
             <Field label="Item name" problem={problems.nameEn}>
               {(props) => (
                 <input {...props} ref={nameInput} value={form.nameEn} onChange={(e) => edit('nameEn')(e.target.value)} maxLength={60} autoComplete="off" required autoFocus />

@@ -845,6 +845,15 @@ a.quiet {
     padding: 12px 16px;
   }
 
+  /* Six numbers are all that fit. The heading below names the current step. */
+  .railStep .railLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
   .main {
     padding: 24px 16px 32px;
   }
