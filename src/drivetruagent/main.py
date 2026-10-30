@@ -28,7 +28,7 @@ from drivetruagent.api import (
 from drivetruagent.api.errors import register_error_handlers
 from drivetruagent.config import get_settings
 from drivetruagent.db.session import create_engine, create_session_factory
-from drivetruagent.telemetry import setup_tracing
+from drivetruagent.telemetry import APP_TELEMETRY, setup_tracing
 
 
 @asynccontextmanager
@@ -85,7 +85,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     """Build the FastAPI application. Tests call this to get a fresh app."""
-    app = FastAPI(title="Drive-through agent", lifespan=lifespan)
+    app = FastAPI(
+        title="Drive-through agent", lifespan=lifespan, telemetry=APP_TELEMETRY
+    )
     app.include_router(health.router)
     app.include_router(sessions.router)
     app.include_router(actions.router)
