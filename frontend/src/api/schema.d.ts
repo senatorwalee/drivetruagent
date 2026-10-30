@@ -1304,6 +1304,8 @@ export interface components {
             /** Option Allergens */
             option_allergens: components["schemas"]["AdminOptionAllergens"][];
             photo: components["schemas"]["AdminPhotoView"] | null;
+            /** Sizes */
+            sizes: components["schemas"]["AdminSize"][];
             /** Sold Out */
             sold_out: boolean;
             /** Stock */
@@ -1340,6 +1342,15 @@ export interface components {
             credit: string | null;
             /** Version */
             version: string;
+        };
+        /** AdminSize */
+        AdminSize: {
+            /** Is Default */
+            is_default: boolean;
+            /** Name En */
+            name_en: string;
+            /** Price Cents */
+            price_cents: number;
         };
         /**
          * AgentEventKind
@@ -1868,8 +1879,9 @@ export interface components {
         /**
          * ItemChanges
          * @description Only the fields that are sent are changed. `stock: null` stops
-         *     tracking stock, and `allergens: null` takes the review back; leaving
-         *     either out leaves it as it is.
+         *     tracking stock, `allergens: null` takes the review back, and `sizes: null`
+         *     gives the item one price; leaving any of them out leaves it as it is.
+         *     `sizes` also sets the price, to the cheapest.
          */
         ItemChanges: {
             allergens?: components["schemas"]["AllergenReview"] | null;
@@ -1887,6 +1899,8 @@ export interface components {
             name_en?: string | null;
             /** Name Fr */
             name_fr?: string | null;
+            /** Sizes */
+            sizes?: components["schemas"]["Size"][] | null;
             /** Stock */
             stock?: number | null;
         };
@@ -2046,6 +2060,8 @@ export interface components {
             name_en: string;
             /** Name Fr */
             name_fr?: string | null;
+            /** Sizes */
+            sizes?: components["schemas"]["Size"][] | null;
             /** Stock */
             stock?: number | null;
         };
@@ -2108,6 +2124,8 @@ export interface components {
             name_fr?: string | null;
             /** Section */
             section: string;
+            /** Sizes */
+            sizes?: components["schemas"]["Size"][] | null;
             /** Stock */
             stock?: number | null;
         };
@@ -2440,6 +2458,18 @@ export interface components {
         SetStockRequest: {
             /** On Hand */
             on_hand: number;
+        };
+        /** Size */
+        Size: {
+            /**
+             * Is Default
+             * @default false
+             */
+            is_default: boolean;
+            /** Name En */
+            name_en: string;
+            /** Price Cents */
+            price_cents: number;
         };
         /** SpecialStatus */
         SpecialStatus: {

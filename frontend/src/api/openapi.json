@@ -376,6 +376,13 @@
               }
             ]
           },
+          "sizes": {
+            "items": {
+              "$ref": "#/components/schemas/AdminSize"
+            },
+            "title": "Sizes",
+            "type": "array"
+          },
           "sold_out": {
             "title": "Sold Out",
             "type": "boolean"
@@ -407,6 +414,7 @@
           "allergens_reviewed_on",
           "allergens",
           "option_allergens",
+          "sizes",
           "choices"
         ],
         "title": "AdminItemView",
@@ -506,6 +514,29 @@
           "credit"
         ],
         "title": "AdminPhotoView",
+        "type": "object"
+      },
+      "AdminSize": {
+        "properties": {
+          "is_default": {
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "name_en": {
+            "title": "Name En",
+            "type": "string"
+          },
+          "price_cents": {
+            "title": "Price Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name_en",
+          "price_cents",
+          "is_default"
+        ],
+        "title": "AdminSize",
         "type": "object"
       },
       "AgentEventKind": {
@@ -1815,7 +1846,7 @@
       },
       "ItemChanges": {
         "additionalProperties": false,
-        "description": "Only the fields that are sent are changed. `stock: null` stops\ntracking stock, and `allergens: null` takes the review back; leaving\neither out leaves it as it is.",
+        "description": "Only the fields that are sent are changed. `stock: null` stops\ntracking stock, `allergens: null` takes the review back, and `sizes: null`\ngives the item one price; leaving any of them out leaves it as it is.\n`sizes` also sets the price, to the cheapest.",
         "properties": {
           "allergens": {
             "anyOf": [
@@ -1910,6 +1941,22 @@
               }
             ],
             "title": "Name Fr"
+          },
+          "sizes": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Size"
+                },
+                "maxItems": 8,
+                "minItems": 2,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sizes"
           },
           "stock": {
             "anyOf": [
@@ -2350,6 +2397,22 @@
             ],
             "title": "Name Fr"
           },
+          "sizes": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Size"
+                },
+                "maxItems": 8,
+                "minItems": 2,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sizes"
+          },
           "stock": {
             "anyOf": [
               {
@@ -2553,6 +2616,22 @@
             "minLength": 1,
             "title": "Section",
             "type": "string"
+          },
+          "sizes": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Size"
+                },
+                "maxItems": 8,
+                "minItems": 2,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sizes"
           },
           "stock": {
             "anyOf": [
@@ -3451,6 +3530,34 @@
           "on_hand"
         ],
         "title": "SetStockRequest",
+        "type": "object"
+      },
+      "Size": {
+        "additionalProperties": false,
+        "properties": {
+          "is_default": {
+            "default": false,
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "name_en": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name En",
+            "type": "string"
+          },
+          "price_cents": {
+            "maximum": 100000.0,
+            "minimum": 0.0,
+            "title": "Price Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name_en",
+          "price_cents"
+        ],
+        "title": "Size",
         "type": "object"
       },
       "SpecialStatus": {

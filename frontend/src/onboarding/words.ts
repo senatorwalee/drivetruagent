@@ -185,6 +185,7 @@ export function formFromDraftItem(item: DraftItem): ItemForm {
     allergens_reviewed_on: null,
     allergens: null,
     option_allergens: [],
+    sizes: [],
     choices: [],
   })
 }

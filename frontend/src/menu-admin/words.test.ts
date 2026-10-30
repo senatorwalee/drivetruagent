@@ -19,6 +19,7 @@ const FRIES: AdminItem = {
   allergens_reviewed_on: '2026-10-01',
   allergens: { contains: [], may_contain: [] },
   option_allergens: [],
+  sizes: [],
   choices: [
     {
       group_name: 'Size',

@@ -1,11 +1,13 @@
 """Changing the menu: adding items, editing them, taking them off, and photos.
 
-For the menu page a manager uses. An item's own allergens are reviewed here.
-Choices (option groups), what they add to allergens, and aliases are not
-edited here; they still come from data/menu.json.
+For the menu page a manager uses. An item's own allergens are reviewed here,
+and its sizes set. Other choices (option groups), what choices add to
+allergens, and aliases are not edited here; they still come from
+data/menu.json.
 
 Items are never deleted, because past orders point at them. Taking one off
-the menu sets `is_active` to false, and it can be put back.
+the menu sets `is_active` to false, and it can be put back. A size is the same:
+carts point at options, so a removed one is deactivated and can come back.
 
 Nothing here commits. The caller owns the transaction.
 """
@@ -18,6 +20,7 @@ from datetime import date
 from typing import Annotated, Self
 
 from pydantic import (
+    AfterValidator,
     BaseModel,
     ConfigDict,
     Field,
@@ -37,6 +40,7 @@ from drivetruagent.db.models import (
     MenuCategory,
     MenuItem,
     MenuItemPhoto,
+    Option,
     OptionGroup,
     Special,
 )
@@ -55,8 +59,14 @@ from drivetruagent.ordering.views import localize
 # Generous for a drive-through, and small enough to catch a typo of 100x.
 MAX_PRICE_CENTS = 100_000
 MAX_STOCK = 100_000
+# More than a drive-through asks a guest to choose between.
+MAX_SIZES = 8
 # Codes made from names are cut to this length, before any _2 suffix.
 _CODE_LENGTH = 40
+# The group that holds an item's sizes. The menu file's use the same code and
+# the same name.
+_SIZE_GROUP_CODE = "size"
+_SIZE_GROUP_NAME = {"en": "Size", "fr": "Format"}
 _ALLERGEN_ORDER = {allergen: position for position, allergen in enumerate(Allergen)}
 
 Name = Annotated[str, StringConstraints(strip_whitespace=True, max_length=60)]
@@ -88,6 +98,14 @@ class AdminPhotoView(BaseModel):
     # Changes whenever the photo does; put it in the photo's URL.
     version: str
     credit: str | None
+
+
+class AdminSize(BaseModel):
+    name_en: str
+    # What a guest pays for this size, before any other choice.
+    price_cents: int
+    # The size assumed when a guest doesn't say. With none, the agent asks.
+    is_default: bool
 
 
 class AdminMayContain(BaseModel):
@@ -130,6 +148,9 @@ class AdminItemView(BaseModel):
     allergens_reviewed_on: date | None
     allergens: AdminAllergens | None
     option_allergens: list[AdminOptionAllergens]
+    # Empty when the item has one price.
+    sizes: list[AdminSize]
+    # Every other choice the item offers.
     choices: list[AdminChoiceGroup]
 
 
@@ -177,6 +198,37 @@ class AllergenReview(BaseModel):
         return self
 
 
+class Size(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name_en: Annotated[Name, StringConstraints(min_length=1)]
+    # What a guest pays for it. The cheapest size becomes the item's price and
+    # the others what they add to it.
+    price_cents: int = Field(ge=0, le=MAX_PRICE_CENTS)
+    is_default: bool = False
+
+
+def _check_sizes(sizes: list[Size]) -> list[Size]:
+    codes = [code_from_name(size.name_en) for size in sizes]
+    if len(set(codes)) != len(codes):
+        raise ValueError("two sizes have the same name")
+    if sum(size.is_default for size in sizes) > 1:
+        raise ValueError("only one size can be the default")
+    return sizes
+
+
+# At least two: one size is no choice. Stock stays with the item, not the size.
+Sizes = Annotated[
+    list[Size],
+    Field(min_length=2, max_length=MAX_SIZES),
+    AfterValidator(_check_sizes),
+]
+
+
+def _cheapest(sizes: list[Size]) -> int:
+    return min(size.price_cents for size in sizes)
+
+
 class _ItemFields(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -202,6 +254,13 @@ class NewItemFields(_ItemFields):
     # Leave out, or None, and the item starts unreviewed: the agent will not
     # say anything about its allergens until someone does this.
     allergens: AllergenReview | None = None
+    sizes: Sizes | None = None
+
+    @model_validator(mode="after")
+    def check_price_is_the_cheapest_size(self) -> Self:
+        if self.sizes and self.base_price_cents != _cheapest(self.sizes):
+            raise ValueError("base_price_cents must be the cheapest size")
+        return self
 
     @model_validator(mode="after")
     def check_french_description_has_english(self) -> Self:
@@ -217,8 +276,9 @@ class NewItem(NewItemFields):
 
 class ItemChanges(_ItemFields):
     """Only the fields that are sent are changed. `stock: null` stops
-    tracking stock, and `allergens: null` takes the review back; leaving
-    either out leaves it as it is."""
+    tracking stock, `allergens: null` takes the review back, and `sizes: null`
+    gives the item one price; leaving any of them out leaves it as it is.
+    `sizes` also sets the price, to the cheapest."""
 
     name_en: Annotated[Name, StringConstraints(min_length=1)] | None = None
     name_fr: Name | None = None
@@ -228,6 +288,7 @@ class ItemChanges(_ItemFields):
     base_price_cents: int | None = Field(default=None, ge=0, le=MAX_PRICE_CENTS)
     stock: int | None = Field(default=None, ge=0, le=MAX_STOCK)
     allergens: AllergenReview | None = None
+    sizes: Sizes | None = None
     is_active: bool | None = None
 
     @model_validator(mode="after")
@@ -235,6 +296,13 @@ class ItemChanges(_ItemFields):
         for field in ("name_en", "category_code", "base_price_cents", "is_active"):
             if field in self.model_fields_set and getattr(self, field) is None:
                 raise ValueError(f"{field} cannot be cleared")
+        return self
+
+    @model_validator(mode="after")
+    def check_price_is_the_cheapest_size(self) -> Self:
+        price = self.base_price_cents
+        if self.sizes and price is not None and price != _cheapest(self.sizes):
+            raise ValueError("base_price_cents must be the cheapest size")
         return self
 
     @model_validator(mode="after")
@@ -315,6 +383,8 @@ async def create_item(db: AsyncSession, new: NewItem, *, today: date) -> AdminIt
         await inventory.set_on_hand(db, item.code, new.stock)
     if new.allergens is not None:
         await _set_allergens(db, item, new.allergens, today)
+    if new.sizes is not None:
+        await _set_sizes(db, item, new.sizes)
     return await read_item(db, item.code)
 
 
@@ -355,9 +425,13 @@ async def update_item(
             item.category_id = category_id
             item.sort_order = await _next_position(db, category_id)
 
-    if changes.base_price_cents is not None:
-        await _check_price_leaves_something_to_pay(db, item, changes.base_price_cents)
-        item.base_price_cents = changes.base_price_cents
+    price = _cheapest(changes.sizes) if changes.sizes else changes.base_price_cents
+    if price is not None:
+        await _check_price_leaves_something_to_pay(db, item, price)
+    if "sizes" in sent:
+        await _set_sizes(db, item, changes.sizes)
+    if price is not None:
+        item.base_price_cents = price
 
     if changes.is_active is not None:
         item.is_active = changes.is_active
@@ -451,6 +525,74 @@ async def _set_allergens(
         for entry in review.may_contain
     )
     await db.flush()
+
+
+async def _set_sizes(
+    db: AsyncSession, item: MenuItem, sizes: list[Size] | None
+) -> None:
+    """Make the item's size group match; None leaves it with one price. A
+    size keeps its identity by its name, so one removed and typed again comes
+    back, with its other languages. Nothing is deleted: carts point at these."""
+    group = await db.scalar(
+        select(OptionGroup)
+        .where(OptionGroup.item_id == item.id, OptionGroup.code == _SIZE_GROUP_CODE)
+        .options(selectinload(OptionGroup.options))
+        .execution_options(populate_existing=True)
+    )
+    if sizes is None:
+        if group is not None:
+            # Required with nothing to choose, nobody could order the item.
+            group.min_select = 0
+            for option in group.options:
+                option.is_active = option.is_default = False
+        return
+    if group is None:
+        group = OptionGroup(
+            item_id=item.id,
+            code=_SIZE_GROUP_CODE,
+            name_i18n=_SIZE_GROUP_NAME,
+            min_select=1,
+            max_select=1,
+            sort_order=await _next_group_position(db, item.id),
+            options=[],
+        )
+        db.add(group)
+
+    group.min_select = group.max_select = 1
+    # Cleared first: one default per group, so moving it would collide.
+    for option in group.options:
+        option.is_default = False
+    await db.flush()
+
+    cheapest = _cheapest(sizes)
+    existing = {option.code: option for option in group.options}
+    wanted = {code_from_name(size.name_en): size for size in sizes}
+    for position, (code, size) in enumerate(wanted.items()):
+        option = existing.get(code)
+        if option is None:
+            option = Option(code=code, name_i18n={"en": size.name_en})
+            group.options.append(option)
+        else:
+            option.name_i18n = {**option.name_i18n, "en": size.name_en}
+        option.price_delta_cents = size.price_cents - cheapest
+        option.is_default = size.is_default
+        option.is_active = True
+        option.sort_order = position
+    for code, option in existing.items():
+        if code not in wanted and option.is_active:
+            option.is_active = False
+            # What it costs a car that already has it stays the same, as far
+            # as an option's price can say so.
+            real_price = item.base_price_cents + option.price_delta_cents
+            option.price_delta_cents = max(real_price - cheapest, 0)
+    await db.flush()
+
+
+async def _next_group_position(db: AsyncSession, item_id: uuid.UUID) -> int:
+    highest = await db.scalar(
+        select(func.max(OptionGroup.sort_order)).where(OptionGroup.item_id == item_id)
+    )
+    return 0 if highest is None else highest + 1
 
 
 def _reason(old: dict[str, str] | None, because: str) -> dict[str, str]:
@@ -637,6 +779,7 @@ async def _views(db: AsyncSession, items: list[MenuItem]) -> list[AdminItemView]
             allergens_reviewed_on=item.allergens_reviewed_on,
             allergens=_allergens_view(item, declarations.get(item.id, [])),
             option_allergens=_option_allergens(item, declarations.get(item.id, [])),
+            sizes=_sizes_view(item),
             choices=[
                 AdminChoiceGroup(
                     group_name=localize(group.name_i18n, Language.EN),
@@ -651,9 +794,25 @@ async def _views(db: AsyncSession, items: list[MenuItem]) -> list[AdminItemView]
                     ],
                 )
                 for group in item.option_groups
+                if group.code != _SIZE_GROUP_CODE
+                and any(option.is_active for option in group.options)
             ],
         )
         for item in items
+    ]
+
+
+def _sizes_view(item: MenuItem) -> list[AdminSize]:
+    return [
+        AdminSize(
+            name_en=localize(option.name_i18n, Language.EN),
+            price_cents=item.base_price_cents + option.price_delta_cents,
+            is_default=option.is_default,
+        )
+        for group in item.option_groups
+        if group.code == _SIZE_GROUP_CODE
+        for option in group.options
+        if option.is_active
     ]
 
 

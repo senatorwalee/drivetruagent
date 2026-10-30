@@ -27,6 +27,7 @@ function item(overrides: Partial<AdminItem>): AdminItem {
     allergens_reviewed_on: '2026-10-01',
     allergens: { contains: [], may_contain: [] },
     option_allergens: [],
+    sizes: [],
     choices: [],
     ...overrides,
   }

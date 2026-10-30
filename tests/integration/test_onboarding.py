@@ -19,6 +19,8 @@ from drivetruagent.enums import Allergen, Channel, Diet, DietStatus, Language
 from drivetruagent.ordering import allergen_matrix, inventory
 from drivetruagent.ordering import diet as diet_rules
 from drivetruagent.ordering.cart import add_item, get_cart
+from drivetruagent.ordering.errors import MissingRequiredOptions
+from drivetruagent.ordering.menu import get_item_details
 from drivetruagent.ordering.sessions import open_session
 from drivetruagent.seed import load_menu, seed_menu
 
@@ -544,6 +546,128 @@ async def test_a_review_that_does_not_say_what_it_means_is_refused(
 ) -> None:
     response = await go_live(
         client, items=[item("Fish taco", "Tacos", 650, allergens=allergens)]
+    )
+
+    assert response.status_code == 422
+
+
+# --- Sizes ------------------------------------------------------------------
+
+SIZES = [
+    {"name_en": "Regular", "price_cents": 650},
+    {"name_en": "Large", "price_cents": 900},
+]
+
+
+async def test_the_cheapest_size_is_the_price_and_the_others_add_to_it(
+    client: httpx.AsyncClient, db_session: AsyncSession
+) -> None:
+    # Typed dearest first, as an owner might.
+    response = await go_live(
+        client,
+        items=[item("Fish taco", "Tacos", 650, sizes=list(reversed(SIZES)))],
+    )
+
+    assert response.status_code == 201
+    details = await get_item_details(db_session, "fish_taco", Language.EN)
+    assert details.base_price_cents == 650
+    group = details.choices[0]
+    assert (group.group_code, group.min_select, group.max_select) == ("size", 1, 1)
+    assert [(o.option_name, o.price_delta_cents) for o in group.options] == [
+        ("Large", 250),
+        ("Regular", 0),
+    ]
+
+
+async def test_with_no_default_the_agent_has_to_ask(
+    client: httpx.AsyncClient, db_session: AsyncSession
+) -> None:
+    await go_live(client, items=[item("Fish taco", "Tacos", 650, sizes=SIZES)])
+
+    details = await get_item_details(db_session, "fish_taco", Language.EN)
+    assert details.must_ask == ["size"]
+    customer_session = await open_session(db_session, lane="1")
+    with pytest.raises(MissingRequiredOptions):
+        await add_item(
+            db_session, customer_session.id, "fish_taco", 1, tax_rate=TEST_TAX_RATE
+        )
+
+
+async def test_with_a_default_the_agent_assumes_it_at_its_real_price(
+    client: httpx.AsyncClient, db_session: AsyncSession
+) -> None:
+    sizes = [SIZES[0], {**SIZES[1], "is_default": True}]
+    await go_live(client, items=[item("Fish taco", "Tacos", 650, sizes=sizes)])
+
+    details = await get_item_details(db_session, "fish_taco", Language.EN)
+    assert details.must_ask == []
+    assert details.choices[0].default_option_code == "large"
+    customer_session = await open_session(db_session, lane="1")
+    cart = await add_item(
+        db_session, customer_session.id, "fish_taco", 1, tax_rate=TEST_TAX_RATE
+    )
+    assert cart.lines[0].unit_price_cents == 900
+
+
+async def test_stock_is_per_item_whatever_the_size(
+    client: httpx.AsyncClient, db_session: AsyncSession
+) -> None:
+    await go_live(client, items=[item("Fish taco", "Tacos", 650, sizes=SIZES, stock=5)])
+
+    customer_session = await open_session(db_session, lane="1")
+    for size, quantity in (("regular", 2), ("large", 1)):
+        await add_item(
+            db_session,
+            customer_session.id,
+            "fish_taco",
+            quantity,
+            {"size": [size]},
+            tax_rate=TEST_TAX_RATE,
+        )
+
+    levels = await inventory.stock_levels(db_session)
+    assert [level.available for level in levels if level.item_code == "fish_taco"] == [
+        2
+    ]
+
+
+async def test_a_combo_counts_an_item_at_its_cheapest_size(
+    client: httpx.AsyncClient,
+) -> None:
+    response = await go_live(
+        client,
+        replace_menu=True,
+        items=[
+            item("Fish taco", "Tacos", 650, sizes=SIZES),
+            item("Slaw cup", "Extras", 300),
+        ],
+        combos=[{**TACO_PLATE, "discount_cents": 950}],
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["details"]["cheapest_set_cents"] == 950
+
+
+@pytest.mark.parametrize(
+    ("price", "sizes"),
+    [
+        # The item's price and the sizes disagree.
+        (700, SIZES),
+        # One size is no choice.
+        (650, SIZES[:1]),
+        # Two of the same, however they are written.
+        (650, [SIZES[0], {"name_en": "REGULAR!", "price_cents": 700}]),
+        # Only one can be assumed.
+        (650, [{**size, "is_default": True} for size in SIZES]),
+        (650, [SIZES[0], {"name_en": "  ", "price_cents": 700}]),
+        (650, [SIZES[0], {"name_en": "Large", "price_cents": -1}]),
+    ],
+)
+async def test_sizes_that_do_not_add_up_are_refused(
+    client: httpx.AsyncClient, price: int, sizes: list[dict[str, Any]]
+) -> None:
+    response = await go_live(
+        client, items=[item("Fish taco", "Tacos", price, sizes=sizes)]
     )
 
     assert response.status_code == 422
