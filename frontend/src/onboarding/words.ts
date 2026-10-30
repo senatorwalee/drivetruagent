@@ -5,6 +5,8 @@
  */
 import { ApiError } from '../api/client'
 import type { AdminMenu, Combo, Diet, DietStatus, Onboarding, OnboardingResult } from '../api/client'
+import { reviewProblem, reviewSent } from '../menu-admin/allergens'
+import type { Review } from '../menu-admin/allergens'
 import { checkForm, formFromItem, newItemFrom, parsePrice, stockFrom } from '../menu-admin/words'
 import type { FormProblems, ItemForm } from '../menu-admin/words'
 import { money } from '../session/presentation'
@@ -12,6 +14,7 @@ import { money } from '../session/presentation'
 export const STEPS = [
   { id: 'restaurant', label: 'Restaurant' },
   { id: 'menu', label: 'Menu' },
+  { id: 'allergens', label: 'Allergens' },
   { id: 'diets', label: 'Halal and kosher' },
   { id: 'combos', label: 'Combos' },
   { id: 'review', label: 'Go live' },
@@ -47,6 +50,8 @@ export interface DraftItem {
   /** Units on hand; null for unlimited. */
   stock: number | null
   diets: Partial<Record<Diet, DraftReview>>
+  /** null: not reviewed, so the agent says nothing about its allergens. */
+  allergens: Review | null
 }
 
 export interface DraftCombo {
@@ -59,7 +64,7 @@ export interface DraftCombo {
 
 /** Everything entered so far. Nothing reaches the backend until Go live. */
 export interface Draft {
-  version: 1
+  version: 2
   step: Step
   restaurant: { name: string; address: string; pickupMinutes: string }
   /** Sections added by hand. Others come from the menu and the items. */
@@ -72,7 +77,7 @@ export interface Draft {
 
 export function newDraft(): Draft {
   return {
-    version: 1,
+    version: 2,
     step: 'restaurant',
     restaurant: { name: '', address: '', pickupMinutes: '15' },
     sections: [],
@@ -89,12 +94,23 @@ const DRAFT_KEY = 'frontdesk.onboarding.draft'
 /** The draft from this device, if there is one. Storage can be turned off. */
 export function loadDraft(): Draft {
   try {
-    const stored = JSON.parse(window.localStorage.getItem(DRAFT_KEY) ?? 'null') as Draft | null
-    if (stored?.version === 1) return stored
+    const stored = JSON.parse(window.localStorage.getItem(DRAFT_KEY) ?? 'null') as Draft | DraftVersion1 | null
+    if (stored?.version === 2) return stored
+    if (stored?.version === 1) return fromVersion1(stored)
   } catch {
     // Unreadable, or storage is blocked: start clean.
   }
   return newDraft()
+}
+
+/** A draft saved before items had allergens. Nothing about them is reviewed. */
+interface DraftVersion1 extends Omit<Draft, 'version' | 'items'> {
+  version: 1
+  items: Omit<DraftItem, 'allergens'>[]
+}
+
+function fromVersion1(stored: DraftVersion1): Draft {
+  return { ...stored, version: 2, items: stored.items.map((item) => ({ ...item, allergens: null })) }
 }
 
 export function saveDraft(draft: Draft): void {
@@ -163,10 +179,10 @@ export function itemsBySection(draft: Draft, today: MenuToday): { section: strin
 
 // --- Items ------------------------------------------------------------------
 
-/** A form's words for a draft item. Keeps what the item already has. */
-export function draftItemFrom(form: ItemForm, id: string, diets: DraftItem['diets']): DraftItem {
+/** A form's words for a draft item. Keeps the reviews the item already has. */
+export function draftItemFrom(form: ItemForm, id: string, kept: Pick<DraftItem, 'diets' | 'allergens'> = { diets: {}, allergens: null }): DraftItem {
   const { category_code: section, ...fields } = newItemFrom(form)
-  return { ...fields, id, section, name_fr: fields.name_fr ?? null, description_en: fields.description_en ?? null, description_fr: fields.description_fr ?? null, stock: stockFrom(form) ?? null, diets }
+  return { ...fields, diets: kept.diets, allergens: kept.allergens, id, section, name_fr: fields.name_fr ?? null, description_en: fields.description_en ?? null, description_fr: fields.description_fr ?? null, stock: stockFrom(form) ?? null }
 }
 
 export function formFromDraftItem(item: DraftItem): ItemForm {
@@ -204,6 +220,21 @@ export function checkItem(form: ItemForm, draft: Draft, today: MenuToday, editin
 
 export function quantityLabel(item: DraftItem): string {
   return item.stock === null ? 'Unlimited' : `${item.stock} on hand`
+}
+
+// --- Allergens --------------------------------------------------------------
+
+export function allergenCounts(draft: Draft): { reviewed: number; unreviewed: number } {
+  const reviewed = draft.items.filter((item) => item.allergens !== null).length
+  return { reviewed, unreviewed: draft.items.length - reviewed }
+}
+
+function allergenProblem(draft: Draft): string | null {
+  for (const item of draft.items) {
+    const problem = reviewProblem(item.allergens, item.name_en)
+    if (problem) return problem
+  }
+  return null
 }
 
 // --- Halal and kosher -------------------------------------------------------
@@ -328,6 +359,8 @@ export function stepProblem(step: Step, draft: Draft, today: MenuToday): string 
       return restaurantProblem(draft)
     case 'menu':
       return menuProblem(draft) ?? clashProblem(draft, today)
+    case 'allergens':
+      return allergenProblem(draft)
     case 'diets':
       return dietProblem(draft)
     case 'combos':
@@ -368,6 +401,7 @@ export function goLivePayload(draft: Draft): Onboarding {
       base_price_cents: item.base_price_cents,
       stock: item.stock,
       diets: dietsSent(item),
+      allergens: reviewSent(item.allergens),
     })),
     combos: draft.combos.map((combo) => ({ name_en: combo.name.trim(), discount_cents: combo.savingCents, slots: combo.slots })),
   }
@@ -386,6 +420,10 @@ export function goLiveRefusal(error: unknown): string {
     default:
       return error.message
   }
+}
+
+export function unreviewedNote(count: number): string {
+  return count === 1 ? '1 item isn’t reviewed for allergens, so the agent hands those questions to a person.' : `${count} items aren’t reviewed for allergens, so the agent hands those questions to a person.`
 }
 
 /** "6 items and 1 combo" */

@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 
 import { ApiError } from '../api/client'
 import type { AdminMenu, Combo } from '../api/client'
+import { NONE_OF_THESE } from '../menu-admin/allergens'
 import { emptyForm } from '../menu-admin/words'
 import {
+  allergenCounts,
   checkCombo,
   checkItem,
   cheapestSet,
@@ -50,6 +52,7 @@ function item(name: string, section: string, cents: number, overrides: Partial<D
     base_price_cents: cents,
     stock: null,
     diets: {},
+    allergens: null,
     ...overrides,
   }
 }
@@ -74,6 +77,45 @@ describe('the draft', () => {
 
     window.localStorage.setItem('frontdesk.onboarding.draft', JSON.stringify({ version: 99 }))
     expect(loadDraft()).toEqual(newDraft())
+  })
+
+  it('keeps a draft saved before items had allergens, with nothing reviewed', () => {
+    const { allergens: _none, ...older } = item('Fish taco', 'Mains', 650)
+    const saved = { ...draft({ step: 'combos' }), version: 1, items: [older] }
+    window.localStorage.setItem('frontdesk.onboarding.draft', JSON.stringify(saved))
+
+    const loaded = loadDraft()
+
+    expect(loaded.version).toBe(2)
+    expect(loaded.step).toBe('combos')
+    expect(loaded.items).toEqual([item('Fish taco', 'Mains', 650)])
+  })
+})
+
+describe('allergens', () => {
+  const mayContain = { noneOfThese: false, contains: [], mayContain: [{ allergen: 'sesame' as const, because: '' }] }
+
+  it('counts an item as reviewed only once someone has said something', () => {
+    const items = [item('A', 'Mains', 100), item('B', 'Mains', 100, { allergens: NONE_OF_THESE })]
+
+    expect(allergenCounts(draft({ items }))).toEqual({ reviewed: 1, unreviewed: 1 })
+  })
+
+  it('lets an item go on not reviewed', () => {
+    expect(stepProblem('allergens', draft({ items: [item('A', 'Mains', 100)] }), NOTHING_YET)).toBeNull()
+  })
+
+  it('stops at a may contain with no reason, at the step and at Go live', () => {
+    const blocked = draft({ items: [item('Fries', 'Sides', 100, { allergens: mayContain })] })
+
+    expect(stepProblem('allergens', blocked, NOTHING_YET)).toBe('Say why Fries may contain sesame.')
+    expect(goLiveProblems(blocked, NOTHING_YET).map((each) => each.step)).toEqual(['allergens'])
+  })
+
+  it('sends null for a blank item and none of these only when it was chosen', () => {
+    const payload = goLivePayload(draft({ items: [item('A', 'Mains', 100), item('B', 'Mains', 100, { allergens: NONE_OF_THESE })] }))
+
+    expect(payload.items.map((each) => each.allergens)).toEqual([null, { none_of_these: true }])
   })
 })
 
@@ -127,14 +169,27 @@ describe('an item', () => {
   const form = { ...emptyForm('Burgers'), nameEn: 'Fish burger', price: '6.50' }
 
   it('goes from the form to the draft and back', () => {
-    const made = draftItemFrom({ ...form, stockMode: 'counted', stock: '40', descriptionEn: 'Crispy.' }, 'a', {})
+    const made = draftItemFrom({ ...form, stockMode: 'counted', stock: '40', descriptionEn: 'Crispy.' }, 'a')
 
     expect(made).toMatchObject({ id: 'a', section: 'Burgers', name_en: 'Fish burger', base_price_cents: 650, stock: 40, description_en: 'Crispy.' })
     expect(formFromDraftItem(made)).toMatchObject({ categoryCode: 'Burgers', nameEn: 'Fish burger', price: '6.50', stockMode: 'counted', stock: '40' })
   })
 
   it('is unlimited unless a count is given', () => {
-    expect(draftItemFrom(form, 'a', {}).stock).toBeNull()
+    expect(draftItemFrom(form, 'a').stock).toBeNull()
+  })
+
+  it('starts with its allergens not reviewed', () => {
+    expect(draftItemFrom(form, 'a').allergens).toBeNull()
+  })
+
+  it('keeps its reviews through an edit, and takes what was typed', () => {
+    const before = item('Fish burger', 'Burgers', 650, { allergens: NONE_OF_THESE, diets: { halal: { status: 'suitable', note: '', certifiedBy: '' } } })
+
+    const edited = draftItemFrom({ ...form, nameEn: 'Fish sandwich', price: '7' }, 'a', before)
+
+    expect(edited).toMatchObject({ id: 'a', name_en: 'Fish sandwich', base_price_cents: 700, allergens: NONE_OF_THESE })
+    expect(edited.diets.halal?.status).toBe('suitable')
   })
 
   it('needs a name, a price, and a count if it is counted', () => {
@@ -301,6 +356,7 @@ describe('going live', () => {
             halal: { status: 'suitable', note: 'Own oil.' },
             kosher: { status: 'certified', certified_by: 'COR' },
           },
+          allergens: null,
         },
       ],
       combos: [{ name_en: 'Plate', discount_cents: 150, slots: ['Tacos', 'Sides'] }],

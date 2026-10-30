@@ -43,6 +43,7 @@ function installBackend({ items = ON_THE_MENU, combos = [] as Combo[], refuse = 
           sections_added: 0,
           combos: body.combos?.length ?? 0,
           diet_reviews: 0,
+          allergen_reviews: body.items.filter((item) => item.allergens).length,
           items_taken_off: body.replace_menu ? items.length : 0,
           combos_retired: 0,
         })
@@ -87,6 +88,10 @@ describe('onboarding', () => {
     await addItem(user, 'Slaw', '3', 'Sides')
     await user.click(screen.getByRole('button', { name: 'Continue' }))
 
+    await screen.findByRole('heading', { name: 'Allergens' })
+    await user.click(within(screen.getByRole('radiogroup', { name: 'Allergens in Fish taco' })).getByRole('radio', { name: 'None of these' }))
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+
     await screen.findByRole('heading', { name: 'Halal and kosher' })
     await user.click(within(screen.getByRole('radiogroup', { name: 'Fish taco for halal' })).getByRole('radio', { name: 'Suitable' }))
     await user.click(screen.getByRole('button', { name: 'Continue' }))
@@ -113,8 +118,15 @@ describe('onboarding', () => {
         restaurant: { name: 'Harbour Grill', address: '12 Water Street', pickup_minutes: 15 },
         replace_menu: false,
         items: [
-          expect.objectContaining({ section: 'Mains', name_en: 'Fish taco', base_price_cents: 650, stock: null, diets: { halal: { status: 'suitable', note: null } } }),
-          expect.objectContaining({ section: 'Sides', name_en: 'Slaw', base_price_cents: 300, stock: null, diets: {} }),
+          expect.objectContaining({
+            section: 'Mains',
+            name_en: 'Fish taco',
+            base_price_cents: 650,
+            stock: null,
+            diets: { halal: { status: 'suitable', note: null } },
+            allergens: { none_of_these: true },
+          }),
+          expect.objectContaining({ section: 'Sides', name_en: 'Slaw', base_price_cents: 300, stock: null, diets: {}, allergens: null }),
         ],
         combos: [{ name_en: 'Taco plate', discount_cents: 150, slots: ['Mains', 'Sides'] }],
       },
@@ -305,7 +317,7 @@ describe('halal and kosher', () => {
     await fillRestaurant(user)
     await addItem(user, 'Fish burger', '6.50', 'Burgers')
     await addItem(user, 'Veggie burger', '6')
-    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    await user.click(step('Halal and kosher'))
     await screen.findByRole('heading', { name: 'Halal and kosher' })
   }
 
@@ -389,8 +401,7 @@ describe('combos', () => {
     await fillRestaurant(user)
     await addItem(user, 'Fish taco', '6.50', 'Burgers')
     await addItem(user, 'Slaw', '3', 'Sides')
-    await user.click(screen.getByRole('button', { name: 'Continue' }))
-    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    await user.click(step('Combos'))
     await screen.findByRole('heading', { name: 'Combos' })
     await user.click(screen.getByRole('button', { name: 'Add a combo' }))
   }
@@ -481,16 +492,6 @@ describe('going live', () => {
     expect(await screen.findByRole('heading', { name: 'Enter your menu' })).toBeInTheDocument()
   })
 
-  it('says allergens are still to do', async () => {
-    installBackend()
-    const user = userEvent.setup()
-    open()
-
-    await user.click(step('Go live'))
-
-    expect(await screen.findByText(/Allergens aren’t set here/)).toBeInTheDocument()
-  })
-
   it('stays put and keeps everything if the backend refuses', async () => {
     installBackend({ refuse: { status: 409, code: 'duplicate_item_name' } })
     const user = userEvent.setup()
@@ -519,5 +520,149 @@ describe('going live', () => {
     expect(screen.getByRole('link', { name: 'Try it in the live lane' })).toHaveAttribute('href', '/live')
     expect(screen.getByRole('link', { name: 'Add photos on the Menu page' })).toHaveAttribute('href', '/menu')
     expect(JSON.parse(window.localStorage.getItem('frontdesk.onboarding.draft') ?? '{}').items).toEqual([])
+  })
+})
+
+describe('the allergens step', () => {
+  async function onAllergens(user: UserEvent, ...names: string[]) {
+    open()
+    await fillRestaurant(user)
+    for (const name of names) await addItem(user, name, '5')
+    await user.click(step('Allergens'))
+    await screen.findByRole('heading', { name: 'Allergens' })
+  }
+
+  const answer = (item: string, choice: string) => within(screen.getByRole('radiogroup', { name: `Allergens in ${item}` })).getByRole('radio', { name: choice })
+  const chip = (item: string, level: string, allergen: string) => within(screen.getByRole('group', { name: `${item}: ${level}` })).getByRole('button', { name: allergen })
+
+  async function goLive(user: UserEvent, backend: Backend) {
+    await user.click(step('Go live'))
+    await user.click(await screen.findByRole('button', { name: 'Go live' }))
+    await waitFor(() => expect(backend.sent()).toHaveLength(1))
+    return backend.sent()[0].items
+  }
+
+  it('starts every item not reviewed', async () => {
+    installBackend({ items: [] })
+    const user = userEvent.setup()
+    await onAllergens(user, 'Fish taco', 'Slaw')
+
+    expect(answer('Fish taco', 'Not reviewed')).toBeChecked()
+    expect(answer('Slaw', 'Not reviewed')).toBeChecked()
+    expect(screen.getByText('0 of 2 reviewed')).toBeInTheDocument()
+  })
+
+  it('sends an item nobody touched as not reviewed', async () => {
+    const backend = installBackend({ items: [] })
+    const user = userEvent.setup()
+    await onAllergens(user, 'Fish taco')
+
+    expect((await goLive(user, backend))[0].allergens).toBeNull()
+  })
+
+  it('leaves an item not reviewed when the list was opened and nothing ticked', async () => {
+    const backend = installBackend({ items: [] })
+    const user = userEvent.setup()
+    await onAllergens(user, 'Fish taco')
+
+    await user.click(answer('Fish taco', 'Has allergens'))
+    expect(screen.getByText('Tick at least one, or it stays not reviewed.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Done with allergens in Fish taco' }))
+
+    expect(answer('Fish taco', 'Not reviewed')).toBeChecked()
+    expect((await goLive(user, backend))[0].allergens).toBeNull()
+  })
+
+  it('goes back to not reviewed when the only tick is taken off', async () => {
+    const backend = installBackend({ items: [] })
+    const user = userEvent.setup()
+    await onAllergens(user, 'Fish taco')
+
+    await user.click(answer('Fish taco', 'Has allergens'))
+    await user.click(chip('Fish taco', 'contains', 'Milk'))
+    await user.click(chip('Fish taco', 'contains', 'Milk'))
+    await user.click(screen.getByRole('button', { name: 'Done with allergens in Fish taco' }))
+
+    expect(screen.getByText('0 of 1 reviewed')).toBeInTheDocument()
+    expect((await goLive(user, backend))[0].allergens).toBeNull()
+  })
+
+  it('takes none of these as a choice of its own, per item', async () => {
+    const backend = installBackend({ items: [] })
+    const user = userEvent.setup()
+    await onAllergens(user, 'Fish taco', 'Slaw')
+
+    await user.click(answer('Slaw', 'None of these'))
+
+    expect(screen.queryByRole('button', { name: /^All/ })).not.toBeInTheDocument()
+    const items = await goLive(user, backend)
+    expect(items.map((item) => item.allergens)).toEqual([null, { none_of_these: true }])
+  })
+
+  it('picks allergens from the twelve, each at one level', async () => {
+    const backend = installBackend({ items: [] })
+    const user = userEvent.setup()
+    await onAllergens(user, 'Fish taco')
+
+    await user.click(answer('Fish taco', 'Has allergens'))
+    expect(within(screen.getByRole('group', { name: 'Fish taco: contains' })).getAllByRole('button')).toHaveLength(12)
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    await user.click(chip('Fish taco', 'contains', 'Fish'))
+    await user.click(chip('Fish taco', 'contains', 'Sesame'))
+    await user.click(chip('Fish taco', 'may contain', 'Sesame'))
+    expect(chip('Fish taco', 'contains', 'Sesame')).toHaveAttribute('aria-pressed', 'false')
+    await user.type(screen.getByRole('textbox', { name: 'Why Fish taco may contain sesame' }), 'Shared with the buns')
+    await user.click(screen.getByRole('button', { name: 'Done with allergens in Fish taco' }))
+
+    expect(screen.getByText('Contains fish. May contain sesame.')).toBeInTheDocument()
+    expect((await goLive(user, backend))[0].allergens).toEqual({
+      none_of_these: false,
+      contains: ['fish'],
+      may_contain: [{ allergen: 'sesame', because: 'Shared with the buns' }],
+    })
+  })
+
+  it('won’t go on from a may contain with no reason', async () => {
+    installBackend({ items: [] })
+    const user = userEvent.setup()
+    await onAllergens(user, 'Fish taco')
+
+    await user.click(answer('Fish taco', 'Has allergens'))
+    await user.click(chip('Fish taco', 'may contain', 'Sesame'))
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Say why Fish taco may contain sesame.')
+    expect(screen.getByRole('heading', { name: 'Allergens' })).toBeInTheDocument()
+  })
+
+  it('keeps a review when the item is edited on the menu step', async () => {
+    const backend = installBackend({ items: [] })
+    const user = userEvent.setup()
+    await onAllergens(user, 'Fish taco')
+    await user.click(answer('Fish taco', 'None of these'))
+
+    await user.click(step('Menu'))
+    await user.click(await screen.findByRole('button', { name: 'Edit Fish taco' }))
+    await user.clear(screen.getByRole('textbox', { name: 'Price' }))
+    await user.type(screen.getByRole('textbox', { name: 'Price' }), '6{Enter}')
+
+    const [item] = await goLive(user, backend)
+    expect(item).toMatchObject({ base_price_cents: 600, allergens: { none_of_these: true } })
+  })
+
+  it('counts what is left at Go live, and says so when it is done', async () => {
+    const backend = installBackend({ items: [] })
+    const user = userEvent.setup()
+    await onAllergens(user, 'Fish taco', 'Slaw')
+    await user.click(answer('Slaw', 'None of these'))
+
+    await user.click(step('Go live'))
+    const part = await screen.findByRole('region', { name: 'Allergens' })
+    expect(part).toHaveTextContent('1 of 2 reviewed')
+    expect(part).toHaveTextContent('hands allergen questions about the others to a person')
+
+    await user.click(screen.getByRole('button', { name: 'Go live' }))
+    await waitFor(() => expect(backend.sent()).toHaveLength(1))
+    expect(await screen.findByText(/1 item isn’t reviewed for allergens/)).toBeInTheDocument()
   })
 })

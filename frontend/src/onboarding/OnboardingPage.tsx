@@ -5,6 +5,7 @@ import { api } from '../api/client'
 import type { OnboardingResult } from '../api/client'
 import { HomeLink } from '../app/HomeLink'
 import staff from '../staff/Staff.module.css'
+import { AllergensStep } from './AllergensStep'
 import { CombosStep } from './CombosStep'
 import { DietStep } from './DietStep'
 import { DoneScreen } from './DoneScreen'
@@ -16,9 +17,9 @@ import { goLivePayload, goLiveProblems, goLiveRefusal, loadDraft, menuToday, new
 import type { Draft, Step } from './words'
 
 /**
- * A restaurant's first visit, one step at a time: who it is, its menu, what
- * is halal or kosher, its combos, and going live. Everything stays on this
- * device until Go live, which saves it all at once.
+ * A restaurant's first visit, one step at a time: who it is, its menu, its
+ * allergens, what is halal or kosher, its combos, and going live. Everything
+ * stays on this device until Go live, which saves it all at once.
  */
 export function OnboardingPage() {
   const queryClient = useQueryClient()
@@ -141,6 +142,7 @@ export function OnboardingPage() {
 
             {draft.step === 'restaurant' && <RestaurantStep {...steps} onDone={next} />}
             {draft.step === 'menu' && <ItemsStep {...steps} />}
+            {draft.step === 'allergens' && <AllergensStep {...steps} />}
             {draft.step === 'diets' && <DietStep {...steps} />}
             {draft.step === 'combos' && <CombosStep {...steps} />}
             {draft.step === 'review' && <ReviewStep {...steps} blockers={blockers} goTo={goTo} />}
@@ -182,6 +184,7 @@ export function OnboardingPage() {
 const HEADINGS: Record<Step, { title: string; lede: string }> = {
   restaurant: { title: 'Tell us about your restaurant', lede: 'This is what the agent says to your guests. You can change it later.' },
   menu: { title: 'Enter your menu', lede: 'Add one item at a time. Press Enter to add it and start the next one.' },
+  allergens: { title: 'Allergens', lede: 'The agent only says what you set here. Whatever you leave, it hands to a person.' },
   diets: { title: 'Halal and kosher', lede: 'The agent only claims what you set here. Skip this if you don’t offer either.' },
   combos: { title: 'Combos', lede: 'One item from each part, bought together, costs less. Skip this if you don’t have any.' },
   review: { title: 'Ready to go live?', lede: 'Nothing has reached the agent yet. It all goes in at once when you press the button.' },

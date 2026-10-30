@@ -361,7 +361,14 @@
   color: var(--reject);
 }
 
-/* --- Halal and kosher ---------------------------------------------------- */
+/* --- Allergens, halal and kosher ------------------------------------------ */
+
+.progress {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 13px;
+}
 
 .legend {
   margin: 0;

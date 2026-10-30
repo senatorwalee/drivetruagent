@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 
 import { money } from '../session/presentation'
 import styles from './Onboarding.module.css'
-import { cheapestSet, comboParts, dietCounts, DIETS, itemsBySection } from './words'
+import { allergenCounts, cheapestSet, comboParts, dietCounts, DIETS, itemsBySection } from './words'
 import type { Draft, MenuToday, Step } from './words'
 
 interface ReviewStepProps {
@@ -16,6 +16,7 @@ interface ReviewStepProps {
 export function ReviewStep({ draft, today, blockers, goTo }: ReviewStepProps) {
   const groups = itemsBySection(draft, today)
   const counted = draft.items.filter((item) => item.stock !== null).length
+  const allergens = allergenCounts(draft)
 
   return (
     <div className={styles.review}>
@@ -48,6 +49,13 @@ export function ReviewStep({ draft, today, blockers, goTo }: ReviewStepProps) {
             {draft.items.length - counted} unlimited, {counted} counted
           </p>
         )}
+      </Part>
+
+      <Part title="Allergens" onEdit={() => goTo('allergens')}>
+        <p className={styles.reviewLead}>
+          {allergens.reviewed} of {draft.items.length} reviewed
+        </p>
+        {allergens.unreviewed > 0 && <p>The agent hands allergen questions about the others to a person.</p>}
       </Part>
 
       <Part title="Halal and kosher" onEdit={() => goTo('diets')}>
@@ -94,9 +102,7 @@ export function ReviewStep({ draft, today, blockers, goTo }: ReviewStepProps) {
           Nothing is deleted.
         </p>
       )}
-      <p className={styles.reviewNote}>
-        Allergens aren’t set here. Until you review them, the agent passes allergen questions to a person. Photos can be added on the Menu page.
-      </p>
+      <p className={styles.reviewNote}>Photos can be added on the Menu page.</p>
     </div>
   )
 }

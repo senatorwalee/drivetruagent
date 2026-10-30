@@ -51,7 +51,7 @@ export function ItemsStep({ draft, today, update }: ItemsStepProps) {
       return
     }
     const before = draft.items.find((item) => item.id === editing)
-    const item = draftItemFrom(form, editing ?? newId(), before?.diets ?? {})
+    const item = draftItemFrom(form, editing ?? newId(), before)
     update({ items: before ? draft.items.map((each) => (each.id === editing ? item : each)) : [...draft.items, item] })
     setAdded(`${before ? 'Saved' : 'Added'} ${item.name_en}.`)
     startNext(item.section)
