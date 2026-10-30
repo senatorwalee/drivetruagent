@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from drivetruagent.enums import Channel, Language
 from drivetruagent.ordering.menu import get_menu
+from drivetruagent.ordering.restaurant import read_profile
 from drivetruagent.ordering.views import MenuView
 
 # How long a phone order takes to be ready, unless the restaurant says.
@@ -179,15 +180,18 @@ async def build_instructions(
     channel: Channel = Channel.DRIVE_THRU,
     pickup_minutes: int = DEFAULT_PICKUP_MINUTES,
 ) -> str:
-    """The instructions for a session, with the menu index read from the database."""
+    """The instructions for a session, with the menu index read from the
+    database. What the restaurant registered overrides what the caller passes."""
     english = await get_menu(db, Language.EN)
     french = await get_menu(db, Language.FR)
+    profile = await read_profile(db)
     return render_instructions(
-        restaurant_name,
+        profile.name if profile else restaurant_name,
         english,
         french,
         channel=channel,
-        pickup_minutes=pickup_minutes,
+        pickup_minutes=profile.pickup_minutes if profile else pickup_minutes,
+        address=profile.address if profile else None,
     )
 
 
@@ -198,12 +202,16 @@ def render_instructions(
     *,
     channel: Channel = Channel.DRIVE_THRU,
     pickup_minutes: int = DEFAULT_PICKUP_MINUTES,
+    address: str | None = None,
 ) -> str:
     setting = _SETTINGS[channel]
+    finish = setting.finish.format(pickup_minutes=pickup_minutes)
+    if address and channel is Channel.PHONE:
+        finish += f" If they ask where to pick it up, it is at {address}."
     return _INSTRUCTIONS.format(
         intro=setting.intro.format(restaurant_name=restaurant_name),
         manner=setting.manner,
-        finish=setting.finish.format(pickup_minutes=pickup_minutes),
+        finish=finish,
         menu_index=_menu_index(english, french),
     )
 

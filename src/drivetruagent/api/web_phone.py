@@ -44,6 +44,7 @@ from drivetruagent.api.errors import (
 from drivetruagent.api.voice import LiveCallsDep, RealtimeDep, ScopeDep
 from drivetruagent.ordering.errors import OrderingError
 from drivetruagent.ordering.phone_numbers import normalize_phone
+from drivetruagent.ordering.restaurant import registered_name
 from drivetruagent.policy.caller_rules import TurnAway
 
 router = APIRouter(tags=["web phone"])
@@ -163,13 +164,13 @@ class WebPhoneInfo(BaseModel):
     summary="Who the web phone calls",
 )
 async def web_phone_line(
-    settings: SettingsDep, calls: LiveCallsDep, lines: LinesDep
+    db: SessionDep, settings: SettingsDep, calls: LiveCallsDep, lines: LinesDep
 ) -> WebPhoneInfo:
     """Lets the page show who it calls and which lines are free, and find out
     a wrong key before anyone taps Call."""
     numbers = caller_numbers(settings.web_phone_caller)
     return WebPhoneInfo(
-        restaurant_name=settings.restaurant_name,
+        restaurant_name=await registered_name(db, settings.restaurant_name),
         lines=[
             WebPhoneLine(
                 line=line,

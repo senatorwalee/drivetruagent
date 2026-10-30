@@ -13,7 +13,7 @@ import asyncio
 import contextlib
 import uuid
 from collections.abc import Coroutine
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime
 from typing import Any
 
@@ -42,6 +42,7 @@ from drivetruagent.agent.voice import (
 )
 from drivetruagent.enums import Channel, SessionState
 from drivetruagent.ordering.callers import record_call
+from drivetruagent.ordering.restaurant import registered_name
 from drivetruagent.ordering.sessions import end_session, open_session
 from drivetruagent.policy import caller_rules
 from drivetruagent.policy.caller_rules import TURN_AWAY_SENTENCES, CallerLimits
@@ -118,6 +119,7 @@ async def answer_call(
         )
         return CallOutcome(turned_away=refusal)
 
+    config = await _as_registered(db, config)
     session_id, instructions = await open_phone_session(
         db, incoming.caller_phone, business_date=business_date, config=config
     )
@@ -165,6 +167,12 @@ async def screen_caller(
         await record_call(db, caller_phone)
         await db.commit()
     return refusal
+
+
+async def _as_registered(db: AsyncSession, config: AgentConfig) -> AgentConfig:
+    """The greeting is said by code, so it needs the registered name too."""
+    name = await registered_name(db, config.restaurant_name)
+    return replace(config, restaurant_name=name)
 
 
 async def open_phone_session(
@@ -241,6 +249,7 @@ async def answer_web_call(
         )
         return WebCallOutcome(answer, key, turned_away=refusal)
 
+    config = await _as_registered(db, config)
     session_id, instructions = await open_phone_session(
         db, caller_phone, business_date=business_date, config=config
     )

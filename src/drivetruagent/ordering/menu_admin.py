@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from drivetruagent.db.models import (
+    ComboRule,
     Inventory,
     MenuCategory,
     MenuItem,
@@ -126,12 +127,13 @@ class _ItemFields(BaseModel):
         return value or None
 
 
-class NewItem(_ItemFields):
+class NewItemFields(_ItemFields):
+    """An item being added, whichever page it comes from."""
+
     name_en: Annotated[Name, StringConstraints(min_length=1)]
     name_fr: Name | None = None
     description_en: Description | None = None
     description_fr: Description | None = None
-    category_code: str
     base_price_cents: int = Field(ge=0, le=MAX_PRICE_CENTS)
     # Leave out, or None, to not track stock.
     stock: int | None = Field(default=None, ge=0, le=MAX_STOCK)
@@ -142,6 +144,10 @@ class NewItem(_ItemFields):
         if self.description_fr and not self.description_en:
             raise ValueError("a French description needs an English one")
         return self
+
+
+class NewItem(NewItemFields):
+    category_code: str
 
 
 class ItemChanges(_ItemFields):
@@ -221,7 +227,7 @@ async def create_item(db: AsyncSession, new: NewItem) -> AdminItemView:
     category_id = await _category_id(db, new.category_code)
     await _check_name_is_free(db, new.name_en, None)
     item = MenuItem(
-        code=await _free_code(db, new.name_en),
+        code=await free_code(db, MenuItem, new.name_en),
         category_id=category_id,
         name_i18n=_localized(new.name_en, new.name_fr),
         description_i18n=_description(new.description_en, new.description_fr),
@@ -341,14 +347,15 @@ def code_from_name(name: str) -> str:
     return code[:_CODE_LENGTH].rstrip("_") or "item"
 
 
-async def _free_code(db: AsyncSession, name: str) -> str:
+async def free_code(
+    db: AsyncSession, model: type[MenuItem] | type[ComboRule], name: str
+) -> str:
+    """A code made from a name that no row of `model` has yet."""
     base = code_from_name(name)
     taken = set(
-        (
-            await db.execute(
-                select(MenuItem.code).where(MenuItem.code.startswith(base))
-            )
-        ).scalars()
+        (await db.execute(select(model.code).where(model.code.startswith(base))))
+        .scalars()
+        .all()
     )
     code, n = base, 2
     while code in taken:
@@ -409,6 +416,25 @@ async def _category_id(db: AsyncSession, category_code: str) -> uuid.UUID:
     if category_id is None:
         raise UnknownCategory(category_code)
     return category_id
+
+
+async def ensure_category(db: AsyncSession, name: str) -> tuple[str, bool]:
+    """The code of the category with this name, added at the end of the menu
+    if there isn't one. Says which: (code, whether it is new)."""
+    code = code_from_name(name)
+    found = await db.scalar(select(MenuCategory.id).where(MenuCategory.code == code))
+    if found is not None:
+        return code, False
+    highest = await db.scalar(select(func.max(MenuCategory.sort_order)))
+    db.add(
+        MenuCategory(
+            code=code,
+            name_i18n={"en": name},
+            sort_order=0 if highest is None else highest + 1,
+        )
+    )
+    await db.flush()
+    return code, True
 
 
 async def _next_position(db: AsyncSession, category_id: uuid.UUID) -> int:

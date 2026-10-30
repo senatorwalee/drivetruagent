@@ -91,6 +91,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/onboarding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Go live with everything the restaurant entered
+         * @description The restaurant's details, its menu, its halal and kosher reviews and
+         *     its combos, saved together: any refusal leaves everything as it was. With
+         *     `replace_menu`, what is on the menu now comes off first. The agent sees
+         *     it all from the next session.
+         */
+        post: operations["go_live_admin_onboarding_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/agent": {
         parameters: {
             query?: never;
@@ -1558,6 +1581,29 @@ export interface components {
          */
         Decision: "allow" | "reject" | "confirm" | "escalate";
         /**
+         * Diet
+         * @description Religious dietary rules a guest may ask about.
+         * @enum {string}
+         */
+        Diet: "halal" | "kosher";
+        /**
+         * DietReview
+         * @description How the restaurant reviewed an item for a diet. An item with no review
+         *     has none on file, and nothing is claimed about it.
+         */
+        DietReview: {
+            /** Certified By */
+            certified_by?: string | null;
+            /** Note */
+            note?: string | null;
+            status: components["schemas"]["DietStatus"];
+        };
+        /**
+         * DietStatus
+         * @enum {string}
+         */
+        DietStatus: "certified" | "suitable" | "not_suitable";
+        /**
          * DiscountKind
          * @description Why an amount came off an order.
          * @enum {string}
@@ -1954,6 +2000,71 @@ export interface components {
             /** Word */
             word: string;
         };
+        /** Onboarding */
+        Onboarding: {
+            /** Combos */
+            combos?: components["schemas"]["OnboardingCombo"][];
+            /** Items */
+            items: components["schemas"]["OnboardingItem"][];
+            /**
+             * Replace Menu
+             * @default false
+             */
+            replace_menu: boolean;
+            restaurant: components["schemas"]["RestaurantDetails"];
+        };
+        /**
+         * OnboardingCombo
+         * @description One item from each part, bought together, costs less.
+         */
+        OnboardingCombo: {
+            /** Discount Cents */
+            discount_cents: number;
+            /** Name En */
+            name_en: string;
+            /** Name Fr */
+            name_fr?: string | null;
+            /** Slots */
+            slots: string[];
+        };
+        /** OnboardingItem */
+        OnboardingItem: {
+            /** Base Price Cents */
+            base_price_cents: number;
+            /** Description En */
+            description_en?: string | null;
+            /** Description Fr */
+            description_fr?: string | null;
+            /** Diets */
+            diets?: {
+                [key: string]: components["schemas"]["DietReview"];
+            };
+            /** Name En */
+            name_en: string;
+            /** Name Fr */
+            name_fr?: string | null;
+            /** Section */
+            section: string;
+            /** Stock */
+            stock?: number | null;
+        };
+        /** OnboardingResult */
+        OnboardingResult: {
+            /** Combos */
+            combos: number;
+            /** Combos Retired */
+            combos_retired: number;
+            /** Diet Reviews */
+            diet_reviews: number;
+            /** Items */
+            items: number;
+            /** Items Taken Off */
+            items_taken_off: number;
+            /** Restaurant Name */
+            restaurant_name: string;
+            /** Sections Added */
+            sections_added: number;
+        };
         /** OpenSessionRequest */
         OpenSessionRequest: {
             /** Caller Phone */
@@ -2131,6 +2242,15 @@ export interface components {
             /** Note */
             note?: string | null;
             outcome: components["schemas"]["HandoffOutcome"];
+        };
+        /** RestaurantDetails */
+        RestaurantDetails: {
+            /** Address */
+            address?: string | null;
+            /** Name */
+            name: string;
+            /** Pickup Minutes */
+            pickup_minutes: number;
         };
         /** SelectedOptionView */
         SelectedOptionView: {
@@ -2810,6 +2930,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    go_live_admin_onboarding_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Onboarding"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingResult"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

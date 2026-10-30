@@ -14,16 +14,22 @@ export interface ItemForm {
   descriptionFr: string
   categoryCode: string
   price: string
+  stockMode: StockMode
+  /** How many, when the mode is counted. */
   stock: string
 }
+
+/** Unlimited has no count and never runs out until someone says so. */
+export type StockMode = 'unlimited' | 'counted' | 'sold_out'
 
 /** What is wrong with the form, by field. Empty when it can be saved. */
 export type FormProblems = Partial<Record<keyof ItemForm, string>>
 
 const MAX_PRICE_CENTS = 100_000
+const MAX_STOCK = 100_000
 
 export function emptyForm(categoryCode: string): ItemForm {
-  return { nameEn: '', nameFr: '', descriptionEn: '', descriptionFr: '', categoryCode, price: '', stock: '' }
+  return { nameEn: '', nameFr: '', descriptionEn: '', descriptionFr: '', categoryCode, price: '', stockMode: 'unlimited', stock: '' }
 }
 
 export function formFromItem(item: AdminItem): ItemForm {
@@ -34,7 +40,8 @@ export function formFromItem(item: AdminItem): ItemForm {
     descriptionFr: item.description_fr ?? '',
     categoryCode: item.category_code,
     price: (item.base_price_cents / 100).toFixed(2),
-    stock: item.stock === null ? '' : String(item.stock),
+    stockMode: item.stock === null ? 'unlimited' : item.stock === 0 ? 'sold_out' : 'counted',
+    stock: item.stock ? String(item.stock) : '',
   }
 }
 
@@ -52,13 +59,22 @@ export function parseStock(text: string): number | null | undefined {
   return /^\d{1,6}$/.test(trimmed) ? Number(trimmed) : undefined
 }
 
+/** What to send for stock: null for unlimited. undefined if the count isn't one. */
+export function stockFrom(form: Pick<ItemForm, 'stockMode' | 'stock'>): number | null | undefined {
+  if (form.stockMode === 'unlimited') return null
+  if (form.stockMode === 'sold_out') return 0
+  return form.stock.trim() === '' ? undefined : parseStock(form.stock)
+}
+
 export function checkForm(form: ItemForm): FormProblems {
   const problems: FormProblems = {}
   if (!form.nameEn.trim()) problems.nameEn = 'Give the item a name.'
   const cents = parsePrice(form.price)
   if (cents === null) problems.price = 'Enter a price, like 5.49.'
   else if (cents > MAX_PRICE_CENTS) problems.price = 'That is more than $1,000. Check the price.'
-  if (parseStock(form.stock) === undefined) problems.stock = 'Enter a whole number, or leave it blank.'
+  const stock = stockFrom(form)
+  if (stock === undefined) problems.stock = 'Enter how many you have, as a whole number.'
+  else if (stock !== null && stock > MAX_STOCK) problems.stock = 'That is more than 100,000. Check the count.'
   if (form.descriptionFr.trim() && !form.descriptionEn.trim()) {
     problems.descriptionEn = 'Add an English description; it is used when French is missing.'
   }
@@ -74,7 +90,7 @@ export function newItemFrom(form: ItemForm): NewItem {
     description_fr: form.descriptionFr.trim() || null,
     category_code: form.categoryCode,
     base_price_cents: parsePrice(form.price) ?? 0,
-    stock: parseStock(form.stock) ?? null,
+    stock: stockFrom(form) ?? null,
   }
 }
 
@@ -97,7 +113,7 @@ export function sameForm(a: ItemForm, b: ItemForm): boolean {
 }
 
 export function stockLabel(item: AdminItem): string {
-  if (item.stock === null) return 'Stock not tracked'
+  if (item.stock === null) return 'Unlimited'
   if (item.sold_out) return 'Sold out'
   return `${item.stock} in stock`
 }

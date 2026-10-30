@@ -123,6 +123,36 @@ describe('the menu page', () => {
     expect(screen.getByText(/3 on the menu/)).toBeInTheDocument()
   })
 
+  it('marks an unlimited item sold out, and back', async () => {
+    const backend = installBackend()
+    const user = userEvent.setup()
+    open()
+
+    await user.click(await screen.findByText('Classic burger'))
+    await user.click(screen.getByRole('radio', { name: 'Unlimited' }))
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await screen.findByText(/^Saved/)
+    expect(backend.writes().at(-1)?.body).toEqual({ stock: null })
+
+    await user.click(screen.getByRole('radio', { name: 'Sold out' }))
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(backend.writes().at(-1)?.body).toEqual({ stock: 0 }))
+  })
+
+  it('asks how many when an item is counted', async () => {
+    const backend = installBackend()
+    const user = userEvent.setup()
+    open()
+
+    await user.click(await screen.findByText('Classic burger'))
+    const count = screen.getByRole('textbox', { name: 'How many do you have?' })
+    await user.clear(count)
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByText('Enter how many you have, as a whole number.')).toBeInTheDocument()
+    expect(backend.writes()).toHaveLength(0)
+  })
+
   it('finds items by name in either language', async () => {
     installBackend()
     open()

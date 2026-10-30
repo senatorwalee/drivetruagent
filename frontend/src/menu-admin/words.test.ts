@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { ApiError } from '../api/client'
 import type { AdminItem } from '../api/client'
-import { changesFrom, checkForm, emptyForm, explainError, formFromItem, optionsLabel, parsePrice, parseStock, stockLabel } from './words'
+import { changesFrom, checkForm, emptyForm, explainError, formFromItem, optionsLabel, parsePrice, parseStock, stockFrom, stockLabel } from './words'
 
 const FRIES: AdminItem = {
   item_code: 'fries',
@@ -52,7 +52,7 @@ describe('reading the form', () => {
   })
 
   it('says what is wrong, field by field', () => {
-    const problems = checkForm({ ...emptyForm('sides'), price: 'free', stock: 'lots', descriptionFr: 'Croustillant' })
+    const problems = checkForm({ ...emptyForm('sides'), price: 'free', stockMode: 'counted', stock: 'lots', descriptionFr: 'Croustillant' })
 
     expect(Object.keys(problems).sort()).toEqual(['descriptionEn', 'nameEn', 'price', 'stock'])
   })
@@ -63,8 +63,8 @@ describe('reading the form', () => {
 })
 
 describe('what is sent', () => {
-  it('sends only what changed, and blank stock as "not tracked"', () => {
-    const form = { ...formFromItem(FRIES), price: '2.99', stock: '', nameFr: '' }
+  it('sends only what changed, and unlimited as no stock at all', () => {
+    const form = { ...formFromItem(FRIES), price: '2.99', stockMode: 'unlimited' as const, nameFr: '' }
 
     expect(changesFrom(form, FRIES)).toEqual({ base_price_cents: 299, stock: null, name_fr: null })
   })
@@ -75,10 +75,29 @@ describe('what is sent', () => {
 })
 
 describe('words for an item', () => {
+  it('reads the quantity choice as what to send', () => {
+    expect(stockFrom({ stockMode: 'unlimited', stock: '40' })).toBeNull()
+    expect(stockFrom({ stockMode: 'sold_out', stock: '40' })).toBe(0)
+    expect(stockFrom({ stockMode: 'counted', stock: '40' })).toBe(40)
+    expect(stockFrom({ stockMode: 'counted', stock: ' ' })).toBeUndefined()
+    expect(stockFrom({ stockMode: 'counted', stock: 'lots' })).toBeUndefined()
+  })
+
+  it('catches a count too big to be real', () => {
+    expect(checkForm({ ...emptyForm('sides'), nameEn: 'Fries', price: '2', stockMode: 'counted', stock: '100001' }).stock).toMatch(/more than 100,000/)
+    expect(checkForm({ ...emptyForm('sides'), nameEn: 'Fries', price: '2', stockMode: 'counted', stock: '100000' }).stock).toBeUndefined()
+  })
+
+  it('opens an item on the quantity choice it has now', () => {
+    expect(formFromItem(FRIES)).toMatchObject({ stockMode: 'counted', stock: '100' })
+    expect(formFromItem({ ...FRIES, stock: null })).toMatchObject({ stockMode: 'unlimited', stock: '' })
+    expect(formFromItem({ ...FRIES, stock: 0 })).toMatchObject({ stockMode: 'sold_out', stock: '' })
+  })
+
   it('describes stock in plain words', () => {
     expect(stockLabel(FRIES)).toBe('100 in stock')
     expect(stockLabel({ ...FRIES, stock: 0, sold_out: true })).toBe('Sold out')
-    expect(stockLabel({ ...FRIES, stock: null })).toBe('Stock not tracked')
+    expect(stockLabel({ ...FRIES, stock: null })).toBe('Unlimited')
   })
 
   it('lists choices with what they add to the price', () => {

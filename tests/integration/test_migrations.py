@@ -59,6 +59,7 @@ def test_upgrade_creates_the_tables(scratch_database_url: str) -> None:
         "options",
         "menu_item_aliases",
         "menu_item_photos",
+        "restaurant_profile",
         "allergen_declarations",
         "diet_suitability",
         "callers",

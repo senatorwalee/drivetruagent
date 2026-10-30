@@ -31,7 +31,7 @@ from drivetruagent.api.voice import (
 )
 from drivetruagent.api.web_phone import WebPhoneLines, get_web_phone_lines
 from drivetruagent.config import Settings, get_settings
-from drivetruagent.db.models import Caller, CustomerSession
+from drivetruagent.db.models import Caller, CustomerSession, RestaurantProfile
 from drivetruagent.enums import CallerStatus, Channel, SessionState
 from drivetruagent.ordering.callers import set_status
 from drivetruagent.ordering.sessions import open_session
@@ -227,6 +227,17 @@ async def test_the_page_can_check_its_key_and_learn_who_it_calls(
         },
     )
     assert wrong.status_code == 403
+
+
+async def test_the_page_shows_the_name_the_restaurant_registered(
+    client: httpx.AsyncClient, stand_in: StandInOpenAI, db_session: AsyncSession
+) -> None:
+    db_session.add(RestaurantProfile(name="Harbour Grill", pickup_minutes=30))
+    await db_session.commit()
+
+    info = await client.get("/web-phone/line", headers={"X-Web-Phone-Key": KEY})
+
+    assert info.json()["restaurant_name"] == "Harbour Grill"
 
 
 async def test_hanging_up_and_connecting_need_the_key_too(

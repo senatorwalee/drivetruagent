@@ -46,6 +46,7 @@ from drivetruagent.db.models.orders import (
     OrderLineOption,
 )
 from drivetruagent.db.models.policy import PendingAction
+from drivetruagent.db.models.restaurant import RestaurantProfile
 from drivetruagent.db.models.summaries import SessionSummary
 
 __all__ = [
@@ -78,6 +79,7 @@ __all__ = [
     "OrderLineOption",
     "PendingAction",
     "Reservation",
+    "RestaurantProfile",
     "SessionSuggestion",
     "SessionSummary",
     "Special",

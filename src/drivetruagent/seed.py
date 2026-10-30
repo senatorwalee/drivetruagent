@@ -44,6 +44,7 @@ from drivetruagent.db.models import (
     MenuItemPhoto,
     Option,
     OptionGroup,
+    RestaurantProfile,
     Special,
 )
 from drivetruagent.db.session import create_engine, create_session_factory
@@ -441,6 +442,8 @@ async def seed_menu(
     )
     await _seed_combos(session, menu.combos, category_ids)
     await _seed_specials(session, menu.specials, item_ids_by_code)
+    # Seeding is a reset: back to the name in the settings.
+    await session.execute(delete(RestaurantProfile))
 
     return SeedSummary(
         categories=len(menu.categories),

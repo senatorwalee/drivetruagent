@@ -3,12 +3,12 @@ import type { ReactNode } from 'react'
 
 import { api } from '../api/client'
 import { FrontdeskMark, HomeLink } from '../app/HomeLink'
-import { CONVERSATIONS_PATH, INSIGHTS_PATH, LIVE_PATH, MENU_PATH, STAFF_PATH } from '../app/navigation'
+import { CONVERSATIONS_PATH, INSIGHTS_PATH, LIVE_PATH, MENU_PATH, ONBOARDING_PATH, STAFF_PATH } from '../app/navigation'
 import { PageLink } from '../app/PageLink'
 import styles from './Home.module.css'
 import { CommonQuestions, HowItWorks, WhyIBuiltThis } from './StorySections'
 import { HOME_DESIGNS, useHomeDesign } from './useHomeDesign'
-import { agentNote, conversationsStat, insightsStat, liveStat, menuStat, staffStat } from './words'
+import { agentNote, conversationsStat, insightsStat, liveStat, menuStat, ONBOARDING_STAT, staffStat } from './words'
 import type { Stat } from './words'
 
 // Handoffs and requests arrive while the page is open.
@@ -61,6 +61,9 @@ export function HomePage() {
       </Card>
       <Card to={MENU_PATH} name="Menu" stat={menu.data && menuStat(menu.data.items)} failed={menu.isError}>
         Add, edit and take off items, each with a photo. The agent sees changes from the next car.
+      </Card>
+      <Card to={ONBOARDING_PATH} name="Onboarding" stat={ONBOARDING_STAT} failed={false}>
+        Bring a new restaurant on: its details, menu, halal and kosher options, and combos, all in one go.
       </Card>
     </ul>
   )
