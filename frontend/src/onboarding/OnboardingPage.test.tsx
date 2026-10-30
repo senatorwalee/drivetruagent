@@ -523,6 +523,137 @@ describe('going live', () => {
   })
 })
 
+describe('sizes', () => {
+  async function onMenuStep(user: UserEvent) {
+    open()
+    await fillRestaurant(user)
+  }
+
+  async function typeSizes(user: UserEvent, ...sizes: [string, string][]) {
+    for (const [index, [name, price]] of sizes.entries()) {
+      await user.type(screen.getByRole('textbox', { name: `Size ${index + 1} name` }), name)
+      await user.type(screen.getByRole('textbox', { name: `Size ${index + 1} price` }), price)
+    }
+  }
+
+  async function goLive(user: UserEvent, backend: Backend) {
+    await user.click(step('Go live'))
+    await user.click(await screen.findByRole('button', { name: 'Go live' }))
+    await waitFor(() => expect(backend.sent()).toHaveLength(1))
+    return backend.sent()[0].items
+  }
+
+  it('stays out of the way until asked for', async () => {
+    installBackend()
+    const user = userEvent.setup()
+    await onMenuStep(user)
+
+    expect(screen.queryByRole('textbox', { name: 'Size 1 name' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add sizes' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Price' })).toBeInTheDocument()
+  })
+
+  it('takes each size’s real price, and says stock is per item', async () => {
+    const backend = installBackend({ items: [] })
+    const user = userEvent.setup()
+    await onMenuStep(user)
+
+    await user.type(screen.getByRole('textbox', { name: 'Item name' }), 'Fish taco')
+    await user.click(screen.getByRole('button', { name: 'Add sizes' }))
+    expect(screen.queryByRole('textbox', { name: 'Price' })).not.toBeInTheDocument()
+    expect(screen.getByText('Stock is counted per item, not per size.')).toBeInTheDocument()
+    await typeSizes(user, ['Large', '9'], ['Regular', '6.50'])
+    await user.click(screen.getByRole('button', { name: 'Add item' }))
+
+    expect(await screen.findByRole('button', { name: 'Edit Fish taco' })).toHaveTextContent('from $6.50')
+    const [item] = await goLive(user, backend)
+    expect(item.base_price_cents).toBe(650)
+    expect(item.sizes).toEqual([
+      { name_en: 'Large', price_cents: 900, is_default: false },
+      { name_en: 'Regular', price_cents: 650, is_default: false },
+    ])
+  })
+
+  it('asks by default, or assumes the size the owner chooses', async () => {
+    const backend = installBackend({ items: [] })
+    const user = userEvent.setup()
+    await onMenuStep(user)
+
+    await user.type(screen.getByRole('textbox', { name: 'Item name' }), 'Fish taco')
+    await user.click(screen.getByRole('button', { name: 'Add sizes' }))
+    await typeSizes(user, ['Regular', '6.50'], ['Large', '9'])
+    const fallback = screen.getByRole('combobox', { name: 'If a guest doesn’t say' })
+    expect(fallback).toHaveDisplayValue('The agent asks')
+    await user.selectOptions(fallback, 'Large')
+    await user.click(screen.getByRole('button', { name: 'Add item' }))
+
+    const [item] = await goLive(user, backend)
+    expect(item.sizes?.map((size) => size.is_default)).toEqual([false, true])
+  })
+
+  it('won’t add sizes with no price', async () => {
+    installBackend()
+    const user = userEvent.setup()
+    await onMenuStep(user)
+
+    await user.type(screen.getByRole('textbox', { name: 'Item name' }), 'Fish taco')
+    await user.click(screen.getByRole('button', { name: 'Add sizes' }))
+    await user.type(screen.getByRole('textbox', { name: 'Size 1 name' }), 'Regular')
+    await user.type(screen.getByRole('textbox', { name: 'Size 2 name' }), 'Large')
+    await user.click(screen.getByRole('button', { name: 'Add item' }))
+
+    expect(await screen.findByText('Enter a price for each size, like 5.49.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit Fish taco' })).not.toBeInTheDocument()
+  })
+
+  it('goes back to one price, the cheapest', async () => {
+    const backend = installBackend({ items: [] })
+    const user = userEvent.setup()
+    await onMenuStep(user)
+
+    await user.type(screen.getByRole('textbox', { name: 'Item name' }), 'Fish taco')
+    await user.click(screen.getByRole('button', { name: 'Add sizes' }))
+    await typeSizes(user, ['Large', '9'], ['Regular', '6.50'])
+    await user.click(screen.getByRole('button', { name: 'Use one price' }))
+
+    expect(screen.getByRole('textbox', { name: 'Price' })).toHaveValue('6.50')
+    await user.click(screen.getByRole('button', { name: 'Add item' }))
+    const [item] = await goLive(user, backend)
+    expect(item).toMatchObject({ base_price_cents: 650, sizes: null })
+  })
+
+  it('adds and removes sizes, keeping at least two', async () => {
+    installBackend()
+    const user = userEvent.setup()
+    await onMenuStep(user)
+
+    await user.click(screen.getByRole('button', { name: 'Add sizes' }))
+    expect(screen.queryByRole('button', { name: /^Remove/ })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Add a size' }))
+    await user.type(screen.getByRole('textbox', { name: 'Size 3 name' }), 'Huge')
+    await user.click(screen.getByRole('button', { name: 'Remove Huge' }))
+
+    expect(screen.queryByRole('textbox', { name: 'Size 3 name' })).not.toBeInTheDocument()
+  })
+
+  it('brings the sizes back when the item is opened, and starts the next one with none', async () => {
+    installBackend()
+    const user = userEvent.setup()
+    await onMenuStep(user)
+    await user.type(screen.getByRole('textbox', { name: 'Item name' }), 'Fish taco')
+    await user.click(screen.getByRole('button', { name: 'Add sizes' }))
+    await typeSizes(user, ['Regular', '6.50'], ['Large', '9'])
+    await user.click(screen.getByRole('button', { name: 'Add item' }))
+    await screen.findByRole('button', { name: 'Edit Fish taco' })
+
+    expect(screen.getByRole('button', { name: 'Add sizes' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Edit Fish taco' }))
+    expect(screen.getByRole('textbox', { name: 'Size 2 price' })).toHaveValue('9.00')
+  })
+})
+
 describe('the allergens step', () => {
   async function onAllergens(user: UserEvent, ...names: string[]) {
     open()

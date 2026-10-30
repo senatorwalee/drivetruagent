@@ -71,7 +71,7 @@ export function ItemEditor({ item, categories, defaultCategory, notice, onSaved,
   const savedPhoto = item?.photo ? api.photoUrl(item.item_code, item.photo.version) : null
   const pictureSrc = photo.kind === 'replace' ? photo.preview : photo.kind === 'remove' ? null : savedPhoto
 
-  const edit = (field: keyof ItemForm) => (value: string) => {
+  const edit = (field: Exclude<keyof ItemForm, 'sizes'>) => (value: string) => {
     setForm((current) => ({ ...current, [field]: value }))
     setProblems((current) => ({ ...current, [field]: undefined, form: undefined }))
   }

@@ -20,6 +20,7 @@ import {
   loadDraft,
   menuToday,
   newDraft,
+  priceLabel,
   reviewSection,
   saveDraft,
   sectionKey,
@@ -53,6 +54,7 @@ function item(name: string, section: string, cents: number, overrides: Partial<D
     stock: null,
     diets: {},
     allergens: null,
+    sizes: null,
     ...overrides,
   }
 }
@@ -80,7 +82,7 @@ describe('the draft', () => {
   })
 
   it('keeps a draft saved before items had allergens, with nothing reviewed', () => {
-    const { allergens: _none, ...older } = item('Fish taco', 'Mains', 650)
+    const { allergens: _none, sizes: _onePrice, ...older } = item('Fish taco', 'Mains', 650)
     const saved = { ...draft({ step: 'combos' }), version: 1, items: [older] }
     window.localStorage.setItem('frontdesk.onboarding.draft', JSON.stringify(saved))
 
@@ -179,6 +181,26 @@ describe('an item', () => {
     expect(draftItemFrom(form, 'a').stock).toBeNull()
   })
 
+  it('takes the cheapest size as its price and keeps the sizes through the form', () => {
+    const made = draftItemFrom({ ...form, price: '', sizes: [{ key: 'a', name: 'Large', price: '9', isDefault: true }, { key: 'b', name: 'Regular', price: '6.50', isDefault: false }] }, 'a')
+
+    expect(made.base_price_cents).toBe(650)
+    expect(made.sizes).toEqual([
+      { name_en: 'Large', price_cents: 900, is_default: true },
+      { name_en: 'Regular', price_cents: 650, is_default: false },
+    ])
+    expect(priceLabel(made)).toBe('from $6.50')
+    expect(formFromDraftItem(made).sizes).toMatchObject([
+      { name: 'Large', price: '9.00', isDefault: true },
+      { name: 'Regular', price: '6.50', isDefault: false },
+    ])
+  })
+
+  it('shows a plain price when it has one', () => {
+    expect(priceLabel(draftItemFrom(form, 'a'))).toBe('$6.50')
+    expect(draftItemFrom(form, 'a').sizes).toBeNull()
+  })
+
   it('starts with its allergens not reviewed', () => {
     expect(draftItemFrom(form, 'a').allergens).toBeNull()
   })
@@ -190,6 +212,12 @@ describe('an item', () => {
 
     expect(edited).toMatchObject({ id: 'a', name_en: 'Fish sandwich', base_price_cents: 700, allergens: NONE_OF_THESE })
     expect(edited.diets.halal?.status).toBe('suitable')
+  })
+
+  it('counts toward a combo at its cheapest size', () => {
+    const taco = draftItemFrom({ ...form, categoryCode: 'Tacos', price: '', sizes: [{ key: 'a', name: 'Regular', price: '6.50', isDefault: false }, { key: 'b', name: 'Large', price: '9', isDefault: false }] }, 'a')
+
+    expect(comboParts(['Tacos'], draft({ items: [taco] }), NOTHING_YET)[0].cheapest?.cents).toBe(650)
   })
 
   it('needs a name, a price, and a count if it is counted', () => {
@@ -357,6 +385,7 @@ describe('going live', () => {
             kosher: { status: 'certified', certified_by: 'COR' },
           },
           allergens: null,
+          sizes: null,
         },
       ],
       combos: [{ name_en: 'Plate', discount_cents: 150, slots: ['Tacos', 'Sides'] }],

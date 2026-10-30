@@ -4,10 +4,10 @@
  * tested on its own.
  */
 import { ApiError } from '../api/client'
-import type { AdminMenu, Combo, Diet, DietStatus, Onboarding, OnboardingResult } from '../api/client'
+import type { AdminMenu, Combo, Diet, DietStatus, NewItem, Onboarding, OnboardingResult } from '../api/client'
 import { reviewProblem, reviewSent } from '../menu-admin/allergens'
 import type { Review } from '../menu-admin/allergens'
-import { checkForm, formFromItem, newItemFrom, parsePrice, stockFrom } from '../menu-admin/words'
+import { checkForm, codeFromName, formFromItem, newItemFrom, parsePrice, stockFrom } from '../menu-admin/words'
 import type { FormProblems, ItemForm } from '../menu-admin/words'
 import { money } from '../session/presentation'
 
@@ -52,6 +52,8 @@ export interface DraftItem {
   diets: Partial<Record<Diet, DraftReview>>
   /** null: not reviewed, so the agent says nothing about its allergens. */
   allergens: Review | null
+  /** null: it has one price. */
+  sizes: NonNullable<NewItem['sizes']> | null
 }
 
 export interface DraftCombo {
@@ -103,14 +105,15 @@ export function loadDraft(): Draft {
   return newDraft()
 }
 
-/** A draft saved before items had allergens. Nothing about them is reviewed. */
+/** A draft saved before items had allergens and sizes. Nothing about their
+ * allergens is reviewed, and each has one price. */
 interface DraftVersion1 extends Omit<Draft, 'version' | 'items'> {
   version: 1
-  items: Omit<DraftItem, 'allergens'>[]
+  items: Omit<DraftItem, 'allergens' | 'sizes'>[]
 }
 
 function fromVersion1(stored: DraftVersion1): Draft {
-  return { ...stored, version: 2, items: stored.items.map((item) => ({ ...item, allergens: null })) }
+  return { ...stored, version: 2, items: stored.items.map((item) => ({ ...item, allergens: null, sizes: null })) }
 }
 
 export function saveDraft(draft: Draft): void {
@@ -146,16 +149,8 @@ export function menuToday(menu: AdminMenu | undefined, combos: Combo[] | undefin
 
 // --- Sections ---------------------------------------------------------------
 
-/** The same key the backend's code_from_name gives a name, so "BURGERS" and
- * "Burgers" are one section here as they are there. */
-export function sectionKey(name: string): string {
-  return name
-    .normalize('NFKD')
-    .replace(/[^\p{ASCII}]/gu, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-}
+/** So "BURGERS" and "Burgers" are one section here as they are in the backend. */
+export const sectionKey = codeFromName
 
 function sameName(a: string, b: string): boolean {
   return a.trim().toLowerCase() === b.trim().toLowerCase()
@@ -182,7 +177,18 @@ export function itemsBySection(draft: Draft, today: MenuToday): { section: strin
 /** A form's words for a draft item. Keeps the reviews the item already has. */
 export function draftItemFrom(form: ItemForm, id: string, kept: Pick<DraftItem, 'diets' | 'allergens'> = { diets: {}, allergens: null }): DraftItem {
   const { category_code: section, ...fields } = newItemFrom(form)
-  return { ...fields, diets: kept.diets, allergens: kept.allergens, id, section, name_fr: fields.name_fr ?? null, description_en: fields.description_en ?? null, description_fr: fields.description_fr ?? null, stock: stockFrom(form) ?? null }
+  return {
+    ...fields,
+    diets: kept.diets,
+    allergens: kept.allergens,
+    id,
+    section,
+    name_fr: fields.name_fr ?? null,
+    description_en: fields.description_en ?? null,
+    description_fr: fields.description_fr ?? null,
+    stock: stockFrom(form) ?? null,
+    sizes: fields.sizes ?? null,
+  }
 }
 
 export function formFromDraftItem(item: DraftItem): ItemForm {
@@ -201,7 +207,7 @@ export function formFromDraftItem(item: DraftItem): ItemForm {
     allergens_reviewed_on: null,
     allergens: null,
     option_allergens: [],
-    sizes: [],
+    sizes: item.sizes ?? [],
     choices: [],
   })
 }
@@ -220,6 +226,11 @@ export function checkItem(form: ItemForm, draft: Draft, today: MenuToday, editin
 
 export function quantityLabel(item: DraftItem): string {
   return item.stock === null ? 'Unlimited' : `${item.stock} on hand`
+}
+
+/** "$6.50", or "from $6.50" when it comes in sizes. */
+export function priceLabel(item: DraftItem): string {
+  return item.sizes ? `from ${money(item.base_price_cents)}` : money(item.base_price_cents)
 }
 
 // --- Allergens --------------------------------------------------------------
@@ -402,6 +413,7 @@ export function goLivePayload(draft: Draft): Onboarding {
       stock: item.stock,
       diets: dietsSent(item),
       allergens: reviewSent(item.allergens),
+      sizes: item.sizes,
     })),
     combos: draft.combos.map((combo) => ({ name_en: combo.name.trim(), discount_cents: combo.savingCents, slots: combo.slots })),
   }

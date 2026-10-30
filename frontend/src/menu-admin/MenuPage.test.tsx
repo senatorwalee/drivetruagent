@@ -80,6 +80,7 @@ function installBackend(refuse: Record<string, { status: number; code: string }>
             photo: null,
             allergens_reviewed_on: null,
             allergens: null,
+            sizes: [],
           }),
         )
       }
