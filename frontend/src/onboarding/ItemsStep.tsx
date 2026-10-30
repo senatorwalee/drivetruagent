@@ -136,7 +136,7 @@ export function ItemsStep({ draft, today, update }: ItemsStepProps) {
           {form.sizes ? (
             <SizesField sizes={form.sizes} problem={problems.sizes} onChange={editSizes} />
           ) : (
-            <button type="button" className={`${menuStyles.linkButton} ${styles.addSizes}`} onClick={() => editSizes(firstSizes(form.price))}>
+            <button type="button" className={menuStyles.addSizes} onClick={() => editSizes(firstSizes(form.price))}>
               Add sizes
             </button>
           )}

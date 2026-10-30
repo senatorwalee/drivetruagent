@@ -246,12 +246,6 @@
   align-items: start;
 }
 
-.addSizes {
-  justify-self: start;
-  margin: -8px 0;
-  padding: 0;
-}
-
 .more summary {
   width: fit-content;
   color: var(--muted);
