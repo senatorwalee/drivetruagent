@@ -30,6 +30,7 @@ import {
   withReview,
 } from './words'
 import type { Draft, DraftItem, MenuToday } from './words'
+import { sampleDraft } from './sample'
 
 const NOTHING_YET: MenuToday = { items: [], sections: [], comboNames: [] }
 const MAPLE_LANE: MenuToday = {
@@ -91,6 +92,36 @@ describe('the draft', () => {
     expect(loaded.version).toBe(2)
     expect(loaded.step).toBe('combos')
     expect(loaded.items).toEqual([item('Fish taco', 'Mains', 650)])
+  })
+})
+
+describe('the sample for a preview', () => {
+  it('has nothing in the way of going live', () => {
+    expect(goLiveProblems(sampleDraft(), NOTHING_YET)).toEqual([])
+  })
+
+  it('shows every state, with one item left not reviewed on purpose', () => {
+    const sample = sampleDraft()
+
+    expect(allergenCounts(sample)).toEqual({ reviewed: 5, unreviewed: 1 })
+    expect(sample.items.some((each) => each.sizes !== null)).toBe(true)
+    expect(sample.items.some((each) => each.stock !== null)).toBe(true)
+    expect(sample.combos.length).toBeGreaterThan(0)
+  })
+
+  it('sends only what the backend would take, if it were ever sent', () => {
+    const { items } = goLivePayload(sampleDraft())
+
+    for (const each of items) {
+      if (each.sizes) expect(each.base_price_cents).toBe(Math.min(...each.sizes.map((size) => size.price_cents)))
+    }
+  })
+
+  it('is a fresh copy each time, so a reset undoes what was changed', () => {
+    const first = sampleDraft()
+    first.items.pop()
+
+    expect(sampleDraft().items).toHaveLength(6)
   })
 })
 

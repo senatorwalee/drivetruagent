@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../api/client'
 import type { OnboardingResult } from '../api/client'
 import { HomeLink } from '../app/HomeLink'
+import { ONBOARDING_PATH, ONBOARDING_PREVIEW_PATH } from '../app/navigation'
+import { PageLink } from '../app/PageLink'
 import staff from '../staff/Staff.module.css'
 import { AllergensStep } from './AllergensStep'
 import { CombosStep } from './CombosStep'
@@ -13,6 +15,7 @@ import { ItemsStep } from './ItemsStep'
 import styles from './Onboarding.module.css'
 import { RestaurantStep } from './RestaurantStep'
 import { ReviewStep } from './ReviewStep'
+import { sampleDraft } from './sample'
 import { goLivePayload, goLiveProblems, goLiveRefusal, loadDraft, menuToday, newDraft, saveDraft, stepProblem, STEPS } from './words'
 import type { Draft, Step } from './words'
 
@@ -20,20 +23,26 @@ import type { Draft, Step } from './words'
  * A restaurant's first visit, one step at a time: who it is, its menu, its
  * allergens, what is halal or kosher, its combos, and going live. Everything
  * stays on this device until Go live, which saves it all at once.
+ *
+ * `preview` is the same page with sample items, for showing it. It doesn't
+ * touch the backend or this device's draft, and its Go live saves nothing.
  */
-export function OnboardingPage() {
+export function OnboardingPage({ preview = false }: { preview?: boolean }) {
   const queryClient = useQueryClient()
-  const menu = useQuery({ queryKey: ['admin-menu'], queryFn: api.adminMenu, retry: false })
-  const combos = useQuery({ queryKey: ['combos', 'en'], queryFn: () => api.combos('en'), retry: false })
-  const [draft, setDraft] = useState<Draft>(loadDraft)
+  const menu = useQuery({ queryKey: ['admin-menu'], queryFn: api.adminMenu, retry: false, enabled: !preview })
+  const combos = useQuery({ queryKey: ['combos', 'en'], queryFn: () => api.combos('en'), retry: false, enabled: !preview })
+  const [draft, setDraft] = useState<Draft>(preview ? sampleDraft : loadDraft)
   const [problem, setProblem] = useState<string | null>(null)
   const [refusal, setRefusal] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [triedPreview, setTriedPreview] = useState(false)
   const [finished, setFinished] = useState<OnboardingResult | null>(null)
   const heading = useRef<HTMLHeadingElement>(null)
   const firstStep = useRef(true)
 
-  useEffect(() => saveDraft(draft), [draft])
+  useEffect(() => {
+    if (!preview) saveDraft(draft)
+  }, [draft, preview])
 
   // A new step is a new screen: start reading from its heading.
   useEffect(() => {
@@ -45,13 +54,16 @@ export function OnboardingPage() {
     heading.current?.scrollIntoView?.({ block: 'center' })
   }, [draft.step])
 
-  const today = menuToday(menu.data, combos.data)
+  // Nothing on the menu in a preview: the sample stands alone, whatever the
+  // restaurant's menu has on it.
+  const today = menuToday(preview ? undefined : menu.data, preview ? undefined : combos.data)
   const position = STEPS.findIndex((each) => each.id === draft.step)
   const blockers = goLiveProblems(draft, today)
 
   function update(change: Partial<Draft>) {
     setProblem(null)
     setRefusal(null)
+    setTriedPreview(false)
     setDraft((current) => ({ ...current, ...change }))
   }
 
@@ -69,13 +81,18 @@ export function OnboardingPage() {
   }
 
   function startOver() {
-    if (!window.confirm('Clear everything entered so far?')) return
+    if (!preview && !window.confirm('Clear everything entered so far?')) return
     setProblem(null)
     setRefusal(null)
-    setDraft(newDraft())
+    setTriedPreview(false)
+    setDraft(preview ? sampleDraft() : newDraft())
   }
 
   async function goLive() {
+    if (preview) {
+      setTriedPreview(true)
+      return
+    }
     setBusy(true)
     setRefusal(null)
     try {
@@ -98,14 +115,17 @@ export function OnboardingPage() {
         <div className={staff.titleGroup}>
           <HomeLink />
           <h1 className={staff.title}>
-            Onboarding <span className={staff.titleSub}>New restaurant</span>
+            Onboarding <span className={staff.titleSub}>{preview ? 'Preview' : 'New restaurant'}</span>
           </h1>
         </div>
         {!finished && (
           <div className={styles.topEnd}>
-            <span className={styles.saved}>Saved on this device</span>
+            <span className={styles.saved}>{preview ? 'Sample items. Nothing is saved.' : 'Saved on this device'}</span>
+            <PageLink to={preview ? ONBOARDING_PATH : ONBOARDING_PREVIEW_PATH} className={styles.quiet}>
+              {preview ? 'Leave preview' : 'Preview'}
+            </PageLink>
             <button type="button" className={styles.quiet} onClick={startOver}>
-              Start over
+              {preview ? 'Reset sample' : 'Start over'}
             </button>
           </div>
         )}
@@ -153,6 +173,11 @@ export function OnboardingPage() {
               {(problem ?? refusal) && (
                 <p role="alert" className={styles.footProblem}>
                   {problem ?? refusal}
+                </p>
+              )}
+              {triedPreview && (
+                <p role="status" className={styles.footNote}>
+                  This is a preview, so nothing was saved. The menu is as it was.
                 </p>
               )}
               <div className={styles.footActions}>

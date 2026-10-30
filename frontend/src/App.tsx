@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 
-import { CALL_PATH, CALLERS_PATH, CALLS_PATH, CONVERSATIONS_PATH, INSIGHTS_PATH, LIVE_PATH, MENU_PATH, ONBOARDING_PATH, PICKUPS_PATH, STAFF_PATH, usePath } from './app/navigation'
+import { CALL_PATH, CALLERS_PATH, CALLS_PATH, CONVERSATIONS_PATH, INSIGHTS_PATH, LIVE_PATH, MENU_PATH, ONBOARDING_PATH, ONBOARDING_PREVIEW_PATH, PICKUPS_PATH, STAFF_PATH, usePath } from './app/navigation'
 import { CallersPage } from './callers/CallersPage'
 import { PickupsPage } from './callers/PickupsPage'
 import { ConversationsPage } from './conversations/ConversationsPage'
@@ -45,7 +45,10 @@ export function App() {
       ) : path === MENU_PATH ? (
         <MenuPage />
       ) : path === ONBOARDING_PATH ? (
-        <OnboardingPage />
+        <OnboardingPage key="restaurant" />
+      ) : path === ONBOARDING_PREVIEW_PATH ? (
+        // A key of its own, or moving between the two would keep the draft.
+        <OnboardingPage key="preview" preview />
       ) : path === CALLS_PATH ? (
         <LiveSessionPage follow="phone" />
       ) : path === CALL_PATH ? (

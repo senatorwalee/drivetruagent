@@ -797,3 +797,110 @@ describe('the allergens step', () => {
     expect(await screen.findByText(/1 item isn’t reviewed for allergens/)).toBeInTheDocument()
   })
 })
+
+describe('the preview', () => {
+  const DRAFT_KEY = 'frontdesk.onboarding.draft'
+
+  function openPreview() {
+    window.history.replaceState(null, '', '/onboarding/preview')
+    render(<App />)
+  }
+
+  function requests() {
+    return vi.mocked(fetch).mock.calls.map(([input, init]) => ({ path: String(input), method: init?.method ?? 'GET' }))
+  }
+
+  it('has something to show on every step', async () => {
+    installBackend()
+    const user = userEvent.setup()
+    openPreview()
+
+    expect(screen.getByRole('textbox', { name: 'Restaurant name' })).toHaveValue('Harbour Grill')
+
+    await user.click(step('Menu'))
+    expect(await screen.findByRole('button', { name: 'Edit Fries' })).toHaveTextContent('from $3.00')
+
+    await user.click(step('Allergens'))
+    expect(await screen.findByText('5 of 6 reviewed')).toBeInTheDocument()
+    expect(within(screen.getByRole('radiogroup', { name: 'Allergens in Apple hand pie' })).getByRole('radio', { name: 'Not reviewed' })).toBeChecked()
+    expect(screen.getByText(/Contains fish, wheat, gluten/)).toBeInTheDocument()
+
+    await user.click(step('Halal and kosher'))
+    expect(within(await screen.findByRole('radiogroup', { name: 'Fries for halal' })).getByRole('radio', { name: 'Suitable' })).toBeChecked()
+
+    await user.click(step('Combos'))
+    expect(await screen.findByText('Taco plate')).toBeInTheDocument()
+
+    await user.click(step('Go live'))
+    expect(await screen.findByRole('region', { name: 'Menu' })).toHaveTextContent('6 items')
+  })
+
+  it('has a Go live button that cannot save', async () => {
+    installBackend()
+    const user = userEvent.setup()
+    openPreview()
+
+    await user.click(step('Go live'))
+    await user.click(await screen.findByRole('button', { name: 'Go live' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('This is a preview, so nothing was saved.')
+    expect(screen.queryByRole('heading', { name: /is live/ })).not.toBeInTheDocument()
+    expect(requests().filter((request) => request.path.includes('/admin/onboarding'))).toEqual([])
+    expect(requests().filter((request) => request.method !== 'GET')).toEqual([])
+  })
+
+  it('does not read the menu, so its items never clash with a real one', async () => {
+    installBackend({ items: [{ ...ON_THE_MENU[1], name_en: 'Fries' }] })
+    const user = userEvent.setup()
+    openPreview()
+
+    await user.click(step('Go live'))
+
+    expect(await screen.findByRole('button', { name: 'Go live' })).toBeEnabled()
+    expect(requests().filter((request) => request.path.includes('/admin/menu'))).toEqual([])
+  })
+
+  it('leaves this device’s draft alone', async () => {
+    installBackend()
+    const user = userEvent.setup()
+    open()
+    await fillRestaurant(user, 'My real restaurant')
+    const saved = window.localStorage.getItem(DRAFT_KEY)
+    document.body.innerHTML = ''
+
+    openPreview()
+    await user.click(step('Menu'))
+    await user.click(await screen.findByRole('button', { name: 'Remove Fries' }))
+
+    expect(window.localStorage.getItem(DRAFT_KEY)).toBe(saved)
+  })
+
+  it('forgets changes when reset, and on leaving', async () => {
+    installBackend()
+    const user = userEvent.setup()
+    openPreview()
+    await user.click(step('Menu'))
+    await user.click(await screen.findByRole('button', { name: 'Remove Fries' }))
+    expect(screen.queryByRole('button', { name: 'Edit Fries' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Reset sample' }))
+    await user.click(step('Menu'))
+
+    expect(await screen.findByRole('button', { name: 'Edit Fries' })).toBeInTheDocument()
+  })
+
+  it('goes back and forth, each with its own draft', async () => {
+    installBackend()
+    const user = userEvent.setup()
+    open()
+    await fillRestaurant(user, 'My real restaurant')
+
+    await user.click(screen.getByRole('link', { name: 'Preview' }))
+    await user.click(step('Restaurant'))
+    expect(await screen.findByRole('textbox', { name: 'Restaurant name' })).toHaveValue('Harbour Grill')
+
+    await user.click(screen.getByRole('link', { name: 'Leave preview' }))
+    await user.click(step('Restaurant'))
+    expect(await screen.findByRole('textbox', { name: 'Restaurant name' })).toHaveValue('My real restaurant')
+  })
+})
