@@ -117,6 +117,10 @@ export function HomePage() {
               Open the live lane
               <span aria-hidden="true">→</span>
             </PageLink>
+            <PageLink to={ONBOARDING_PATH} className={styles.secondary}>
+              Bring a restaurant on
+              <span aria-hidden="true">→</span>
+            </PageLink>
             {agent.data && <span className={styles.note}>{agentNote(agent.data)}</span>}
           </div>
         </section>
