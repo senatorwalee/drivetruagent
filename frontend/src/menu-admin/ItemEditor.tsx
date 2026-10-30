@@ -1,12 +1,14 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import type { DragEvent, FormEvent, ReactNode } from 'react'
+import type { DragEvent, FormEvent } from 'react'
 
 import { api } from '../api/client'
 import type { AdminCategory, AdminItem } from '../api/client'
 import staff from '../staff/Staff.module.css'
+import { Field } from './Field'
 import { ItemPicture } from './ItemPicture'
 import styles from './MenuAdmin.module.css'
 import { ACCEPT, PhotoProblem, preparePhoto } from './photo'
+import { QuantityField } from './QuantityField'
 import {
   changesFrom,
   checkForm,
@@ -258,7 +260,7 @@ export function ItemEditor({ item, categories, defaultCategory, notice, onSaved,
           </Field>
         </div>
 
-        <div className={styles.fieldRow} data-columns="3">
+        <div className={styles.fieldRow}>
           <Field label="Category" problem={problems.categoryCode}>
             {(props) => (
               <select {...props} value={form.categoryCode} onChange={(e) => edit('categoryCode')(e.target.value)}>
@@ -278,10 +280,16 @@ export function ItemEditor({ item, categories, defaultCategory, notice, onSaved,
               </span>
             )}
           </Field>
-          <Field label="Stock on hand" hint="Blank: not tracked, never sells out" problem={problems.stock}>
-            {(props) => <input {...props} inputMode="numeric" value={form.stock} onChange={(e) => edit('stock')(e.target.value)} />}
-          </Field>
         </div>
+
+        <QuantityField
+          mode={form.stockMode}
+          stock={form.stock}
+          problem={problems.stock}
+          offerSoldOut
+          onMode={edit('stockMode')}
+          onStock={edit('stock')}
+        />
 
         <section className={styles.facts} aria-label="Set elsewhere">
           <h3 className={staff.sectionTitle}>Set in the menu file</h3>
@@ -356,35 +364,5 @@ export function ItemEditor({ item, categories, defaultCategory, notice, onSaved,
         )}
       </form>
     </aside>
-  )
-}
-
-interface FieldProps {
-  label: string
-  hint?: string
-  problem?: string
-  children: (props: { id: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean }) => ReactNode
-}
-
-function Field({ label, hint, problem, children }: FieldProps) {
-  const id = useId()
-  const describedBy = [hint && `${id}-hint`, problem && `${id}-problem`].filter(Boolean).join(' ') || undefined
-  return (
-    <div className={styles.field}>
-      <label htmlFor={id} className={styles.label}>
-        {label}
-      </label>
-      {children({ id, 'aria-describedby': describedBy, 'aria-invalid': problem ? true : undefined })}
-      {hint && (
-        <span id={`${id}-hint`} className={styles.help}>
-          {hint}
-        </span>
-      )}
-      {problem && (
-        <span id={`${id}-problem`} className={styles.fieldProblem}>
-          {problem}
-        </span>
-      )}
-    </div>
   )
 }
