@@ -1,0 +1,52 @@
+/* Shared Business appearance. Apply on each working screen, never globally:
+   the two original home designs, Receipt and Control room retain theme.css. */
+.surface {
+  --ground: #f8f7f2;
+  --panel: #fff;
+  --raised: #edf0e8;
+  --hairline: #d0d9cf;
+  --text: #172e35;
+  --muted: #526166;
+  --faint: #5b6b64;
+  --accent: #24645b;
+  --on-accent: #fff;
+  --listening: #695397;
+  --allow: #286846;
+  --confirm: #865712;
+  --reject: #ac382e;
+  --escalate: #695397;
+  --on-light: #fff;
+  --agent-core: #f8f7f2;
+  --call-switcher-shadow: 0 8px 24px rgb(23 46 53 / 0.12);
+  --heading-font: Georgia, 'Times New Roman', serif;
+  color-scheme: light;
+  min-height: 100vh;
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--font);
+}
+
+.surface :is(input, select, textarea):not([type='radio']):not([type='checkbox']) {
+  background: var(--panel);
+  border-color: #819286;
+  border-radius: 7px;
+}
+
+.surface :is(input, select, textarea)[aria-invalid='true'] {
+  border-color: var(--reject);
+}
+
+.surface :is(input, select, textarea) { accent-color: var(--accent); }
+
+.surface :is(button, a, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.heading {
+  font-family: var(--heading-font);
+  font-size: clamp(30px, 3.5vw, 42px);
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+}

@@ -9,6 +9,7 @@ import styles from './Home.module.css'
 import { CommonQuestions, HowItWorks, WhyIBuiltThis } from './StorySections'
 import { HOME_DESIGNS, useHomeDesign } from './useHomeDesign'
 import { agentNote, conversationsStat, insightsStat, liveStat, menuStat, ONBOARDING_STAT, staffStat } from './words'
+import { BusinessHome } from './BusinessHome'
 import type { Stat } from './words'
 
 // Handoffs and requests arrive while the page is open.
@@ -39,6 +40,8 @@ export function HomePage() {
   const restaurant = agent.data?.restaurant_name
   const [design, chooseDesign] = useHomeDesign()
   const isNew = design === 'new'
+
+  if (design === 'business') return <BusinessHome design={design} chooseDesign={chooseDesign} />
 
   const cards = (
     <ul className={styles.cards} aria-label="Parts of Frontdesk">

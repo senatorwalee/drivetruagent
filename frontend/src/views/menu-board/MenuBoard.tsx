@@ -17,7 +17,7 @@ import { OrderPanel } from './OrderPanel'
 /** A calm screen like a drive-through sign at night: orb and order first. */
 export function MenuBoard({ live, view, onViewChange }: LiveSessionViewProps) {
   return (
-    <div className={styles.screen}>
+    <div className={styles.screen} data-appearance="business">
       <header className={styles.topBar}>
         <HomeLink />
         <div className={styles.brand}>

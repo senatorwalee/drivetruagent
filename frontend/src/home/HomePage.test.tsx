@@ -48,7 +48,7 @@ function installBackend(reachable = true) {
   )
 }
 
-function open(path = '/') {
+function open(path = '/?design=current') {
   window.history.replaceState(null, '', path)
   render(<App />)
 }
@@ -121,14 +121,14 @@ describe('the home page', () => {
     await userEvent.click(screen.getByRole('link', { name: 'Frontdesk' }))
 
     expect(window.location.pathname).toBe('/')
-    expect(screen.getByRole('list', { name: 'Parts of Frontdesk' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Keep orders moving.')
   })
 
   it('is where an unknown address lands', () => {
     installBackend()
     open('/nowhere')
 
-    expect(screen.getByRole('list', { name: 'Parts of Frontdesk' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Keep orders moving.')
   })
 
   it('says so when the backend cannot be reached, and the cards still lead somewhere', async () => {
@@ -141,14 +141,46 @@ describe('the home page', () => {
   })
 })
 
-describe('the two home page designs', () => {
-  it('opens on the current design', () => {
+describe('the home page designs', () => {
+  it('adds the business option, keeps its scenario controls working, and returns to either original design', async () => {
     installBackend()
-    open()
+    open('/?design=business')
 
-    expect(screen.getByRole('button', { name: 'Current' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Business' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Keep orders moving.')
+    expect(screen.getAllByRole('link', { name: 'Try an order' }).every((link) => link.getAttribute('href') === '/live')).toBe(true)
+    expect(screen.getByRole('link', { name: 'Workspace' })).toHaveAttribute('href', '/staff')
+    await userEvent.click(screen.getByRole('button', { name: 'Staff handoffs' }))
+    expect(screen.getByRole('link', { name: 'Explore staff handoffs' })).toHaveAttribute('href', '/staff')
+    expect(screen.getByText('I’d like to speak with someone about my order.')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'New' }))
+    expect(screen.getByRole('heading', { name: /in three steps/ })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Business' }))
+    expect(window.location.search).toBe('?design=business')
+    expect(window.localStorage.getItem('drivetruagent.home-design')).toBe('business')
+    await userEvent.click(screen.getByRole('button', { name: 'Current' }))
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('The agent takes the order.')
+    expect(screen.getByRole('list', { name: 'Parts of Frontdesk' })).toBeInTheDocument()
+  })
+
+  it('opens on Business for a new visitor', () => {
+    installBackend()
+    open('/')
+
+    expect(screen.getByRole('button', { name: 'Business' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Keep orders moving.')
     expect(screen.queryByRole('heading', { name: /in three steps/ })).not.toBeInTheDocument()
     expect(screen.queryByText('Voice AI · Drive-through and phone orders')).not.toBeInTheDocument()
+  })
+
+  it('honors an existing saved homepage choice', () => {
+    installBackend()
+    window.localStorage.setItem('drivetruagent.home-design', 'current')
+    open('/')
+
+    expect(screen.getByRole('button', { name: 'Current' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('The agent takes the order.')
   })
 
   it('switches to the new design, which tells the story around the cards', async () => {

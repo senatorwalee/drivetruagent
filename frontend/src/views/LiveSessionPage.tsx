@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react'
 
 import { useLiveSession } from '../session/useLiveSession'
+import theme from '../app/BusinessTheme.module.css'
 import { ControlRoom } from './control-room/ControlRoom'
 import { MenuBoard } from './menu-board/MenuBoard'
 import { Receipt } from './receipt/Receipt'
@@ -29,11 +30,11 @@ export function LiveSessionPage({ follow }: { follow?: 'phone' }) {
   const switching = live.following && (live.calls.length > 1 || live.watching !== null)
 
   return (
-    <>
+    <div className={view === 'menu-board' ? theme.surface : undefined}>
       <View live={live} view={view} onViewChange={setView} />
       {switching && (
         <CallSwitcher calls={live.calls} onScreen={live.session?.session_id ?? null} watching={live.watching} onWatch={live.watch} />
       )}
-    </>
+    </div>
   )
 }

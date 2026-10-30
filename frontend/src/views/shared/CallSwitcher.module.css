@@ -16,7 +16,7 @@
   border: 1px solid var(--hairline);
   background: color-mix(in oklch, var(--raised) 92%, transparent);
   backdrop-filter: blur(8px);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+  box-shadow: var(--call-switcher-shadow, 0 8px 24px rgb(0 0 0 / 0.35));
   font-family: var(--font);
 }
 

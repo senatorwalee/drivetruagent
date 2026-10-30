@@ -2,6 +2,7 @@
    sees. Colours and fonts come from theme.css. */
 
 .screen {
+  composes: surface from '../app/BusinessTheme.module.css';
   /* Colours and fonts: theme.css. */
   min-height: 100vh;
   display: flex;
@@ -21,7 +22,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px 16px;
-  padding: 12px 24px;
+  padding: 18px 24px;
   border-bottom: 1px solid var(--hairline);
 }
 
@@ -39,9 +40,11 @@
 
 .title {
   margin: 0;
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-family: var(--heading-font);
+  font-size: 26px;
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
 }
 
 .titleGroup {
@@ -60,11 +63,10 @@
 .titleSub {
   margin-left: 8px;
   color: var(--muted);
-  font-family: var(--mono);
+  font-family: var(--font);
   font-size: 12px;
   font-weight: 400;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0;
 }
 
 .banner {
@@ -135,7 +137,7 @@
   gap: 4px;
   flex: 1 1 220px;
   color: var(--muted);
-  font-family: var(--mono);
+  font-family: var(--font);
   font-size: 12px;
 }
 
@@ -305,9 +307,9 @@
 }
 
 .packageTitle {
+  composes: heading from '../app/BusinessTheme.module.css';
   margin: 0;
-  font-size: 24px;
-  letter-spacing: -0.02em;
+  font-size: 32px;
 }
 
 .packageMeta {
