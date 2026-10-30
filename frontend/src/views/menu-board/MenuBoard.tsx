@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { HomeLink } from '../../app/HomeLink'
 import { INSIGHTS_PATH, MENU_PATH, STAFF_PATH } from '../../app/navigation'
 import { PageLink } from '../../app/PageLink'
@@ -14,11 +15,25 @@ import { DecisionStrip } from './DecisionStrip'
 import styles from './MenuBoard.module.css'
 import { OrderPanel } from './OrderPanel'
 
-/** A calm screen like a drive-through sign at night: orb and order first. */
+/** Keep the conversation, backend activity and order together during a demo. */
 export function MenuBoard({ live, view, onViewChange }: LiveSessionViewProps) {
+  const screenRef = useRef<HTMLDivElement>(null)
+  const headerRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const header = headerRef.current
+    const screen = screenRef.current
+    if (!header || !screen) return
+    const measure = () => screen.style.setProperty('--menu-header-height', `${header.getBoundingClientRect().height}px`)
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(header)
+    return () => observer.disconnect()
+  }, [])
+
   return (
-    <div className={styles.screen} data-appearance="business">
-      <header className={styles.topBar}>
+    <div ref={screenRef} className={styles.screen} data-appearance="business">
+      <header ref={headerRef} className={styles.topBar}>
         <HomeLink />
         <div className={styles.brand}>
           <span className={styles.brandName}>{live.agent?.restaurant_name ?? 'Restaurant'}</span>
@@ -66,8 +81,10 @@ export function MenuBoard({ live, view, onViewChange }: LiveSessionViewProps) {
           <Composer live={live} />
         </section>
         <OrderPanel live={live} />
-        <DecisionStrip decisions={live.timeline.decisions} />
-        <ShopBoard week={live.board.week} combos={live.board.combos} stock={live.board.stock} className={styles.board} />
+        <div className={styles.demoDetails}>
+          <DecisionStrip decisions={live.timeline.decisions} />
+          <ShopBoard week={live.board.week} combos={live.board.combos} stock={live.board.stock} presentation="demo" className={styles.board} />
+        </div>
       </main>
     </div>
   )
@@ -91,12 +108,23 @@ function ProgressSteps({ live }: { live: LiveSession }) {
 
 /** The last few lines; the newest thing the agent said is the largest. */
 function Conversation({ live }: { live: LiveSession }) {
+  const conversationRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const conversation = conversationRef.current
+    if (!conversation) return
+    const showLatest = () => { conversation.scrollTop = conversation.scrollHeight }
+    showLatest()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(showLatest)
+    observer.observe(conversation)
+    return () => observer.disconnect()
+  }, [live.timeline.transcript])
   const lines = live.timeline.transcript.slice(-3)
   if (lines.length === 0) {
     return <p className={styles.hint}>{emptyConversationHint(live.following)}</p>
   }
   return (
-    <div aria-label="Conversation" aria-live="polite" className={styles.conversation}>
+    <div ref={conversationRef} role="region" aria-label="Conversation" aria-live="polite" tabIndex={0} className={styles.conversation}>
       {lines.map((line, index) => (
         <p key={line.id} className={styles.bubble} data-speaker={line.speaker} data-latest={index === lines.length - 1}>
           {spokenText(line)}
