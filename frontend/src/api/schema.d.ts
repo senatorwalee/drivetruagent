@@ -36,7 +36,8 @@ export interface paths {
         /**
          * Add an item
          * @description Added at the end of its category. Its code is made from the English
-         *     name. Its allergens start unreviewed, so the agent will not discuss them.
+         *     name. Sent with no `allergens`, it starts unreviewed, and the agent will
+         *     not discuss them.
          */
         post: operations["create_item_admin_menu_items_post"];
         delete?: never;
@@ -61,7 +62,8 @@ export interface paths {
         /**
          * Change an item, or take it off the menu
          * @description Only the fields sent are changed. `is_active: false` takes the item
-         *     off the menu; past orders keep it, and `true` puts it back.
+         *     off the menu; past orders keep it, and `true` puts it back. `allergens`
+         *     replaces the item's own review, dated today, and null takes it back.
          */
         patch: operations["update_item_admin_menu_items__item_code__patch"];
         trace?: never;
@@ -102,10 +104,10 @@ export interface paths {
         put?: never;
         /**
          * Go live with everything the restaurant entered
-         * @description The restaurant's details, its menu, its halal and kosher reviews and
-         *     its combos, saved together: any refusal leaves everything as it was. With
-         *     `replace_menu`, what is on the menu now comes off first. The agent sees
-         *     it all from the next session.
+         * @description The restaurant's details, its menu, its allergen, halal and kosher
+         *     reviews and its combos, saved together: any refusal leaves everything as
+         *     it was. With `replace_menu`, what is on the menu now comes off first. The
+         *     agent sees it all from the next session.
          */
         post: operations["go_live_admin_onboarding_post"];
         delete?: never;
@@ -1239,6 +1241,17 @@ export interface components {
                 [key: string]: string[];
             };
         };
+        /**
+         * AdminAllergens
+         * @description The item's own allergens, as reviewed. Both lists empty is a statement
+         *     too: the restaurant said it has none of them.
+         */
+        AdminAllergens: {
+            /** Contains */
+            contains: components["schemas"]["Allergen"][];
+            /** May Contain */
+            may_contain: components["schemas"]["AdminMayContain"][];
+        };
         /** AdminCategoryView */
         AdminCategoryView: {
             /** Category Code */
@@ -1267,6 +1280,7 @@ export interface components {
         };
         /** AdminItemView */
         AdminItemView: {
+            allergens: components["schemas"]["AdminAllergens"] | null;
             /** Allergens Reviewed On */
             allergens_reviewed_on: string | null;
             /** Base Price Cents */
@@ -1287,11 +1301,21 @@ export interface components {
             name_en: string;
             /** Name Fr */
             name_fr: string | null;
+            /** Option Allergens */
+            option_allergens: components["schemas"]["AdminOptionAllergens"][];
             photo: components["schemas"]["AdminPhotoView"] | null;
+            /** Sizes */
+            sizes: components["schemas"]["AdminSize"][];
             /** Sold Out */
             sold_out: boolean;
             /** Stock */
             stock: number | null;
+        };
+        /** AdminMayContain */
+        AdminMayContain: {
+            allergen: components["schemas"]["Allergen"];
+            /** Because */
+            because: string;
         };
         /** AdminMenuView */
         AdminMenuView: {
@@ -1300,12 +1324,33 @@ export interface components {
             /** Items */
             items: components["schemas"]["AdminItemView"][];
         };
+        /**
+         * AdminOptionAllergens
+         * @description What a choice adds to the item. Shown, not edited, on the menu page.
+         */
+        AdminOptionAllergens: {
+            /** Contains */
+            contains: components["schemas"]["Allergen"][];
+            /** May Contain */
+            may_contain: components["schemas"]["Allergen"][];
+            /** Option Name */
+            option_name: string;
+        };
         /** AdminPhotoView */
         AdminPhotoView: {
             /** Credit */
             credit: string | null;
             /** Version */
             version: string;
+        };
+        /** AdminSize */
+        AdminSize: {
+            /** Is Default */
+            is_default: boolean;
+            /** Name En */
+            name_en: string;
+            /** Price Cents */
+            price_cents: number;
         };
         /**
          * AgentEventKind
@@ -1359,6 +1404,25 @@ export interface components {
             reviewed_on: string | null;
             /** Verified */
             verified: boolean;
+        };
+        /**
+         * AllergenReview
+         * @description What the restaurant says about an item's allergens. Sending one marks
+         *     the item reviewed, and a reviewed item with nothing declared is offered to
+         *     guests avoiding an allergen. So it has to say something on purpose: what
+         *     is in it, or `none_of_these`. A review that is merely empty is refused, so
+         *     a missed tick can never read as "none".
+         */
+        AllergenReview: {
+            /** Contains */
+            contains?: components["schemas"]["Allergen"][];
+            /** May Contain */
+            may_contain?: components["schemas"]["MayContain"][];
+            /**
+             * None Of These
+             * @default false
+             */
+            none_of_these: boolean;
         };
         /** CallAnswered */
         CallAnswered: {
@@ -1815,9 +1879,12 @@ export interface components {
         /**
          * ItemChanges
          * @description Only the fields that are sent are changed. `stock: null` stops
-         *     tracking stock; leaving `stock` out leaves it as it is.
+         *     tracking stock, `allergens: null` takes the review back, and `sizes: null`
+         *     gives the item one price; leaving any of them out leaves it as it is.
+         *     `sizes` also sets the price, to the cheapest.
          */
         ItemChanges: {
+            allergens?: components["schemas"]["AllergenReview"] | null;
             /** Base Price Cents */
             base_price_cents?: number | null;
             /** Category Code */
@@ -1832,6 +1899,8 @@ export interface components {
             name_en?: string | null;
             /** Name Fr */
             name_fr?: string | null;
+            /** Sizes */
+            sizes?: components["schemas"]["Size"][] | null;
             /** Stock */
             stock?: number | null;
         };
@@ -1893,6 +1962,12 @@ export interface components {
              * @enum {string}
              */
             status: "picked_up" | "no_show";
+        };
+        /** MayContain */
+        MayContain: {
+            allergen: components["schemas"]["Allergen"];
+            /** Because */
+            because: string;
         };
         /** MayContainView */
         MayContainView: {
@@ -1972,6 +2047,7 @@ export interface components {
         Mood: "pleased" | "neutral" | "frustrated";
         /** NewItem */
         NewItem: {
+            allergens?: components["schemas"]["AllergenReview"] | null;
             /** Base Price Cents */
             base_price_cents: number;
             /** Category Code */
@@ -1984,6 +2060,8 @@ export interface components {
             name_en: string;
             /** Name Fr */
             name_fr?: string | null;
+            /** Sizes */
+            sizes?: components["schemas"]["Size"][] | null;
             /** Stock */
             stock?: number | null;
         };
@@ -2029,6 +2107,7 @@ export interface components {
         };
         /** OnboardingItem */
         OnboardingItem: {
+            allergens?: components["schemas"]["AllergenReview"] | null;
             /** Base Price Cents */
             base_price_cents: number;
             /** Description En */
@@ -2045,11 +2124,15 @@ export interface components {
             name_fr?: string | null;
             /** Section */
             section: string;
+            /** Sizes */
+            sizes?: components["schemas"]["Size"][] | null;
             /** Stock */
             stock?: number | null;
         };
         /** OnboardingResult */
         OnboardingResult: {
+            /** Allergen Reviews */
+            allergen_reviews: number;
             /** Combos */
             combos: number;
             /** Combos Retired */
@@ -2375,6 +2458,18 @@ export interface components {
         SetStockRequest: {
             /** On Hand */
             on_hand: number;
+        };
+        /** Size */
+        Size: {
+            /**
+             * Is Default
+             * @default false
+             */
+            is_default: boolean;
+            /** Name En */
+            name_en: string;
+            /** Price Cents */
+            price_cents: number;
         };
         /** SpecialStatus */
         SpecialStatus: {

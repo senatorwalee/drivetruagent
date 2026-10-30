@@ -63,7 +63,7 @@ export function HomePage() {
         Add, edit and take off items, each with a photo. The agent sees changes from the next car.
       </Card>
       <Card to={ONBOARDING_PATH} name="Onboarding" stat={ONBOARDING_STAT} failed={false}>
-        Bring a new restaurant on: its details, menu, halal and kosher options, and combos, all in one go.
+        Bring a new restaurant on: its details, menu, allergens, halal and kosher options, and combos, all in one go.
       </Card>
     </ul>
   )
@@ -115,6 +115,10 @@ export function HomePage() {
           <div className={styles.actions}>
             <PageLink to={LIVE_PATH} className={styles.primary}>
               Open the live lane
+              <span aria-hidden="true">→</span>
+            </PageLink>
+            <PageLink to={ONBOARDING_PATH} className={styles.secondary}>
+              Bring a restaurant on
               <span aria-hidden="true">→</span>
             </PageLink>
             {agent.data && <span className={styles.note}>{agentNote(agent.data)}</span>}

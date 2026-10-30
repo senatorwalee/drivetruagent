@@ -56,7 +56,7 @@ export function insightsStat(requests: UnmetRequest[]): Stat {
   return { figure: `“${top.request}”`, caption: `most asked this week, ${plural(top.times, 'time', 'times')}` }
 }
 
-export const ONBOARDING_STAT: Stat = { figure: '5', caption: 'steps from a name to going live' }
+export const ONBOARDING_STAT: Stat = { figure: '6', caption: 'steps from a name to going live' }
 
 export function menuStat(items: AdminItem[]): Stat {
   const onMenu = items.filter((item) => item.is_active)

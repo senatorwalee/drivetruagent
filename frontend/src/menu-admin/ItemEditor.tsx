@@ -4,22 +4,27 @@ import type { DragEvent, FormEvent } from 'react'
 import { api } from '../api/client'
 import type { AdminCategory, AdminItem } from '../api/client'
 import staff from '../staff/Staff.module.css'
+import { AllergenField } from './AllergenField'
+import { allergenLabel, reviewFromItem, reviewProblem, reviewSent, sameReview } from './allergens'
+import type { Review } from './allergens'
 import { Field } from './Field'
 import { ItemPicture } from './ItemPicture'
 import styles from './MenuAdmin.module.css'
 import { ACCEPT, PhotoProblem, preparePhoto } from './photo'
 import { QuantityField } from './QuantityField'
+import { SizesField } from './SizesField'
 import {
   changesFrom,
   checkForm,
   emptyForm,
   explainError,
+  firstSizes,
   formFromItem,
   newItemFrom,
   optionsLabel,
   sameForm,
 } from './words'
-import type { FormProblems, ItemForm } from './words'
+import type { FormProblems, ItemForm, SizeRow } from './words'
 
 type PhotoChange = { kind: 'keep' } | { kind: 'replace'; blob: Blob; preview: string } | { kind: 'remove' }
 
@@ -43,9 +48,12 @@ interface ItemEditorProps {
  */
 export function ItemEditor({ item, categories, defaultCategory, notice, onSaved, onClose, onDirtyChange }: ItemEditorProps) {
   const initial = item ? formFromItem(item) : emptyForm(defaultCategory)
+  const initialReview = item ? reviewFromItem(item) : null
   const [form, setForm] = useState<ItemForm>(initial)
+  const [allergens, setAllergens] = useState<Review | null>(initialReview)
+  const [listingAllergens, setListingAllergens] = useState(false)
   const [photo, setPhoto] = useState<PhotoChange>({ kind: 'keep' })
-  const [problems, setProblems] = useState<FormProblems & { photo?: string; form?: string }>({})
+  const [problems, setProblems] = useState<FormProblems & { photo?: string; form?: string; allergens?: string }>({})
   const [busy, setBusy] = useState(false)
   const [confirmingRemove, setConfirmingRemove] = useState(false)
   const [dragging, setDragging] = useState(false)
@@ -58,7 +66,7 @@ export function ItemEditor({ item, categories, defaultCategory, notice, onSaved,
     if (notice) noticeRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
   }, [notice])
 
-  const dirty = !sameForm(form, initial) || photo.kind !== 'keep'
+  const dirty = !sameForm(form, initial) || !sameReview(allergens, initialReview) || photo.kind !== 'keep'
   useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange])
 
   // A preview's object URL holds the image in memory until it is let go.
@@ -71,9 +79,19 @@ export function ItemEditor({ item, categories, defaultCategory, notice, onSaved,
   const savedPhoto = item?.photo ? api.photoUrl(item.item_code, item.photo.version) : null
   const pictureSrc = photo.kind === 'replace' ? photo.preview : photo.kind === 'remove' ? null : savedPhoto
 
-  const edit = (field: keyof ItemForm) => (value: string) => {
+  const edit = (field: Exclude<keyof ItemForm, 'sizes'>) => (value: string) => {
     setForm((current) => ({ ...current, [field]: value }))
     setProblems((current) => ({ ...current, [field]: undefined, form: undefined }))
+  }
+
+  function editSizes(sizes: SizeRow[] | null, price?: string) {
+    setForm((current) => ({ ...current, sizes, price: price ?? current.price }))
+    setProblems((current) => ({ ...current, sizes: undefined, price: undefined, form: undefined }))
+  }
+
+  function editAllergens(review: Review | null) {
+    setAllergens(review)
+    setProblems((current) => ({ ...current, allergens: undefined, form: undefined }))
   }
 
   async function choosePhoto(file: File | undefined) {
@@ -99,17 +117,20 @@ export function ItemEditor({ item, categories, defaultCategory, notice, onSaved,
   async function save(event: FormEvent) {
     event.preventDefault()
     const found = checkForm(form)
-    if (Object.keys(found).length > 0) {
-      setProblems(found)
+    const unexplained = reviewProblem(allergens, name)
+    if (Object.keys(found).length > 0 || unexplained) {
+      setProblems({ ...found, allergens: unexplained ?? undefined })
+      if (unexplained) setListingAllergens(true)
       return
     }
     setBusy(true)
     let saved = item
     try {
       if (saved === null) {
-        saved = await api.createItem(newItemFrom(form))
+        saved = await api.createItem({ ...newItemFrom(form), allergens: reviewSent(allergens) })
       } else {
         const changes = changesFrom(form, saved)
+        if (!sameReview(allergens, initialReview)) changes.allergens = reviewSent(allergens)
         if (Object.keys(changes).length > 0) saved = await api.updateItem(saved.item_code, changes)
       }
     } catch (error) {
@@ -132,6 +153,8 @@ export function ItemEditor({ item, categories, defaultCategory, notice, onSaved,
     setPhoto({ kind: 'keep' })
     // As the backend has it: "5.5" typed comes back as "5.50".
     setForm(formFromItem(saved))
+    setAllergens(reviewFromItem(saved))
+    setListingAllergens(false)
     onSaved(saved, item ? 'Saved. Guests and the agent see it from the next order.' : 'Added to the menu.')
   }
 
@@ -272,15 +295,25 @@ export function ItemEditor({ item, categories, defaultCategory, notice, onSaved,
               </select>
             )}
           </Field>
-          <Field label="Price" hint="Before tax, with the cheapest choices" problem={problems.price}>
-            {(props) => (
-              <span className={styles.prefixed}>
-                <span aria-hidden="true">$</span>
-                <input {...props} inputMode="decimal" placeholder="0.00" value={form.price} onChange={(e) => edit('price')(e.target.value)} required />
-              </span>
-            )}
-          </Field>
+          {!form.sizes && (
+            <Field label="Price" hint="Before tax, with the cheapest choices" problem={problems.price}>
+              {(props) => (
+                <span className={styles.prefixed}>
+                  <span aria-hidden="true">$</span>
+                  <input {...props} inputMode="decimal" placeholder="0.00" value={form.price} onChange={(e) => edit('price')(e.target.value)} required />
+                </span>
+              )}
+            </Field>
+          )}
         </div>
+
+        {form.sizes ? (
+          <SizesField sizes={form.sizes} problem={problems.sizes} onChange={editSizes} />
+        ) : (
+          <button type="button" className={styles.addSizes} onClick={() => editSizes(firstSizes(form.price))}>
+            Add sizes
+          </button>
+        )}
 
         <QuantityField
           mode={form.stockMode}
@@ -290,6 +323,36 @@ export function ItemEditor({ item, categories, defaultCategory, notice, onSaved,
           onMode={edit('stockMode')}
           onStock={edit('stock')}
         />
+
+        <section className={styles.allergens} aria-label="Allergens">
+          <AllergenField
+            itemName={name}
+            title={<span className={styles.label}>Allergens</span>}
+            review={allergens}
+            listing={listingAllergens}
+            onListing={setListingAllergens}
+            onChange={editAllergens}
+          />
+          {problems.allergens && (
+            <p role="alert" className={styles.fieldProblem}>
+              {problems.allergens}
+            </p>
+          )}
+          {allergens ? (
+            item?.allergens_reviewed_on && <p className={styles.help}>Reviewed {item.allergens_reviewed_on}.</p>
+          ) : (
+            <p className={`${styles.help} ${styles.warning}`}>The agent won't answer allergen questions about this item; it hands them to staff.</p>
+          )}
+          {item && item.option_allergens.length > 0 && (
+            <ul className={styles.optionAllergens} aria-label="What choices add">
+              {item.option_allergens.map((option) => (
+                <li key={option.option_name}>
+                  {option.option_name} adds {[...option.contains, ...option.may_contain].map((allergen) => allergenLabel(allergen).toLowerCase()).join(', ')}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
         <section className={styles.facts} aria-label="Set elsewhere">
           <h3 className={staff.sectionTitle}>Set in the menu file</h3>
@@ -305,18 +368,10 @@ export function ItemEditor({ item, categories, defaultCategory, notice, onSaved,
                     </li>
                   ))}
                 </ul>
+              ) : form.sizes ? (
+                'None besides its sizes.'
               ) : (
                 'None. Guests order it as it is.'
-              )}
-            </dd>
-            <dt>Allergens</dt>
-            <dd>
-              {item?.allergens_reviewed_on ? (
-                `Reviewed ${item.allergens_reviewed_on}.`
-              ) : (
-                <span className={styles.warning}>
-                  Not reviewed. The agent won't answer allergen questions about this item; it hands them to staff.
-                </span>
               )}
             </dd>
             {item && (

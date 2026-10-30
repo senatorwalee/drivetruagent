@@ -31,6 +31,13 @@
   text-underline-offset: 3px;
 }
 
+/* The same, as a link to another page. */
+a.quiet {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
 /* --- Steps --------------------------------------------------------------- */
 
 .railWrap {
@@ -361,7 +368,14 @@
   color: var(--reject);
 }
 
-/* --- Halal and kosher ---------------------------------------------------- */
+/* --- Allergens, halal and kosher ------------------------------------------ */
+
+.progress {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 13px;
+}
 
 .legend {
   margin: 0;
@@ -725,6 +739,12 @@
   text-align: right;
 }
 
+.footNote {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
 .footActions {
   display: flex;
   justify-content: space-between;
@@ -823,6 +843,15 @@
 @media (max-width: 560px) {
   .railWrap {
     padding: 12px 16px;
+  }
+
+  /* Six numbers are all that fit. The heading below names the current step. */
+  .railStep .railLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
 
   .main {

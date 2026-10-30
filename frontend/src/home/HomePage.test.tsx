@@ -100,6 +100,20 @@ describe('the home page', () => {
     expect(window.location.pathname).toBe('/live')
   })
 
+  it('offers onboarding beside the live lane, on both designs', async () => {
+    installBackend()
+    open()
+
+    const hero = within(screen.getByRole('region', { name: /The agent takes the order/ }))
+    expect(hero.getByRole('link', { name: /Bring a restaurant on/ })).toHaveAttribute('href', '/onboarding')
+
+    await userEvent.click(screen.getByRole('button', { name: 'New' }))
+    expect(hero.getByRole('link', { name: /Bring a restaurant on/ })).toHaveAttribute('href', '/onboarding')
+
+    await userEvent.click(hero.getByRole('link', { name: /Bring a restaurant on/ }))
+    expect(window.location.pathname).toBe('/onboarding')
+  })
+
   it('is reached from the Frontdesk wordmark on every other page', async () => {
     installBackend()
     open('/insights')

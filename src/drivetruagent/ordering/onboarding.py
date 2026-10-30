@@ -5,13 +5,14 @@ live, then sends it here. It all lands in one transaction, like the seed: a
 refusal leaves the menu as it was, so a guest never meets half of one.
 
 Items go through `menu_admin.create_item`, so names are checked and codes made
-the way the menu page does it. Their allergens start unreviewed, so the agent
-sends those questions to a person.
+the way the menu page does it. An item sent with no allergen review stays
+unreviewed, so the agent sends those questions to a person.
 
 Nothing here commits. The caller owns the transaction.
 """
 
 import uuid
+from datetime import date
 from typing import Annotated, Self
 
 from pydantic import (
@@ -122,14 +123,18 @@ class OnboardingResult(BaseModel):
     sections_added: int
     combos: int
     diet_reviews: int
+    allergen_reviews: int
     # What `replace_menu` took off. Past orders keep them.
     items_taken_off: int
     combos_retired: int
 
 
-async def go_live(db: AsyncSession, setup: Onboarding) -> OnboardingResult:
-    """Save the whole setup. Raises DuplicateItemName, DuplicateComboName,
-    ComboNeedsItems or ComboSavingTooLarge, and the caller then rolls back."""
+async def go_live(
+    db: AsyncSession, setup: Onboarding, *, today: date
+) -> OnboardingResult:
+    """Save the whole setup. `today` dates the allergen reviews. Raises
+    DuplicateItemName, DuplicateComboName, ComboNeedsItems or
+    ComboSavingTooLarge, and the caller then rolls back."""
     taken_off, retired = await _clear_menu(db) if setup.replace_menu else (0, 0)
     await save_profile(db, setup.restaurant)
 
@@ -138,7 +143,9 @@ async def go_live(db: AsyncSession, setup: Onboarding) -> OnboardingResult:
         code, created = await menu_admin.ensure_category(db, entry.section)
         sections_added += created
         fields = entry.model_dump(exclude={"section", "diets"})
-        item = await menu_admin.create_item(db, NewItem(**fields, category_code=code))
+        item = await menu_admin.create_item(
+            db, NewItem(**fields, category_code=code), today=today
+        )
         item_id = await db.scalar(
             select(MenuItem.id).where(MenuItem.code == item.item_code)
         )
@@ -164,6 +171,7 @@ async def go_live(db: AsyncSession, setup: Onboarding) -> OnboardingResult:
         sections_added=sections_added,
         combos=len(setup.combos),
         diet_reviews=diet_reviews,
+        allergen_reviews=sum(entry.allergens is not None for entry in setup.items),
         items_taken_off=taken_off,
         combos_retired=retired,
     )

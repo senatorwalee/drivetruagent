@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from drivetruagent.db.models import (
+    CartLineOption,
     ComboRule,
     ComboRuleSlot,
     MenuCategory,
@@ -17,8 +18,12 @@ from drivetruagent.db.models import (
     OptionGroup,
     Special,
 )
+from drivetruagent.enums import Language
+from drivetruagent.ordering.menu import get_item_details
 from drivetruagent.ordering.offers import load_combo_rules, load_specials
 from drivetruagent.seed import ComboSeed, MenuSeed, load_menu, seed_menu
+
+from .factories import make_cart_line
 
 MENU_PATH = Path(__file__).resolve().parents[2] / "data" / "menu.json"
 TABLES = [MenuCategory, MenuItem, OptionGroup, Option, MenuItemAlias]
@@ -200,6 +205,29 @@ async def test_group_removed_from_the_file_is_deleted(
     counts = await row_counts(db_session)
     assert counts["option_groups"] == 0
     assert counts["options"] == 0
+
+
+async def test_a_dropped_group_a_cart_points_at_stays_with_nothing_to_choose(
+    db_session: AsyncSession,
+) -> None:
+    """Carts keep their options, so seeding must not fail on them: this is
+    how a menu changed on the menu page is put back."""
+    await seed_menu(db_session, small_menu())
+    fries = await item_by_code(db_session, "fries")
+    line = await make_cart_line(db_session, item=fries)
+    large = await option_by_code(db_session, "large")
+    db_session.add(CartLineOption(cart_line_id=line.id, option_id=large.id))
+    await db_session.flush()
+    without_groups = small_menu()
+    without_groups.categories[0].items[0].option_groups.clear()
+
+    await seed_menu(db_session, without_groups)
+    db_session.expire_all()
+
+    assert (await option_by_code(db_session, "large")).is_active is False
+    details = await get_item_details(db_session, "fries", Language.EN)
+    assert details.choices == []
+    assert details.must_ask == []
 
 
 async def test_aliases_follow_the_file(db_session: AsyncSession) -> None:
