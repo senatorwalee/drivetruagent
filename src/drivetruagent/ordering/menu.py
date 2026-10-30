@@ -161,7 +161,12 @@ async def get_item_details(
         if entry.description
         else None,
         available=entry.item.is_active,
-        choices=[_choice_view(group, language) for group in entry.item.groups],
+        choices=[
+            _choice_view(group, language)
+            for group in entry.item.groups
+            # A group left with nothing to choose is no choice at all.
+            if group.available_options
+        ],
     )
 
 
