@@ -5,12 +5,12 @@ import { Field } from '../menu-admin/Field'
 import menuStyles from '../menu-admin/MenuAdmin.module.css'
 import { QuantityField } from '../menu-admin/QuantityField'
 import { Segmented } from '../menu-admin/Segmented'
-import { emptyForm } from '../menu-admin/words'
-import type { FormProblems, ItemForm } from '../menu-admin/words'
-import { money } from '../session/presentation'
+import { SizesField } from '../menu-admin/SizesField'
+import { emptyForm, firstSizes } from '../menu-admin/words'
+import type { FormProblems, ItemForm, SizeRow } from '../menu-admin/words'
 import staff from '../staff/Staff.module.css'
 import styles from './Onboarding.module.css'
-import { checkItem, draftItemFrom, formFromDraftItem, itemsBySection, newId, quantityLabel, sectionKey, sectionNames } from './words'
+import { checkItem, draftItemFrom, formFromDraftItem, itemsBySection, newId, priceLabel, quantityLabel, sectionKey, sectionNames } from './words'
 import type { Draft, DraftItem, MenuToday } from './words'
 
 interface ItemsStepProps {
@@ -37,9 +37,15 @@ export function ItemsStep({ draft, today, update }: ItemsStepProps) {
   const nameInput = useRef<HTMLInputElement>(null)
   const groups = itemsBySection(draft, today)
 
-  const edit = (field: keyof ItemForm) => (value: string) => {
+  const edit = (field: Exclude<keyof ItemForm, 'sizes'>) => (value: string) => {
     setForm((current) => ({ ...current, [field]: value }))
     setProblems((current) => ({ ...current, [field]: undefined }))
+    setAdded(null)
+  }
+
+  function editSizes(sizes: SizeRow[] | null, price?: string) {
+    setForm((current) => ({ ...current, sizes, price: price ?? current.price }))
+    setProblems((current) => ({ ...current, sizes: undefined, price: undefined }))
     setAdded(null)
   }
 
@@ -51,7 +57,7 @@ export function ItemsStep({ draft, today, update }: ItemsStepProps) {
       return
     }
     const before = draft.items.find((item) => item.id === editing)
-    const item = draftItemFrom(form, editing ?? newId(), before?.diets ?? {})
+    const item = draftItemFrom(form, editing ?? newId(), before)
     update({ items: before ? draft.items.map((each) => (each.id === editing ? item : each)) : [...draft.items, item] })
     setAdded(`${before ? 'Saved' : 'Added'} ${item.name_en}.`)
     startNext(item.section)
@@ -109,21 +115,31 @@ export function ItemsStep({ draft, today, update }: ItemsStepProps) {
         <form className={styles.composer} onSubmit={submit} noValidate aria-label={editing ? 'Edit item' : 'Add an item'}>
           <SectionPicker sections={sections} chosen={form.categoryCode} onChoose={edit('categoryCode')} onAdd={addSection} />
 
-          <div className={styles.nameAndPrice}>
+          <div className={form.sizes ? undefined : styles.nameAndPrice}>
             <Field label="Item name" problem={problems.nameEn}>
               {(props) => (
                 <input {...props} ref={nameInput} value={form.nameEn} onChange={(e) => edit('nameEn')(e.target.value)} maxLength={60} autoComplete="off" required autoFocus />
               )}
             </Field>
-            <Field label="Price" problem={problems.price}>
-              {(props) => (
-                <span className={menuStyles.prefixed}>
-                  <span aria-hidden="true">$</span>
-                  <input {...props} inputMode="decimal" placeholder="0.00" value={form.price} onChange={(e) => edit('price')(e.target.value)} required />
-                </span>
-              )}
-            </Field>
+            {!form.sizes && (
+              <Field label="Price" problem={problems.price}>
+                {(props) => (
+                  <span className={menuStyles.prefixed}>
+                    <span aria-hidden="true">$</span>
+                    <input {...props} inputMode="decimal" placeholder="0.00" value={form.price} onChange={(e) => edit('price')(e.target.value)} required />
+                  </span>
+                )}
+              </Field>
+            )}
           </div>
+
+          {form.sizes ? (
+            <SizesField sizes={form.sizes} problem={problems.sizes} onChange={editSizes} />
+          ) : (
+            <button type="button" className={menuStyles.addSizes} onClick={() => editSizes(firstSizes(form.price))}>
+              Add sizes
+            </button>
+          )}
 
           <QuantityField mode={form.stockMode} stock={form.stock} problem={problems.stock} onMode={edit('stockMode')} onStock={edit('stock')} />
 
@@ -172,7 +188,7 @@ export function ItemsStep({ draft, today, update }: ItemsStepProps) {
                       <button type="button" className={styles.itemOpen} aria-label={`Edit ${item.name_en}`} onClick={() => open(item)}>
                         <span className={styles.itemName}>{item.name_en}</span>
                         <span className={styles.itemQuantity}>{quantityLabel(item)}</span>
-                        <span className={styles.itemPrice}>{money(item.base_price_cents)}</span>
+                        <span className={styles.itemPrice}>{priceLabel(item)}</span>
                       </button>
                       <button type="button" className={styles.itemRemove} aria-label={`Remove ${item.name_en}`} onClick={() => remove(item)}>
                         <span aria-hidden="true">×</span>

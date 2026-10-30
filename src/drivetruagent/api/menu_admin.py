@@ -7,7 +7,7 @@ from the menu when it starts.
 from fastapi import APIRouter, Request, status
 from fastapi.responses import JSONResponse
 
-from drivetruagent.api.deps import SessionDep, SpecialsCacheDep
+from drivetruagent.api.deps import BusinessDateDep, SessionDep, SpecialsCacheDep
 from drivetruagent.api.errors import CONFLICT, NOT_FOUND, REFUSED, error_response
 from drivetruagent.ordering import menu_admin
 from drivetruagent.ordering.errors import PhotoNotAccepted, UnknownItem
@@ -36,11 +36,12 @@ async def read_admin_menu(db: SessionDep) -> AdminMenuView:
     summary="Add an item",
 )
 async def create_item(
-    body: NewItem, db: SessionDep, cache: SpecialsCacheDep
+    body: NewItem, db: SessionDep, cache: SpecialsCacheDep, today: BusinessDateDep
 ) -> AdminItemView:
     """Added at the end of its category. Its code is made from the English
-    name. Its allergens start unreviewed, so the agent will not discuss them."""
-    item = await menu_admin.create_item(db, body)
+    name. Sent with no `allergens`, it starts unreviewed, and the agent will
+    not discuss them."""
+    item = await menu_admin.create_item(db, body, today=today)
     await db.commit()
     cache.invalidate()
     return item
@@ -53,12 +54,17 @@ async def create_item(
     summary="Change an item, or take it off the menu",
 )
 async def update_item(
-    item_code: str, body: ItemChanges, db: SessionDep, cache: SpecialsCacheDep
+    item_code: str,
+    body: ItemChanges,
+    db: SessionDep,
+    cache: SpecialsCacheDep,
+    today: BusinessDateDep,
 ) -> AdminItemView | JSONResponse:
     """Only the fields sent are changed. `is_active: false` takes the item
-    off the menu; past orders keep it, and `true` puts it back."""
+    off the menu; past orders keep it, and `true` puts it back. `allergens`
+    replaces the item's own review, dated today, and null takes it back."""
     try:
-        item = await menu_admin.update_item(db, item_code, body)
+        item = await menu_admin.update_item(db, item_code, body, today=today)
     except UnknownItem as error:
         return error_response(error, status.HTTP_404_NOT_FOUND)
     await db.commit()

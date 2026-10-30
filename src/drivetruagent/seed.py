@@ -35,6 +35,7 @@ from drivetruagent.config import get_settings
 from drivetruagent.db.base import Base
 from drivetruagent.db.models import (
     AllergenDeclaration,
+    CartLineOption,
     ComboRule,
     ComboRuleSlot,
     DietSuitability,
@@ -415,12 +416,7 @@ async def seed_menu(
             group_count += len(group_ids)
             option_count += sum(len(group.options) for group in item.option_groups)
 
-            # Groups dropped from the file are removed, along with their options.
-            await session.execute(
-                delete(OptionGroup).where(
-                    OptionGroup.item_id == item_id, OptionGroup.id.not_in(group_ids)
-                )
-            )
+            await _drop_groups(session, item_id, group_ids)
             alias_count += await _replace_aliases(session, item_id, item.aliases)
             allergen_count += await _replace_allergens(
                 session,
@@ -584,6 +580,34 @@ async def _seed_group(
         .values(is_active=False, updated_at=func.now())
     )
     return group_id, option_ids
+
+
+async def _drop_groups(
+    session: AsyncSession, item_id: uuid.UUID, kept: list[uuid.UUID]
+) -> None:
+    """Groups no longer in the file are removed, along with their options. A
+    group a cart points at can't be: it stays, with nothing left to choose."""
+    dropped = select(OptionGroup.id).where(
+        OptionGroup.item_id == item_id, OptionGroup.id.not_in(kept)
+    )
+    in_a_cart = (
+        select(Option.option_group_id)
+        .join(CartLineOption, CartLineOption.option_id == Option.id)
+        .where(Option.option_group_id.in_(dropped))
+    )
+    await session.execute(
+        delete(OptionGroup).where(
+            OptionGroup.id.in_(dropped), OptionGroup.id.not_in(in_a_cart)
+        )
+    )
+    await session.execute(
+        update(OptionGroup).where(OptionGroup.id.in_(dropped)).values(min_select=0)
+    )
+    await session.execute(
+        update(Option)
+        .where(Option.option_group_id.in_(dropped))
+        .values(is_active=False, is_default=False, updated_at=func.now())
+    )
 
 
 async def _replace_diets(

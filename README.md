@@ -53,6 +53,7 @@ built piece by piece.
 | 27 | Speakerphone calls: echo cancellation, noise reduction, a language hint, cut-off lines marked, and "OK" is not a choice | Done; evals pass against the real model |
 | 28 | Halal answers: every item reviewed, "not suitable" with a reason, "can't confirm" for what isn't reviewed, and the menu answered first | Done; evals pass against the real model |
 | 29 | Onboarding: a restaurant's details, menu, halal and kosher reviews, and combos, entered step by step and saved in one go, at `/onboarding` | Done; checked in a browser |
+| 30 | Allergens and sizes: reviewed and priced while onboarding, editable on the menu page, and a preview at `/onboarding/preview` that cannot save | Done; checked in a browser |
 | Later | Demo polish: French review, demo script | Planned |
 
 ## Stack
@@ -179,8 +180,9 @@ database (`seed --if-empty`), so a restart keeps every edit.
   `data/photos/` (credits in `data/photos/CREDITS.md`). An item with no photo
   shows a placeholder drawn for its category, and a "No photo" flag.
 - **Add, edit, take off, put back.** Names and descriptions in both languages,
-  category, price and quantity are edited here. Choices, aliases and allergens
-  stay in `data/menu.json` and are shown read-only.
+  category, price, quantity, sizes and an item's own allergens are edited here.
+  Other choices, what a choice adds to allergens, and aliases stay in
+  `data/menu.json` and are shown read-only.
 - **Quantity is unlimited, counted or sold out.** Unlimited has no count and
   stays available until someone marks it sold out. Counted goes down with every
   order and sells out at zero.
@@ -188,8 +190,12 @@ database (`seed --if-empty`), so a restart keeps every edit.
   disappears for guests, the agent and the specials, and can be put back.
 - **Codes never change.** A new item's code is made from its English name
   (`spicy_chicken_wrap`); renaming it later keeps the code.
-- **A new item's allergens are unreviewed**, so the agent will not discuss
-  them and hands the question to a person. The page says so.
+- **A new item's allergens are unreviewed** until someone reviews them, so the
+  agent will not discuss them and hands the question to a person. The page says
+  so. A review can be changed or taken back; what a choice adds stays as it is.
+- **Removing a size deactivates it.** Carts point at options, so it is never
+  deleted, and typing the same name again brings it back. Taking every size off
+  leaves the item with one price, and orderable.
 - **The backend refuses what would confuse the agent or the till:** a second
   item with the same English name, or a price a running special would make free.
 - **Photos are stored in Postgres**, in their own table so reading the menu
@@ -203,28 +209,45 @@ database (`seed --if-empty`), so a restart keeps every edit.
 ### Onboarding a restaurant
 
 The menu page changes a menu that exists. <http://localhost:5174/onboarding> is
-for a restaurant's first visit: five steps, one idea on each screen.
+for a restaurant's first visit: six steps, one idea on each screen.
 
 1. **Restaurant.** Its name, pickup address and pickup time. All three change
    what the agent says, and override the settings. `make seed` goes back to them.
 2. **Menu.** One item at a time: section, name, price, and unlimited or counted.
    A section that doesn't exist yet is created. If the restaurant already has a
-   menu, it chooses to add to it or start fresh.
-3. **Halal and kosher.** One list per diet, each item not reviewed, not suitable,
+   menu, it chooses to add to it or start fresh. **Add sizes** swaps the price
+   for one real price per size, and a choice of what happens if a guest doesn't
+   say: a default size, or the agent asks. The cheapest becomes the item's price
+   and the others what they add to it. Stock stays per item, not per size.
+3. **Allergens.** Each item starts not reviewed. Its allergens are picked from
+   the twelve, as contains or may contain, and may contain needs a reason the
+   agent can read out. **None of these** is a choice of its own, made per item.
+4. **Halal and kosher.** One list per diet, each item not reviewed, not suitable,
    suitable or certified. Certified needs who certified it, because the agent
    repeats the claim to guests. Not reviewed claims nothing either way.
-4. **Combos.** A name, its parts, and what the guest saves. A part is a section,
+5. **Combos.** A name, its parts, and what the guest saves. A part is a section,
    and the guest picks any item from it; the first is the main item, which is
    what makes the agent offer it. The page shows what the cheapest set comes to,
    and refuses a saving that would make it free. The backend checks the same.
-5. **Go live.** Everything is saved in one transaction, `POST /admin/onboarding`.
+6. **Go live.** Everything is saved in one transaction, `POST /admin/onboarding`.
    Until then it stays in the browser, so a half-entered menu never reaches a
    guest, and a refusal leaves everything as it was.
 
 Starting fresh takes the old items off and retires the old combos; nothing is
-deleted. `make seed` puts the file's menu back. Allergens, photos and choices
-are not part of this: new items start with allergens unreviewed, so the agent
-sends those questions to a person.
+deleted. `make seed` puts the file's menu back. Photos, and choices other than
+sizes, are not part of this.
+
+**A blank item stays unreviewed.** A reviewed item with nothing declared is
+offered to guests avoiding an allergen, so a missed tick must never read as a
+review. The page has no empty review to send: opening the list and ticking
+nothing, or taking the only tick off, leaves the item not reviewed. There is no
+"all" button as the halal step has. The API holds the same line: an
+`allergens` object that lists nothing and doesn't say `none_of_these` is refused.
+
+**To show it without changing anything**, open
+<http://localhost:5174/onboarding/preview>. It has a made-up restaurant, so every
+step has something on it. It doesn't read the backend or the draft saved on this
+device, and its Go live says nothing was saved and sends no request.
 
 ## Carts store choices; orders store frozen prices
 
@@ -1460,11 +1483,11 @@ Run `make dev` and open <http://127.0.0.1:8000/docs> to try these.
 | `GET /menu/items/{code}/allergens` | One item's allergens, and which choices add more |
 | `GET /menu/items/{code}/photo` | The item's photo; `?v=` (its version) makes it cacheable for good |
 | `GET /admin/menu` | Every item for the menu page, those taken off too |
-| `POST /admin/menu/items` | Add an item |
-| `PATCH /admin/menu/items/{code}` | Change an item; `is_active: false` takes it off the menu |
+| `POST /admin/menu/items` | Add an item, with its allergen review and sizes if it has them |
+| `PATCH /admin/menu/items/{code}` | Change an item; `is_active: false` takes it off the menu, `allergens: null` takes a review back, `sizes: null` goes back to one price |
 | `PUT /admin/menu/items/{code}/photo` | Set or replace its photo (the image is the body) |
 | `DELETE /admin/menu/items/{code}/photo` | Remove its photo |
-| `POST /admin/onboarding` | Go live: the restaurant's details, items, diet reviews and combos, saved together |
+| `POST /admin/onboarding` | Go live: the restaurant's details, items, allergen and diet reviews and combos, saved together |
 | `GET /insights/unmet-requests?days=7` | What guests asked for that the menu couldn't fill, most asked first |
 | `POST /phone/incoming` | OpenAI's signed webhook: answer a phone call, or turn it away |
 | `GET /phone/calls` | Phone calls in progress, newest first |

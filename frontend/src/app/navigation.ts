@@ -16,6 +16,8 @@ export const INSIGHTS_PATH = '/insights'
 export const MENU_PATH = '/menu'
 /** A restaurant's first visit: who it is, its menu, and going live. */
 export const ONBOARDING_PATH = '/onboarding'
+/** The same page with sample items, for showing it. Nothing can be saved. */
+export const ONBOARDING_PREVIEW_PATH = '/onboarding/preview'
 export const LIVE_PATH = '/live'
 /** The live views, following the newest phone call instead of a lane. */
 export const CALLS_PATH = '/calls'

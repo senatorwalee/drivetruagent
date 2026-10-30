@@ -187,6 +187,31 @@
         "title": "AddLineRequest",
         "type": "object"
       },
+      "AdminAllergens": {
+        "description": "The item's own allergens, as reviewed. Both lists empty is a statement\ntoo: the restaurant said it has none of them.",
+        "properties": {
+          "contains": {
+            "items": {
+              "$ref": "#/components/schemas/Allergen"
+            },
+            "title": "Contains",
+            "type": "array"
+          },
+          "may_contain": {
+            "items": {
+              "$ref": "#/components/schemas/AdminMayContain"
+            },
+            "title": "May Contain",
+            "type": "array"
+          }
+        },
+        "required": [
+          "contains",
+          "may_contain"
+        ],
+        "title": "AdminAllergens",
+        "type": "object"
+      },
       "AdminCategoryView": {
         "properties": {
           "category_code": {
@@ -252,6 +277,16 @@
       },
       "AdminItemView": {
         "properties": {
+          "allergens": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdminAllergens"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "allergens_reviewed_on": {
             "anyOf": [
               {
@@ -324,6 +359,13 @@
             ],
             "title": "Name Fr"
           },
+          "option_allergens": {
+            "items": {
+              "$ref": "#/components/schemas/AdminOptionAllergens"
+            },
+            "title": "Option Allergens",
+            "type": "array"
+          },
           "photo": {
             "anyOf": [
               {
@@ -333,6 +375,13 @@
                 "type": "null"
               }
             ]
+          },
+          "sizes": {
+            "items": {
+              "$ref": "#/components/schemas/AdminSize"
+            },
+            "title": "Sizes",
+            "type": "array"
           },
           "sold_out": {
             "title": "Sold Out",
@@ -363,9 +412,29 @@
           "sold_out",
           "photo",
           "allergens_reviewed_on",
+          "allergens",
+          "option_allergens",
+          "sizes",
           "choices"
         ],
         "title": "AdminItemView",
+        "type": "object"
+      },
+      "AdminMayContain": {
+        "properties": {
+          "allergen": {
+            "$ref": "#/components/schemas/Allergen"
+          },
+          "because": {
+            "title": "Because",
+            "type": "string"
+          }
+        },
+        "required": [
+          "allergen",
+          "because"
+        ],
+        "title": "AdminMayContain",
         "type": "object"
       },
       "AdminMenuView": {
@@ -392,6 +461,36 @@
         "title": "AdminMenuView",
         "type": "object"
       },
+      "AdminOptionAllergens": {
+        "description": "What a choice adds to the item. Shown, not edited, on the menu page.",
+        "properties": {
+          "contains": {
+            "items": {
+              "$ref": "#/components/schemas/Allergen"
+            },
+            "title": "Contains",
+            "type": "array"
+          },
+          "may_contain": {
+            "items": {
+              "$ref": "#/components/schemas/Allergen"
+            },
+            "title": "May Contain",
+            "type": "array"
+          },
+          "option_name": {
+            "title": "Option Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "option_name",
+          "contains",
+          "may_contain"
+        ],
+        "title": "AdminOptionAllergens",
+        "type": "object"
+      },
       "AdminPhotoView": {
         "properties": {
           "credit": {
@@ -415,6 +514,29 @@
           "credit"
         ],
         "title": "AdminPhotoView",
+        "type": "object"
+      },
+      "AdminSize": {
+        "properties": {
+          "is_default": {
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "name_en": {
+            "title": "Name En",
+            "type": "string"
+          },
+          "price_cents": {
+            "title": "Price Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name_en",
+          "price_cents",
+          "is_default"
+        ],
+        "title": "AdminSize",
         "type": "object"
       },
       "AgentEventKind": {
@@ -595,6 +717,33 @@
           "options_that_add"
         ],
         "title": "AllergenReport",
+        "type": "object"
+      },
+      "AllergenReview": {
+        "additionalProperties": false,
+        "description": "What the restaurant says about an item's allergens. Sending one marks\nthe item reviewed, and a reviewed item with nothing declared is offered to\nguests avoiding an allergen. So it has to say something on purpose: what\nis in it, or `none_of_these`. A review that is merely empty is refused, so\na missed tick can never read as \"none\".",
+        "properties": {
+          "contains": {
+            "items": {
+              "$ref": "#/components/schemas/Allergen"
+            },
+            "title": "Contains",
+            "type": "array"
+          },
+          "may_contain": {
+            "items": {
+              "$ref": "#/components/schemas/MayContain"
+            },
+            "title": "May Contain",
+            "type": "array"
+          },
+          "none_of_these": {
+            "default": false,
+            "title": "None Of These",
+            "type": "boolean"
+          }
+        },
+        "title": "AllergenReview",
         "type": "object"
       },
       "CallAnswered": {
@@ -1697,8 +1846,18 @@
       },
       "ItemChanges": {
         "additionalProperties": false,
-        "description": "Only the fields that are sent are changed. `stock: null` stops\ntracking stock; leaving `stock` out leaves it as it is.",
+        "description": "Only the fields that are sent are changed. `stock: null` stops\ntracking stock, `allergens: null` takes the review back, and `sizes: null`\ngives the item one price; leaving any of them out leaves it as it is.\n`sizes` also sets the price, to the cheapest.",
         "properties": {
+          "allergens": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AllergenReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "base_price_cents": {
             "anyOf": [
               {
@@ -1782,6 +1941,22 @@
               }
             ],
             "title": "Name Fr"
+          },
+          "sizes": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Size"
+                },
+                "maxItems": 8,
+                "minItems": 2,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sizes"
           },
           "stock": {
             "anyOf": [
@@ -1943,6 +2118,26 @@
           "status"
         ],
         "title": "MarkPickupRequest",
+        "type": "object"
+      },
+      "MayContain": {
+        "additionalProperties": false,
+        "properties": {
+          "allergen": {
+            "$ref": "#/components/schemas/Allergen"
+          },
+          "because": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Because",
+            "type": "string"
+          }
+        },
+        "required": [
+          "allergen",
+          "because"
+        ],
+        "title": "MayContain",
         "type": "object"
       },
       "MayContainView": {
@@ -2140,6 +2335,16 @@
       "NewItem": {
         "additionalProperties": false,
         "properties": {
+          "allergens": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AllergenReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "base_price_cents": {
             "maximum": 100000.0,
             "minimum": 0.0,
@@ -2191,6 +2396,22 @@
               }
             ],
             "title": "Name Fr"
+          },
+          "sizes": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Size"
+                },
+                "maxItems": 8,
+                "minItems": 2,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sizes"
           },
           "stock": {
             "anyOf": [
@@ -2322,6 +2543,16 @@
       "OnboardingItem": {
         "additionalProperties": false,
         "properties": {
+          "allergens": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AllergenReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "base_price_cents": {
             "maximum": 100000.0,
             "minimum": 0.0,
@@ -2386,6 +2617,22 @@
             "title": "Section",
             "type": "string"
           },
+          "sizes": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Size"
+                },
+                "maxItems": 8,
+                "minItems": 2,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sizes"
+          },
           "stock": {
             "anyOf": [
               {
@@ -2410,6 +2657,10 @@
       },
       "OnboardingResult": {
         "properties": {
+          "allergen_reviews": {
+            "title": "Allergen Reviews",
+            "type": "integer"
+          },
           "combos": {
             "title": "Combos",
             "type": "integer"
@@ -2445,6 +2696,7 @@
           "sections_added",
           "combos",
           "diet_reviews",
+          "allergen_reviews",
           "items_taken_off",
           "combos_retired"
         ],
@@ -3278,6 +3530,34 @@
           "on_hand"
         ],
         "title": "SetStockRequest",
+        "type": "object"
+      },
+      "Size": {
+        "additionalProperties": false,
+        "properties": {
+          "is_default": {
+            "default": false,
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "name_en": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name En",
+            "type": "string"
+          },
+          "price_cents": {
+            "maximum": 100000.0,
+            "minimum": 0.0,
+            "title": "Price Cents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name_en",
+          "price_cents"
+        ],
+        "title": "Size",
         "type": "object"
       },
       "SpecialStatus": {
@@ -4287,7 +4567,7 @@
     },
     "/admin/menu/items": {
       "post": {
-        "description": "Added at the end of its category. Its code is made from the English\nname. Its allergens start unreviewed, so the agent will not discuss them.",
+        "description": "Added at the end of its category. Its code is made from the English\nname. Sent with no `allergens`, it starts unreviewed, and the agent will\nnot discuss them.",
         "operationId": "create_item_admin_menu_items_post",
         "requestBody": {
           "content": {
@@ -4339,7 +4619,7 @@
     },
     "/admin/menu/items/{item_code}": {
       "patch": {
-        "description": "Only the fields sent are changed. `is_active: false` takes the item\noff the menu; past orders keep it, and `true` puts it back.",
+        "description": "Only the fields sent are changed. `is_active: false` takes the item\noff the menu; past orders keep it, and `true` puts it back. `allergens`\nreplaces the item's own review, dated today, and null takes it back.",
         "operationId": "update_item_admin_menu_items__item_code__patch",
         "parameters": [
           {
@@ -4539,7 +4819,7 @@
     },
     "/admin/onboarding": {
       "post": {
-        "description": "The restaurant's details, its menu, its halal and kosher reviews and\nits combos, saved together: any refusal leaves everything as it was. With\n`replace_menu`, what is on the menu now comes off first. The agent sees\nit all from the next session.",
+        "description": "The restaurant's details, its menu, its allergen, halal and kosher\nreviews and its combos, saved together: any refusal leaves everything as\nit was. With `replace_menu`, what is on the menu now comes off first. The\nagent sees it all from the next session.",
         "operationId": "go_live_admin_onboarding_post",
         "requestBody": {
           "content": {

@@ -183,11 +183,30 @@
   text-decoration: none;
 }
 
-.primary:hover span {
+.secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 20px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  color: var(--text);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.secondary:hover {
+  border-color: var(--accent);
+}
+
+.primary:hover span,
+.secondary:hover span {
   translate: 3px 0;
 }
 
-.primary span {
+.primary span,
+.secondary span {
   transition: translate 0.15s ease;
 }
 
@@ -238,7 +257,8 @@
 }
 
 .card:focus-visible,
-.primary:focus-visible {
+.primary:focus-visible,
+.secondary:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
