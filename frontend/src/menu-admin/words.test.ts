@@ -17,6 +17,8 @@ const FRIES: AdminItem = {
   sold_out: false,
   photo: { version: 'abc', credit: 'Mitchell Luo on Unsplash' },
   allergens_reviewed_on: '2026-10-01',
+  allergens: { contains: [], may_contain: [] },
+  option_allergens: [],
   choices: [
     {
       group_name: 'Size',

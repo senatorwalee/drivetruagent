@@ -183,6 +183,8 @@ export function formFromDraftItem(item: DraftItem): ItemForm {
     sold_out: false,
     photo: null,
     allergens_reviewed_on: null,
+    allergens: null,
+    option_allergens: [],
     choices: [],
   })
 }

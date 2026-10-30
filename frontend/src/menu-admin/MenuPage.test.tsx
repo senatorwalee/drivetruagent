@@ -25,6 +25,8 @@ function item(overrides: Partial<AdminItem>): AdminItem {
     sold_out: false,
     photo: { version: 'v1', credit: 'Mitchell Luo on Unsplash' },
     allergens_reviewed_on: '2026-10-01',
+    allergens: { contains: [], may_contain: [] },
+    option_allergens: [],
     choices: [],
     ...overrides,
   }
@@ -76,6 +78,7 @@ function installBackend(refuse: Record<string, { status: number; code: string }>
             stock: (body.stock as number | null) ?? null,
             photo: null,
             allergens_reviewed_on: null,
+            allergens: null,
           }),
         )
       }

@@ -15,9 +15,9 @@ from drivetruagent.db.models import (
     MenuItem,
     RestaurantProfile,
 )
-from drivetruagent.enums import Channel, Diet, DietStatus, Language
+from drivetruagent.enums import Allergen, Channel, Diet, DietStatus, Language
+from drivetruagent.ordering import allergen_matrix, inventory
 from drivetruagent.ordering import diet as diet_rules
-from drivetruagent.ordering import inventory
 from drivetruagent.ordering.cart import add_item, get_cart
 from drivetruagent.ordering.sessions import open_session
 from drivetruagent.seed import load_menu, seed_menu
@@ -73,6 +73,7 @@ async def test_going_live_adds_the_items_and_leaves_the_menu_alone(
         "sections_added": 2,
         "combos": 0,
         "diet_reviews": 0,
+        "allergen_reviews": 0,
         "items_taken_off": 0,
         "combos_retired": 0,
     }
@@ -412,6 +413,137 @@ async def test_a_name_cannot_be_given_to_something_not_certified(
                 diets={"halal": {"status": "suitable", "certified_by": "COR"}},
             )
         ],
+    )
+
+    assert response.status_code == 422
+
+
+# --- Allergens --------------------------------------------------------------
+
+
+async def test_a_review_reaches_what_the_agent_reads(
+    client: httpx.AsyncClient, db_session: AsyncSession
+) -> None:
+    response = await go_live(
+        client,
+        items=[
+            item(
+                "Fish taco",
+                "Tacos",
+                650,
+                allergens={
+                    "contains": ["fish", "wheat"],
+                    "may_contain": [
+                        {"allergen": "sesame", "because": "Shared with the buns."}
+                    ],
+                },
+            )
+        ],
+    )
+
+    assert response.json()["allergen_reviews"] == 1
+    report = await allergen_matrix.item_allergens(
+        db_session, "fish_taco", None, None, Language.EN
+    )
+    assert report.verified
+    assert [found.allergen for found in report.contains] == [
+        Allergen.FISH,
+        Allergen.WHEAT,
+    ]
+    assert [found.allergen for found in report.may_contain] == [Allergen.SESAME]
+    assert report.may_contain[0].because == ["Shared with the buns."]
+
+
+async def test_a_reason_given_in_english_is_read_out_in_french_too(
+    client: httpx.AsyncClient, db_session: AsyncSession
+) -> None:
+    await go_live(
+        client,
+        items=[
+            item(
+                "Fish taco",
+                "Tacos",
+                650,
+                allergens={
+                    "may_contain": [
+                        {"allergen": "sesame", "because": "Shared with the buns."}
+                    ]
+                },
+            )
+        ],
+    )
+
+    report = await allergen_matrix.item_allergens(
+        db_session, "fish_taco", None, None, Language.FR
+    )
+    assert report.may_contain[0].because == ["Shared with the buns."]
+
+
+async def test_an_item_left_blank_stays_unreviewed_and_is_never_offered(
+    client: httpx.AsyncClient, db_session: AsyncSession
+) -> None:
+    """A reviewed item with nothing declared is offered to guests avoiding an
+    allergen, so a missed tick must not read as a review."""
+    response = await go_live(client, items=[item("Fish taco", "Tacos", 650)])
+
+    assert response.json()["allergen_reviews"] == 0
+    report = await allergen_matrix.item_allergens(
+        db_session, "fish_taco", None, [Allergen.PEANUT], Language.EN
+    )
+    assert report.verified is False
+    offered = await allergen_matrix.items_without(
+        db_session, [Allergen.PEANUT], Language.EN, category_code="tacos"
+    )
+    assert offered == []
+
+
+async def test_saying_none_of_these_is_a_review_and_can_be_offered(
+    client: httpx.AsyncClient, db_session: AsyncSession
+) -> None:
+    await go_live(
+        client,
+        items=[
+            item("Fish taco", "Tacos", 650, allergens={"none_of_these": True}),
+        ],
+    )
+
+    report = await allergen_matrix.item_allergens(
+        db_session, "fish_taco", None, [Allergen.PEANUT], Language.EN
+    )
+    assert report.verified is True
+    offered = await allergen_matrix.items_without(
+        db_session, [Allergen.PEANUT], Language.EN, category_code="tacos"
+    )
+    assert [found.item_code for found in offered] == ["fish_taco"]
+
+
+@pytest.mark.parametrize(
+    "allergens",
+    [
+        # Saying nothing is not the same as saying none.
+        {},
+        {"contains": [], "may_contain": []},
+        {"none_of_these": False},
+        # Both at once: which does it mean?
+        {"none_of_these": True, "contains": ["milk"]},
+        # May contain needs a reason a guest can hear.
+        {"may_contain": [{"allergen": "milk"}]},
+        {"may_contain": [{"allergen": "milk", "because": "   "}]},
+        # One allergen has one answer.
+        {"contains": ["milk", "milk"]},
+        {
+            "contains": ["milk"],
+            "may_contain": [{"allergen": "milk", "because": "Shared fryer."}],
+        },
+        # Chosen from the twelve, never typed.
+        {"contains": ["strawberries"]},
+    ],
+)
+async def test_a_review_that_does_not_say_what_it_means_is_refused(
+    client: httpx.AsyncClient, allergens: dict[str, Any]
+) -> None:
+    response = await go_live(
+        client, items=[item("Fish taco", "Tacos", 650, allergens=allergens)]
     )
 
     assert response.status_code == 422

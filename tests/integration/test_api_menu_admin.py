@@ -1,15 +1,20 @@
 """Editing the menu through the API, against a real database and the real menu."""
 
+from datetime import date
 from pathlib import Path
 from typing import Any
 
 import httpx
 import pytest
+from fastapi import FastAPI
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from drivetruagent.agent.prompt import build_instructions
-from drivetruagent.db.models import MenuItemPhoto
+from drivetruagent.api.deps import get_business_date
+from drivetruagent.db.models import AllergenDeclaration, MenuItem, MenuItemPhoto
+from drivetruagent.enums import Allergen, Language
+from drivetruagent.ordering import allergen_matrix
 from drivetruagent.seed import load_menu, photos_dir_for, seed_menu
 
 pytestmark = pytest.mark.usefixtures("menu")
@@ -311,3 +316,193 @@ async def test_seeding_with_photos_gives_every_item_its_photo_and_credit(
     assert fries["photo"]["credit"].endswith("on Unsplash")
     photo = await client.get("/menu/items/fries/photo")
     assert photo.content[:3] == b"\xff\xd8\xff"
+
+
+# --- Allergens --------------------------------------------------------------
+
+SESAME_MAYBE = {"allergen": "sesame", "because": "Shared with the buns."}
+
+
+async def test_a_new_item_can_be_reviewed_as_it_is_added(
+    client: httpx.AsyncClient,
+) -> None:
+    response = await client.post(
+        "/admin/menu/items",
+        json=wrap(allergens={"contains": ["wheat"], "may_contain": [SESAME_MAYBE]}),
+    )
+
+    assert response.status_code == 201
+    item = response.json()
+    assert item["allergens_reviewed_on"] is not None
+    assert item["allergens"] == {
+        "contains": ["wheat"],
+        "may_contain": [SESAME_MAYBE],
+    }
+
+
+async def test_a_new_item_with_no_review_is_not_reviewed(
+    client: httpx.AsyncClient,
+) -> None:
+    item = (await client.post("/admin/menu/items", json=wrap())).json()
+
+    assert item["allergens_reviewed_on"] is None
+    assert item["allergens"] is None
+
+
+async def test_changing_a_review_replaces_what_the_item_declared(
+    client: httpx.AsyncClient, db_session: AsyncSession
+) -> None:
+    response = await client.patch(
+        "/admin/menu/items/fries", json={"allergens": {"contains": ["mustard"]}}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["allergens"] == {"contains": ["mustard"], "may_contain": []}
+    report = await allergen_matrix.item_allergens(
+        db_session, "fries", None, None, Language.EN
+    )
+    assert [found.allergen for found in report.contains] == [Allergen.MUSTARD]
+
+
+async def test_a_review_is_dated_today_where_the_restaurant_is(
+    app: FastAPI, client: httpx.AsyncClient
+) -> None:
+    app.dependency_overrides[get_business_date] = lambda: date(2026, 11, 3)
+
+    response = await client.patch(
+        "/admin/menu/items/fries", json={"allergens": {"none_of_these": True}}
+    )
+
+    assert response.json()["allergens_reviewed_on"] == "2026-11-03"
+
+
+async def test_an_edit_that_leaves_allergens_out_leaves_the_review_alone(
+    client: httpx.AsyncClient,
+) -> None:
+    before = await admin_item(client, "fries")
+
+    await client.patch("/admin/menu/items/fries", json={"name_fr": "Frites maison"})
+
+    after = await admin_item(client, "fries")
+    assert after["allergens"] == before["allergens"]
+    assert after["allergens_reviewed_on"] == before["allergens_reviewed_on"]
+
+
+async def test_an_unreviewed_item_stays_unreviewed_through_other_edits(
+    client: httpx.AsyncClient,
+) -> None:
+    await client.post("/admin/menu/items", json=wrap())
+
+    response = await client.patch(
+        "/admin/menu/items/spicy_wrap", json={"base_price_cents": 749}
+    )
+
+    assert response.json()["allergens_reviewed_on"] is None
+
+
+async def test_a_review_can_be_taken_back(
+    client: httpx.AsyncClient, db_session: AsyncSession
+) -> None:
+    response = await client.patch("/admin/menu/items/fries", json={"allergens": None})
+
+    assert response.json()["allergens_reviewed_on"] is None
+    assert response.json()["allergens"] is None
+    report = await allergen_matrix.item_allergens(
+        db_session, "fries", None, None, Language.EN
+    )
+    assert report.verified is False
+
+
+@pytest.mark.parametrize(
+    "allergens",
+    [
+        {},
+        {"contains": [], "may_contain": []},
+        {"none_of_these": True, "contains": ["milk"]},
+        {"may_contain": [{"allergen": "milk", "because": " "}]},
+    ],
+)
+async def test_a_review_that_does_not_say_what_it_means_is_refused(
+    client: httpx.AsyncClient, allergens: dict[str, Any]
+) -> None:
+    before = await admin_item(client, "fries")
+
+    response = await client.patch(
+        "/admin/menu/items/fries", json={"allergens": allergens}
+    )
+
+    assert response.status_code == 422
+    assert await admin_item(client, "fries") == before
+
+
+async def test_what_a_choice_adds_is_shown_and_survives_a_new_review(
+    client: httpx.AsyncClient, db_session: AsyncSession
+) -> None:
+    """Choices come from the menu file. Reviewing the item itself leaves them."""
+    before = await admin_item(client, "classic_burger")
+    assert {"option_name": "Cheese", "contains": ["milk"], "may_contain": []} in before[
+        "option_allergens"
+    ]
+
+    await client.patch(
+        "/admin/menu/items/classic_burger", json={"allergens": {"contains": ["wheat"]}}
+    )
+
+    report = await allergen_matrix.item_allergens(
+        db_session, "classic_burger", {"extras": ["cheese"]}, None, Language.EN
+    )
+    assert {found.allergen for found in report.contains} == {
+        Allergen.WHEAT,
+        Allergen.MILK,
+    }
+
+
+async def test_a_french_reason_is_kept_while_its_english_is_unchanged(
+    client: httpx.AsyncClient, db_session: AsyncSession
+) -> None:
+    burger = await admin_item(client, "classic_burger")
+    kept = burger["allergens"]["may_contain"][0]
+    assert kept["because"]
+    french_before = await db_session.scalar(
+        select(AllergenDeclaration.note_i18n)
+        .join(MenuItem, MenuItem.id == AllergenDeclaration.item_id)
+        .where(
+            MenuItem.code == "classic_burger",
+            AllergenDeclaration.option_id.is_(None),
+            AllergenDeclaration.allergen == kept["allergen"],
+        )
+    )
+    assert french_before is not None
+    assert "fr" in french_before
+
+    response = await client.patch(
+        "/admin/menu/items/classic_burger",
+        json={"allergens": {"contains": ["mustard"], "may_contain": [kept]}},
+    )
+
+    assert response.status_code == 200
+    report = await allergen_matrix.item_allergens(
+        db_session, "classic_burger", None, None, Language.FR
+    )
+    assert report.may_contain[0].because == [french_before["fr"]]
+
+
+async def test_a_reason_rewritten_in_english_drops_its_old_french(
+    client: httpx.AsyncClient, db_session: AsyncSession
+) -> None:
+    burger = await admin_item(client, "classic_burger")
+    kept = burger["allergens"]["may_contain"][0]
+
+    await client.patch(
+        "/admin/menu/items/classic_burger",
+        json={
+            "allergens": {
+                "may_contain": [{"allergen": kept["allergen"], "because": "New oil."}]
+            }
+        },
+    )
+
+    report = await allergen_matrix.item_allergens(
+        db_session, "classic_burger", None, None, Language.FR
+    )
+    assert report.may_contain[0].because == ["New oil."]
