@@ -2,6 +2,11 @@
 
 from typing import Any
 
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from drivetruagent.agent import tracing
@@ -13,7 +18,12 @@ from drivetruagent.agent.messages import (
 )
 from drivetruagent.agent.model import ModelTurn, ModelUsage
 from drivetruagent.config import Settings
-from drivetruagent.telemetry import build_provider, setup_tracing
+from drivetruagent.telemetry import (
+    APP_TELEMETRY,
+    build_provider,
+    setup_tracing,
+    untraced,
+)
 
 
 def settings(**values: Any) -> Settings:
@@ -152,4 +162,63 @@ def test_the_provider_names_the_service_and_the_phoenix_project() -> None:
     attributes = provider.resource.attributes
     assert attributes["service.name"] == "drivetruagent"
     assert attributes["openinference.project.name"] == "demo"
+    provider.shutdown()
+
+
+# --- Which requests FastAPI traces ------------------------------------------
+
+
+def http(method: str, path: str) -> dict[str, Any]:
+    return {"type": "http", "method": method, "path": path}
+
+
+@pytest.mark.parametrize(
+    "scope",
+    [
+        http("GET", "/health/ready"),
+        http("GET", "/health/live"),
+        http("GET", "/costs/today"),
+        http("GET", "/summaries"),
+        http("HEAD", "/menu"),
+        http("OPTIONS", "/sessions"),
+    ],
+)
+def test_health_checks_and_reads_are_left_out(scope: dict[str, Any]) -> None:
+    assert untraced(scope)
+
+
+@pytest.mark.parametrize(
+    "scope",
+    [
+        http("POST", "/sessions/abc/messages"),
+        http("POST", "/web-phone/calls"),
+        http("DELETE", "/sessions/abc"),
+        {"type": "websocket", "path": "/voice/abc"},
+    ],
+)
+def test_changes_and_voice_connections_are_traced(scope: dict[str, Any]) -> None:
+    assert not untraced(scope)
+
+
+def test_a_health_check_leaves_no_trace_but_a_turn_does() -> None:
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    app = FastAPI(telemetry={**APP_TELEMETRY, "tracer_provider": provider})
+
+    @app.get("/health/ready")
+    def ready() -> str:
+        return "ok"
+
+    @app.post("/sessions/{session_id}/messages")
+    def message(session_id: str) -> str:
+        return session_id
+
+    with TestClient(app) as client:
+        client.get("/health/ready")
+        client.post("/sessions/abc/messages")
+
+    names = [span.name for span in exporter.get_finished_spans()]
+    assert "POST /sessions/{session_id}/messages" in names
+    assert not [name for name in names if "health" in name]
     provider.shutdown()

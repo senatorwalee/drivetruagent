@@ -6,8 +6,15 @@ batches, off the request path.
 
     make phoenix                                   # Phoenix on localhost:6006
     TRACING_ENDPOINT=http://localhost:6006/v1/traces
+
+FastAPI traces every request it serves on its own (FastAPI(telemetry=...)).
+APP_TELEMETRY keeps that to the requests worth reading: see untraced.
 """
 
+from collections.abc import MutableMapping
+from typing import Any
+
+from fastapi.telemetry import TelemetryConfig
 from openinference.semconv.resource import ResourceAttributes
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
@@ -45,3 +52,20 @@ def build_provider(settings: Settings, exporter: SpanExporter) -> TracerProvider
     )
     provider.add_span_processor(BatchSpanProcessor(exporter))
     return provider
+
+
+def untraced(scope: MutableMapping[str, Any]) -> bool:
+    """Whether FastAPI leaves a request out of the traces: health checks and
+    other reads. Docker checks health every few seconds and the screens poll
+    for costs, summaries and calls, so traced reads bury the customer turns.
+    Requests that change something, and voice connections, stay in."""
+    if scope["type"] != "http":
+        return False
+    return scope["path"].startswith("/health/") or scope["method"] in {
+        "GET",
+        "HEAD",
+        "OPTIONS",
+    }
+
+
+APP_TELEMETRY: TelemetryConfig = {"exclude": untraced}

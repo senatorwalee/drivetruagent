@@ -945,6 +945,10 @@ properly:
 - **Exported in batches, off the request path**, over OTLP HTTP. Phoenix runs from
   a pinned image with its own volume, under a compose profile, so `make up` is still
   just Postgres.
+- **Only requests that change something.** FastAPI traces each request itself;
+  `telemetry.untraced` leaves out health checks and reads. Docker's health check
+  every few seconds and the screens' polling for costs and summaries otherwise
+  buried the customer turns in Phoenix's trace list.
 - Tested with an in-memory exporter: the nesting and kinds of a turn with tools, a
   blocked message (a guardrail span and no model call), a retriever span with its
   passages, and a model failure marking the turn as an error.
