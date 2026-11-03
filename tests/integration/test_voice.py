@@ -27,6 +27,7 @@ import pytest
 from fastapi import FastAPI
 from openai.types.realtime import (
     ConversationItemInputAudioTranscriptionCompletedEvent,
+    ConversationItemInputAudioTranscriptionFailedEvent,
     InputAudioBufferSpeechStartedEvent,
     RealtimeErrorEvent,
     ResponseAudioTranscriptDoneEvent,
@@ -338,12 +339,36 @@ async def test_what_the_customer_said_is_written_to_the_log(
     ]
 
 
-async def test_silence_that_was_transcribed_as_nothing_is_not_logged(
+async def test_speech_transcribed_as_nothing_is_logged_as_noise_not_as_said(
     bridge: VoiceBridge, db_session: AsyncSession, session_id: uuid.UUID
 ) -> None:
+    await bridge.handle(speech_started())
     await bridge.handle(heard("   "))
 
-    assert await logged(db_session, session_id) == []
+    assert await logged(db_session, session_id) == [
+        ("noise", {"reason": "no_words", "heard": ""})
+    ]
+
+
+async def test_a_transcript_that_could_not_be_made_is_logged_as_noise_with_why(
+    bridge: VoiceBridge, db_session: AsyncSession, session_id: uuid.UUID
+) -> None:
+    await bridge.handle(speech_started())
+    await bridge.handle(
+        ConversationItemInputAudioTranscriptionFailedEvent.model_validate(
+            {
+                "type": "conversation.item.input_audio_transcription.failed",
+                "event_id": "e",
+                "item_id": "item_user",
+                "content_index": 0,
+                "error": {"code": "audio_unintelligible", "message": "No speech."},
+            }
+        )
+    )
+
+    assert await logged(db_session, session_id) == [
+        ("noise", {"reason": "transcription_failed", "heard": ""})
+    ]
 
 
 async def test_the_clocks_stop_while_the_customer_speaks_and_the_agent_answers(
@@ -995,10 +1020,14 @@ async def test_noise_written_down_in_another_script_is_kept_but_never_judged(
         await bridge.handle(heard(noise))
 
     assert classifier_model.requests == []
+    # Kept as what the transcriber wrote, and counted as noise beside it.
     assert await logged(db_session, session_id) == [
         ("user_message", "意思。"),
+        ("noise", {"reason": "other_script", "heard": "意思。"}),
         ("user_message", "아."),
+        ("noise", {"reason": "other_script", "heard": "아."}),
         ("user_message", "ありがとう。"),
+        ("noise", {"reason": "other_script", "heard": "ありがとう。"}),
     ]
     customer_session = await get_session(db_session, session_id)
     assert (customer_session.abuse_strikes, customer_session.confusion_strikes) == (

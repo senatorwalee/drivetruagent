@@ -88,6 +88,13 @@ GREETING_GRACE_SECONDS = 3.0
 
 type SessionScope = Callable[[], AbstractAsyncContextManager[AsyncSession]]
 
+# Why the call heard noise, not words: speech was detected, and the
+# transcript was empty, was in a script that is neither English nor French,
+# or could not be made at all (which may be OpenAI's fault, not the room's).
+NO_WORDS = "no_words"
+OTHER_SCRIPT = "other_script"
+TRANSCRIPTION_FAILED = "transcription_failed"
+
 
 # Tells the transcriber what to expect. Without it, room noise or the
 # agent's own voice from a speakerphone came back as words in Chinese or
@@ -308,6 +315,8 @@ class VoiceBridge:
             await self._customer_started_speaking()
         elif event.type == "conversation.item.input_audio_transcription.completed":
             await self._customer_said(event.transcript)
+        elif event.type == "conversation.item.input_audio_transcription.failed":
+            await self._heard_noise(TRANSCRIPTION_FAILED)
         elif event.type == "response.created":
             metadata = event.response.metadata or {}
             if metadata.get("purpose") == TIMER_RESPONSE and event.response.id:
@@ -339,6 +348,7 @@ class VoiceBridge:
     async def _customer_said(self, transcript: str) -> None:
         text = transcript.strip()
         if not text:
+            await self._heard_noise(NO_WORDS)
             return
         async with self._scope() as db:
             await events.record_message(
@@ -352,8 +362,22 @@ class VoiceBridge:
             await db.commit()
         if _just_noise(text):
             # Kept in the record, but not judged: nobody said it.
+            await self._heard_noise(OTHER_SCRIPT, text)
             return
         await self._check(text)
+
+    async def _heard_noise(self, reason: str, heard: str = "") -> None:
+        """Log something the call took for speech that gave no words, so a
+        noisy call can be told from a quiet one by how often it happens."""
+        async with self._scope() as db:
+            await events.record(
+                db,
+                self.session_id,
+                self._turn_id,
+                AgentEventKind.NOISE,
+                {"reason": reason, "heard": heard},
+            )
+            await db.commit()
 
     async def _check(self, text: str) -> None:
         """The guardrail, on a call. The model heard the audio and has likely

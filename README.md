@@ -54,6 +54,7 @@ built piece by piece.
 | 28 | Halal answers: every item reviewed, "not suitable" with a reason, "can't confirm" for what isn't reviewed, and the menu answered first | Done; evals pass against the real model |
 | 29 | Onboarding: a restaurant's details, menu, halal and kosher reviews, and combos, entered step by step and saved in one go, at `/onboarding` | Done; checked in a browser |
 | 30 | Allergens and sizes: reviewed and priced while onboarding, editable on the menu page, and a preview at `/onboarding/preview` that cannot save | Done; checked in a browser |
+| 31 | Noise on calls: speech that gave no words is counted in the event log, to set a "move somewhere quieter" warning from | Logging done, tested with a stand-in for OpenAI; the warning waits for real calls to measure |
 | Later | Demo polish: French review, demo script | Planned |
 
 ## Stack
@@ -414,6 +415,11 @@ handles it now:
   never rewritten in it.
 - **"OK" is not a choice.** Asked which flavour, an answer that names none is
   asked again; the `ok_is_not_a_choice` eval checks it.
+- **Noise is counted.** Each time the call takes something for speech and
+  gets no words (an empty transcript, one in another script, or none at
+  all), a `noise` event goes in the log with the reason. Nothing acts on it
+  yet: it is there to tell a noisy call from a quiet one, so a later warning
+  ("it's noisy on your end") can be set from real numbers, not a guess.
 - **A handoff replaces whatever the agent was saying.** At the time limit (or
   a third strike) the call stops listening and clears the agent's audio,
   including an answer already made and still playing, before the fixed

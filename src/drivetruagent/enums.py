@@ -106,6 +106,9 @@ class AgentEventKind(StrEnum):
     # A customer message the guardrail flagged: off topic, abuse, or an
     # attempt to get round the agent's rules. Messages that pass are not logged.
     GUARDRAIL = "guardrail"
+    # On a call: something the call heard as speech that was not words, such
+    # as room noise or the agent's own voice from a speakerphone.
+    NOISE = "noise"
 
 
 class Allergen(StrEnum):

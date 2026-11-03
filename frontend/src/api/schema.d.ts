@@ -1357,7 +1357,7 @@ export interface components {
          * @description What one row of the agent's event log records.
          * @enum {string}
          */
-        AgentEventKind: "user_message" | "model_call" | "tool_call" | "tool_result" | "assistant_message" | "timer" | "guardrail";
+        AgentEventKind: "user_message" | "model_call" | "tool_call" | "tool_result" | "assistant_message" | "timer" | "guardrail" | "noise";
         /** AgentInfoResponse */
         AgentInfoResponse: {
             /** Available */
