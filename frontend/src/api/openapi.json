@@ -548,7 +548,8 @@
           "tool_result",
           "assistant_message",
           "timer",
-          "guardrail"
+          "guardrail",
+          "noise"
         ],
         "title": "AgentEventKind",
         "type": "string"
