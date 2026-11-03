@@ -7,14 +7,14 @@ const SHOWN = 4
 
 /** What the backend decided about the agent's latest tool calls. */
 export function DecisionStrip({ decisions }: { decisions: Decision[] }) {
-  const recent = decisions.slice(-SHOWN)
+  const recent = decisions.slice(-SHOWN).reverse()
   return (
     <section aria-label="What the system did" className={styles.strip}>
       <h2 className={styles.stripTitle}>What the system did</h2>
       {recent.length === 0 ? (
         <p className={styles.stripEmpty}>Each tool the agent uses shows here with the backend's decision.</p>
       ) : (
-        <ol className={styles.decisions}>
+        <ol aria-label="Recent tool calls, newest first" tabIndex={0} className={styles.decisions}>
           {recent.map((decision) => (
             <li key={decision.id} className={styles.decision} data-kind={decision.kind}>
               <div className={styles.decisionHead}>

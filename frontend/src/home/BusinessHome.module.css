@@ -94,6 +94,16 @@
 .footer { padding: 28px 4%; display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: space-between; }
 .footer p, .footer > a:last-child { font-size: 10px; color: var(--muted); }
 
+@media (min-width: 720px) {
+  .header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: color-mix(in oklch, var(--ground) 85%, transparent);
+    backdrop-filter: blur(12px);
+  }
+  .benefits, .productSection, .faq { scroll-margin-top: 112px; }
+}
 @media (min-width: 1450px) { .heroImage { height: 610px; } }
 @media (max-width: 1100px) { .navigation { gap: 16px; } .headerEnd { gap: 14px; } .header { gap: 15px; } .hero { gap: 5%; } .hero h1 { font-size: 51px; } .heroImage { height: 510px; } .productBody { gap: 40px; } }
 @media (max-width: 900px) { .navigation { display: none; } .hero h1 { font-size: 44px; } .heroImage { height: 480px; } .heroNote { max-width: 30ch; } .imageCaption { left: -15px; padding: 17px 20px; } .imageCaption p { font-size: 20px; } .benefitGrid { gap: 24px; } .productHeader > p { max-width: 25ch; } }

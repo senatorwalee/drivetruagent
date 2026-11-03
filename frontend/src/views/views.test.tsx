@@ -230,8 +230,9 @@ describe.each(VIEWS)('%s view', (viewId, View) => {
     expect(screen.getByPlaceholderText('Connecting the call…')).toBeInTheDocument()
   })
 
-  it("shows every day of the week's specials, with today marked", () => {
+  it("shows every day of the week's specials, with today marked", async () => {
     show()
+    if (viewId === 'menu-board') await userEvent.click(screen.getByRole('button', { name: 'Specials' }))
 
     const board = screen.getByRole('region', { name: 'Specials and stock' })
     const days = within(board).getAllByRole('listitem').filter((item) => /day/.test(item.textContent ?? ''))
@@ -244,12 +245,14 @@ describe.each(VIEWS)('%s view', (viewId, View) => {
     expect(today).toHaveTextContent('$3.29')
   })
 
-  it('shows the stock left, and what is held in carts', () => {
+  it('shows the stock left, and what is held in carts', async () => {
     show()
+    if (viewId === 'menu-board') await userEvent.click(screen.getByRole('button', { name: /Stock & holds/ }))
 
     const board = screen.getByRole('region', { name: 'Specials and stock' })
     expect(within(board).getAllByLabelText('99 available')).toHaveLength(2)
     expect(within(board).getAllByText('1 held')).toHaveLength(2)
+    expect(within(board).getAllByText('1 held')[0]).toBeVisible()
     expect(within(board).getByLabelText('4 available')).toBeInTheDocument()
   })
 
@@ -269,7 +272,7 @@ describe.each(VIEWS)('%s view', (viewId, View) => {
     expect(screen.getByRole('listitem', { name: 'Burger combo' })).toHaveTextContent('In this cart ×2 · −$4.00')
   })
 
-  it('says when a special has sold out', () => {
+  it('says when a special has sold out', async () => {
     const soldOut = {
       ...liveSession().board.week!,
       days: liveSession().board.week!.days.map((day) => ({
@@ -278,8 +281,9 @@ describe.each(VIEWS)('%s view', (viewId, View) => {
       })),
     }
     show({ board: { week: soldOut, combos: [], stock: [] } })
+    if (viewId === 'menu-board') await userEvent.click(screen.getByRole('button', { name: 'Specials' }))
 
-    expect(screen.getByText('sold out')).toBeInTheDocument()
+    expect(screen.getByText('sold out')).toBeVisible()
   })
 
   it('pauses and resumes', async () => {
@@ -321,6 +325,30 @@ describe.each(VIEWS)('%s view', (viewId, View) => {
     await userEvent.click(within(switcher).getByRole('button', { name: other }))
 
     expect(onViewChange).toHaveBeenCalledWith(other === 'Receipt' ? 'receipt' : 'control-room')
+  })
+})
+
+describe('menu board demo panels', () => {
+  it('switches the demo detail without losing the order, conversation or live selection', async () => {
+    const live = liveSession({
+      board: { ...liveSession().board, combos: [comboState(0, 'Classic burger', 'Fries', null)] },
+    })
+    const onViewChange = vi.fn()
+    const page = render(<MenuBoard live={live} view="menu-board" onViewChange={onViewChange} />)
+    expect(screen.getByRole('region', { name: 'Combo progress' })).toHaveTextContent('Still needs: Drinks')
+
+    await userEvent.click(screen.getByRole('button', { name: /Stock & holds/ }))
+    expect(screen.getByRole('region', { name: 'Stock and holds' })).toBeVisible()
+    expect(screen.queryByRole('region', { name: 'Combo progress' })).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'What the system did' })).toBeVisible()
+    expect(screen.getByRole('region', { name: 'Conversation' })).toBeVisible()
+    expect(within(screen.getByRole('complementary', { name: 'Order' })).getByText('$6.98')).toBeVisible()
+
+    const stock = live.board.stock.map((group) => ({ ...group, rows: group.rows.map((row) => ({ ...row, held: 3 })) }))
+    page.rerender(<MenuBoard live={{ ...live, board: { ...live.board, stock } }} view="menu-board" onViewChange={onViewChange} />)
+    expect(screen.getByRole('button', { name: /Stock & holds/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(screen.getByRole('region', { name: 'Stock and holds' })).getAllByText('3 held')[0]).toBeVisible()
+    expect(onViewChange).not.toHaveBeenCalled()
   })
 })
 

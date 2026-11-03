@@ -1,5 +1,4 @@
-/* Menu board: a big, calm screen like a drive-through sign at night, built
-   around the agent's orb. Colours and fonts come from theme.css. */
+/* Menu board: conversation and live demo details beside a persistent cart. */
 
 .screen {
   /* Colours and fonts: theme.css. */
@@ -54,8 +53,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px 20px;
-  padding: 14px 32px;
+  gap: 10px 16px;
+  padding: 12px 24px;
   border-bottom: 1px solid var(--hairline);
 }
 
@@ -80,7 +79,7 @@
 .brandName {
   font-family: var(--font);
   font-weight: 700;
-  font-size: 24px;
+  font-size: 20px;
   letter-spacing: -0.01em;
 }
 
@@ -134,12 +133,12 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
 }
 
 .button {
   min-height: 44px;
-  padding: 0 14px;
+  padding: 0 12px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -148,6 +147,7 @@
   background: transparent;
   color: var(--text);
   font: inherit;
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
 }
@@ -198,18 +198,25 @@
 
 .main {
   flex: 1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px 24px;
-  padding: 20px 32px 24px;
+  display: grid;
+  grid-template-areas: 'stage' 'order' 'strip' 'board';
+  gap: 16px;
+  padding: 16px 24px 24px;
+  align-items: start;
 }
 
+.demoDetails { display: contents; }
+
 .stage {
-  flex: 999 1 560px;
+  grid-area: stage;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  background: var(--panel);
 }
 
 /* --- Agent orb ----------------------------------------------------------- */
@@ -217,10 +224,10 @@
 .orbArea {
   --tone: var(--muted);
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 10px;
-  padding: 4px 16px 0;
+  gap: 14px;
+  padding: 0;
 }
 
 .orbArea[data-state='speaking'],
@@ -234,8 +241,9 @@
 
 .orb {
   position: relative;
-  width: 216px;
-  height: 216px;
+  flex: none;
+  width: 52px;
+  height: 52px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -273,7 +281,7 @@
 
 .halo {
   position: absolute;
-  inset: 36px;
+  inset: 9px;
   border-radius: 50%;
   background: var(--tone);
   opacity: 0.16;
@@ -281,8 +289,8 @@
 }
 
 .core {
-  width: 108px;
-  height: 108px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: var(--tone);
   display: flex;
@@ -310,8 +318,8 @@
 }
 
 .coreCentre {
-  width: 48px;
-  height: 48px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: var(--agent-core, var(--text));
   opacity: 0.9;
@@ -321,22 +329,23 @@
   margin: 0;
   font-family: var(--font);
   font-weight: 500;
-  font-size: 26px;
+  font-size: 20px;
   letter-spacing: -0.01em;
   color: var(--tone);
   transition: color 0.4s;
 }
 
 .wave {
+  margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 5px;
-  height: 28px;
+  gap: 3px;
+  height: 20px;
 }
 
 .bar {
-  width: 4px;
-  height: 28px;
+  width: 3px;
+  height: 20px;
   border-radius: 2px;
   background: var(--tone);
   opacity: 0.25;
@@ -372,7 +381,7 @@
 .hint {
   margin: 0 auto;
   max-width: 720px;
-  text-align: center;
+  font-size: 14px;
   color: var(--muted);
 }
 
@@ -381,7 +390,11 @@
   flex-direction: column;
   gap: 10px;
   width: 100%;
-  max-width: 720px;
+  max-height: 150px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px 6px 2px 2px;
+  font-size: 14px;
   margin: 0 auto;
 }
 
@@ -412,7 +425,7 @@
 .bubble[data-latest='true'][data-speaker='agent'] {
   padding: 12px 18px;
   border-color: var(--accent);
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 500;
 }
 
@@ -528,16 +541,25 @@
 /* --- Order --------------------------------------------------------------- */
 
 .order {
-  flex: 1 1 380px;
+  grid-area: order;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 24px;
+  padding: 20px;
   border-radius: 20px;
   border: 1px solid var(--hairline);
   background: var(--panel);
 }
+
+.orderBody {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+}
+
+.orderHeading, .totals { flex-shrink: 0; }
 
 .orderHeading {
   display: flex;
@@ -598,7 +620,7 @@
 }
 
 .lineName {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
 }
 
@@ -691,11 +713,15 @@
 /* --- Decisions ----------------------------------------------------------- */
 
 .strip {
-  flex: 1 1 100%;
+  grid-area: strip;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  background: var(--panel);
 }
 
 .stripTitle {
@@ -718,10 +744,14 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
-  gap: 12px;
+  grid-template-columns: 1fr;
+  max-height: 132px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  gap: 8px;
+  padding: 2px;
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .decision {
@@ -729,7 +759,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 14px 16px;
+  padding: 10px 12px;
   border-radius: 12px;
   border: 1px solid var(--hairline);
   background: var(--panel);
@@ -824,20 +854,6 @@
   .controls {
     margin-left: 0;
   }
-
-  .orb {
-    width: 180px;
-    height: 180px;
-  }
-
-  .halo {
-    inset: 30px;
-  }
-
-  .core {
-    width: 90px;
-    height: 90px;
-  }
 }
 
 /* The same control drawn as a link, for moving to another page. */
@@ -863,7 +879,51 @@ a.button {
   }
 }
 
-/* The week's specials and the stock, on a row of their own under the decisions. */
 .board {
-  flex: 1 1 100%;
+  grid-area: board;
+}
+
+@media (min-width: 760px) {
+  .main {
+    grid-template-areas: 'stage order' 'details order';
+    grid-template-columns: minmax(0, 1.4fr) minmax(290px, 1fr);
+    align-content: start;
+  }
+
+  .demoDetails {
+    grid-area: details;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .strip, .board { grid-area: auto; }
+
+  .order {
+    position: sticky;
+    top: calc(var(--menu-header-height, 132px) + 16px);
+    max-height: calc(100dvh - var(--menu-header-height, 132px) - 40px);
+  }
+}
+
+@media (min-width: 1180px) {
+  .main {
+    grid-template-areas: 'stage details order';
+    grid-template-columns: minmax(0, 1fr) minmax(330px, 1.1fr) minmax(290px, .95fr);
+  }
+
+  .stage {
+    position: sticky;
+    top: calc(var(--menu-header-height, 132px) + 16px);
+  }
+
+  .conversation {
+    max-height: min(340px, 38dvh);
+  }
+}
+
+.conversation:focus-visible, .decisions:focus-visible, .orderBody:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
